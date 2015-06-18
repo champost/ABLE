@@ -67,23 +67,23 @@ static struct chromo *chrom = NULL ;
 struct node *ptree1, *ptree2;
 
 struct segl {
-	int beg;
-	struct node *ptree;
-	int next;
-	}  ;
+        int beg;
+        struct node *ptree;
+        int next;
+        }  ;
 static struct segl *seglst = NULL ;
 
 	struct segl *
 segtre_mig(struct c_params *cp, int *pnsegs ) 
 {
-	int i, j, k, seg, dec, pop, pop2, c1, c2, ind, rchrom, intn  ;
-	int migrant, source_pop, *config, flagint ;
-	double  ran1(), sum, x, tcoal, ttemp, rft, clefta,  tmin, p  ;
-	double prec, cin,  prect, nnm1, nnm0, mig, ran, coal_prob, prob, rdum , arg ;
-	char c, event ;
+	int i, j, k, dec, pop, pop2, c1, c2, ind, rchrom;
+	int migrant, source_pop, *config;
+	double  ran1(), sum, x, ttemp, rft, clefta,  tmin, p  ;
+	double prec, cin,  prect, mig, ran, coal_prob, rdum , arg ;
+	char event ;
 	int re(), cinr(), cleftr(), eflag, cpop, ic  ;
-	int nsam, npop, nsites, nintn, *inconfig ;
-	double r,  f, rf,  track_len, *nrec, *npast, *tpast, **migm ;
+	int nsam, npop, nsites, *inconfig ;
+	double r,  f, rf,  track_len, **migm ;
 	double *size, *alphag, *tlast ;
 	struct devent *nextevent ;
     int ca(int nsam, int nsites, int c1, int c2);
@@ -163,7 +163,6 @@ segtre_mig(struct c_params *cp, int *pnsegs )
 	if( r > 0.0 ) rf = r*f ;
 	else rf = f /(nsites-1) ;
 	rft = rf*track_len ;
-	flagint = 0 ;
 
 /* Main loop */
 
@@ -400,7 +399,7 @@ re(nsam)
 	int nsam;
 {
 	struct seg *pseg ;
-	int  el, lsg, lsgm1,  ic,  is, in;
+	int  el, lsg, lsgm1,  ic,  is;
     long spot;
 	double ran1();
 
@@ -428,7 +427,7 @@ re(nsam)
 cleftr( int nsam)
 {
 	struct seg *pseg ;
-	int   lsg, lsgm1,  ic,  is, in, spot;
+	int  ic,  is;
 	double ran1(), x, sum, len  ;
 
     while( (x = cleft*ran1() )== 0.0 )
@@ -449,7 +448,7 @@ cleftr( int nsam)
 cinr( int nsam, int nsites)
 {
 	struct seg *pseg ;
-	int len,  el, lsg, lsgm1,  ic,  is, in, spot, endic ;
+	int len,  el, lsg, lsgm1,  ic,  is, spot, endic ;
 	double ran1();
 	int  ca() ;
 
@@ -488,7 +487,7 @@ cinr( int nsam, int nsites)
 xover(int nsam,int ic, int is)
 {
 	struct seg *pseg, *pseg2;
-	int i,  lsg, lsgm1, newsg,  jseg, k,  in, spot;
+	int i,  lsg, lsgm1, newsg,  jseg, k,  in;
 	double ran1(), len ;
 
 

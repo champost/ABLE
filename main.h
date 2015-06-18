@@ -32,70 +32,21 @@ knowledge of the CeCILL license and that you accept its terms.
 ***************************************************************************/
 
 /*
- * tmp.h
+ * main.h
  *
- *  Created on: 3 Jun 2015
+ *  Created on: 4 Jun 2015
  *      Author: champost
  */
-#ifndef MS_NEW_H_
-#define MS_NEW_H_
 
-struct devent {
-	double time;
-	int popi;
-	int popj;
-	double paramv;
-	double **mat ;
-	char detype ;
-	struct devent *nextde;
-	} ;
-struct c_params {
-	int npop;
-	int nsam;
-	int *config;
-	double **mig_mat;
-	double r;
-	int nsites;
-	double f;
-	double track_len;
-	double *size;
-	double *alphag;
-	struct devent *deventlist ;
-	} ;
-struct m_params {
-	 double theta;
-	int segsitesin;
-	int treeflag;
-	int timeflag;
-	int mfreq;
-	 } ;
-struct params { 
-	struct c_params cp;
-	struct m_params mp;
-	int commandlineseedflag ;
-	int output_precision;
-	};
+#ifndef MAIN_H_
+#define MAIN_H_
 
-struct node{
-	int abv;
-	int ndes;
-	float time;
-};
+//extern 	double treeTable[][][];
+extern int treeTableX;
+extern int treeTableY;
+extern int treeTableZ;
+extern double main_theta;
+extern double main_rho;
+extern int curve;
 
-
-/*KRT -- prototypes added*/
-void ordran(int n, double pbuf[]);
-void ranvec(int n, double pbuf[]);
-void order(int n, double pbuf[]);
-
-void biggerlist(int nsam,  char **list );
-int poisso(double u);
-void locate(int n,double beg, double len,double *ptr);
-void mnmial(int n, int nclass, double p[], int rv[]);
-void usage();
-int tdesn(struct node *ptree, int tip, int node );
-int pick2(int n, int *i, int *j);
-int xover(int nsam,int ic, int is);
-int links(int c);
-
-#endif /* MS_NEW_H_ */
+#endif /* MAIN_H_ */

@@ -13,17 +13,15 @@ ran1()
 
 	void seedit( char *flag )
 {
-	FILE *fopen(), *pfseed;
-	unsigned short seedv[3], seedv2[3],  *seed48(), *pseed ;
-	int i;
-
+	FILE *fopen();
+	unsigned short seedv[3], *seed48();
 
 	if( flag[0] == 's' ){
-	  seedv[0] =  (unsigned short)time( NULL ) ;
+	  seedv[0] =  (unsigned short) time(NULL) ;
             seedv[1] = 27011; seedv[2] = 59243; 
           seed48( seedv );   
 
-       printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );    
+//       printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
 	}
 }
 
@@ -32,12 +30,11 @@ ran1()
 commandlineseed( char **seeds)
 {
 	unsigned short seedv[3], *seed48();
-	int i ;
 
 	seedv[0] = atoi( seeds[0] );
 	seedv[1] = atoi( seeds[1] );
 	seedv[2] = atoi( seeds[2] );
-	printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );    
+//	printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
 
 	seed48(seedv);
 	return(3);
