@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "ms.h"
+#include "ms_new.h"
 #define NL putchar('\n')
 #define size_t unsigned
 
