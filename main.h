@@ -41,12 +41,10 @@ knowledge of the CeCILL license and that you accept its terms.
 #ifndef MAIN_H_
 #define MAIN_H_
 
-//extern 	double treeTable[][][];
 extern int treeTableX;
 extern int treeTableY;
 extern int treeTableZ;
 extern double main_theta;
 extern double main_rho;
-extern int curve;
 
 #endif /* MAIN_H_ */
