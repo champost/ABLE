@@ -47,6 +47,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <cstdlib>
 #include <cmath>
 #include <cstdio>
+#include <map>
 #include <gsl/gsl_sort_double.h>
 #include <gsl/gsl_statistics_double.h>
 #include <gsl/gsl_randist.h>
@@ -78,7 +79,7 @@ double ranMT() { return(rMT()); }
 int main(int argc, char* argv[]) {
 
 //	time_t likStartTime, likEndTime;
-	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = 3;
+	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = 3, count;
 	long int totTrees;
 	treeTableX = ntrees;	//1000
 	treeTableY = nsam-1;	//4-1=3
@@ -89,11 +90,24 @@ int main(int argc, char* argv[]) {
 			*finalTable = (double *) malloc(finalTableSize * sizeof(double)),	//5^3=125
 			*dataTable = (double *) malloc(finalTableSize * sizeof(double)),	//5^3=125
 			*jointPoisson = (double *) malloc(treeTableX * sizeof(double)),		//1000
-			loglik;
+			loglik, totSum;
 	int **segs = (int **) malloc(treeTableX * sizeof(int *));	//1000*(X+2)
 
+	map<int, string> int2string;
+	count = 0;
+	for (int i = 0; i < treeTableZ; i++) {
+		for (int j = 0; j < treeTableZ; j++) {
+			for (int k = 0; k < treeTableZ; k++) {
+				stringstream stst;
+				stst << "(" << i << "," << j << "," << k << ")";
+				int2string[count] = stst.str();
+				++count;
+			}
+		}
+	}
+
 	if (atoi(argv[argc-1])) {
-		int count = 0;
+		count = 0;
 		string line;
 		ifstream ifs("marginals_only.txt",ios::in);
 		while (getline(ifs,line)) {
@@ -102,24 +116,25 @@ int main(int argc, char* argv[]) {
 		}
 		ifs.close();
 
-		for (double theta = 0.5; theta < 10.0; theta +=0.5) {
-			for (double rho = 0.5; rho < 10.0; rho +=0.5) {
+		for (double theta = 1.5; theta < 7.0; theta +=0.5) {
+			for (double rho = 1.5; rho < 7.0; rho +=0.5) {
 
 				loglik = 0.0;
 				main_theta = theta;
 				main_rho = rho;
 
-				totTrees = 0;
+//				totTrees = 0;
 
 				main_ms(argc-1, argv, treeTable, segs);
 
-				for (int trees = 0; trees < treeTableX; trees++)
-					totTrees += segs[trees][0];
+//				for (int trees = 0; trees < treeTableX; trees++)
+//					totTrees += segs[trees][0];
 
 				for (size_t i = 0; i < finalTableSize; i++)
 					finalTable[i] = 0.0;
 
 				count = 0;
+				totSum = 0.0;
 				for (int i = 0; i < treeTableZ; i++) {
 					for (int j = 0; j < treeTableZ; j++) {
 						for (int k = 0; k < treeTableZ; k++) {
@@ -136,11 +151,15 @@ int main(int argc, char* argv[]) {
 									jointPoisson[trees] = treeTable[trees][0][0][i]*treeTable[trees][0][1][j]*treeTable[trees][0][2][k];
 								finalTable[count] += jointPoisson[trees];
 							}
-							loglik += log(finalTable[count] / totTrees) * dataTable[count];
+							totSum += finalTable[count];
+//							loglik += log(finalTable[count] / totTrees) * dataTable[count];
 							++count;
 						}
 					}
 				}
+
+				for (size_t i = 0; i < finalTableSize; i++)
+					loglik += log(finalTable[i] / totSum) * dataTable[i];
 
 //				printf("%.2f\t%.5e\n",theta, loglik);
 				printf("%.2f\t%.2f\t%.5e\n",theta, rho, loglik);
@@ -157,17 +176,18 @@ int main(int argc, char* argv[]) {
 	else {
 //		time(&likStartTime);
 
-		totTrees = 0;
+//		totTrees = 0;
 
 		main_ms(argc-1, argv, treeTable, segs);
 
-		for (int trees = 0; trees < treeTableX; trees++)
-			totTrees += segs[trees][0];
+//		for (int trees = 0; trees < treeTableX; trees++)
+//			totTrees += segs[trees][0];
 
 		for (size_t i = 0; i < finalTableSize; i++)
 			finalTable[i] = 0.0;
 
-		int count = 0;
+		count = 0;
+		totSum = 0.0;
 		for (int i = 0; i < treeTableZ; i++) {
 			for (int j = 0; j < treeTableZ; j++) {
 				for (int k = 0; k < treeTableZ; k++) {
@@ -184,13 +204,19 @@ int main(int argc, char* argv[]) {
 							jointPoisson[trees] = treeTable[trees][0][0][i]*treeTable[trees][0][1][j]*treeTable[trees][0][2][k];
 						finalTable[count] += jointPoisson[trees];
 					}
-					printf("(%d,%d,%d) : %.5e\n", i, j, k, finalTable[count]/totTrees);
+					totSum += finalTable[count];
+//					printf("%s : %.5e\n", int2string[count].c_str(), finalTable[count]/totTrees);
 					++count;
 				}
 			}
 		}
 
-//		time(&likEndTime);
+		for (size_t i = 0; i < finalTableSize; i++)
+			printf("%s : %.5e\n", int2string[i].c_str(), finalTable[i]/totSum);
+
+//		printf("\n%.5f\n", totSum);
+
+		//		time(&likEndTime);
 //		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
 
 		for (int i = treeTableX-1; i >= 0; i--)
