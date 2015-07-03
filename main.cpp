@@ -48,16 +48,18 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <cmath>
 #include <cstdio>
 #include <map>
-#include <gsl/gsl_sort_double.h>
-#include <gsl/gsl_statistics_double.h>
-#include <gsl/gsl_randist.h>
+#include <vector>
+#include <algorithm>
+//#include <gsl/gsl_sort_double.h>
+//#include <gsl/gsl_statistics_double.h>
+//#include <gsl/gsl_randist.h>
 
 #include "MersenneTwister.h"
 #include "ms_new.h"
 //#include "main.h"
 
 extern "C" {
-int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs);
+int main_ms(int ms_argc, char *ms_argv[], double ***treeTable);
 double *** d3matrix(int x, int y, int z);
 void freed3matrix(double ***m, int x, int y);
 double ** d2matrix(int x, int y);
@@ -80,31 +82,55 @@ int main(int argc, char* argv[]) {
 
 //	time_t likStartTime, likEndTime;
 	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = 3, count;
-	long int totTrees;
 	treeTableX = ntrees;	//1000
 	treeTableY = nsam-1;	//4-1=3
 	treeTableZ = kmax+2;	//3+2=5
-	size_t finalTableSize = (size_t) pow(treeTableZ,treeTableY);	//5^3=125
+	long int finalTableSize = (long int) pow(treeTableZ,treeTableY);	//5^3=125
 
-	double ****treeTable = (double ****) malloc(treeTableX * sizeof(double ***)),	//1000*X*3*5
+	double ***treeTable = (double ***) malloc(treeTableX * sizeof(double **)),	//1000*3*5
 			*finalTable = (double *) malloc(finalTableSize * sizeof(double)),	//5^3=125
 			*dataTable = (double *) malloc(finalTableSize * sizeof(double)),	//5^3=125
 			*jointPoisson = (double *) malloc(treeTableX * sizeof(double)),		//1000
 			loglik, totSum;
-	int **segs = (int **) malloc(treeTableX * sizeof(int *));	//1000*(X+2)
+	for (int i = 0; i < treeTableX; i++) {
+		treeTable[i] = (double **) malloc(treeTableY * sizeof(double *));
+		for (int j = 0; j < treeTableY; j++)
+			treeTable[i][j] = (double *) malloc(treeTableZ * sizeof(double));
+	}
+
 
 	map<int, string> int2string;
-	count = 0;
-	for (int i = 0; i < treeTableZ; i++) {
-		for (int j = 0; j < treeTableZ; j++) {
-			for (int k = 0; k < treeTableZ; k++) {
-				stringstream stst;
-				stst << "(" << i << "," << j << "," << k << ")";
-				int2string[count] = stst.str();
-				++count;
+	map<int, vector<int> > MutConfig;
+
+	int quo, rem;
+	for (long int i = 0; i < finalTableSize; i++) {
+		quo = i;
+		rem = 0;
+		stringstream stst;
+		stst << ")";
+		for (int j = 0; j < treeTableY; j++) {
+			if (quo) {
+				rem = quo % treeTableZ;
+				quo /= treeTableZ;
+				stst << rem;
+				MutConfig[i].push_back(rem);
 			}
+			else {
+				stst << "0";
+				MutConfig[i].push_back(0);
+			}
+
+			if (j < treeTableY - 1)
+				stst << ",";
 		}
+		stst << "(";
+		string config = stst.str();
+		reverse(config.begin(),config.end());
+		int2string[i] = config;
+		reverse(MutConfig[i].begin(),MutConfig[i].end());
+//		cout << config << endl;
 	}
+
 
 	if (atoi(argv[argc-1])) {
 		count = 0;
@@ -116,102 +142,61 @@ int main(int argc, char* argv[]) {
 		}
 		ifs.close();
 
-		for (double theta = 1.5; theta < 7.0; theta +=0.5) {
-			for (double rho = 1.5; rho < 7.0; rho +=0.5) {
+		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
+			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
 
 				loglik = 0.0;
 				main_theta = theta;
 				main_rho = rho;
 
-//				totTrees = 0;
+				// calling ms
+				main_ms(argc-1, argv, treeTable);
 
-				main_ms(argc-1, argv, treeTable, segs);
-
-//				for (int trees = 0; trees < treeTableX; trees++)
-//					totTrees += segs[trees][0];
-
-				for (size_t i = 0; i < finalTableSize; i++)
+				totSum = 0.0;
+				for (long int i = 0; i < finalTableSize; i++) {
 					finalTable[i] = 0.0;
 
-				count = 0;
-				totSum = 0.0;
-				for (int i = 0; i < treeTableZ; i++) {
-					for (int j = 0; j < treeTableZ; j++) {
-						for (int k = 0; k < treeTableZ; k++) {
+					for (int trees = 0; trees < treeTableX; trees++) {
+						jointPoisson[trees] = 1.0;
+						for (int j = 0; j < treeTableY; j++)
+							jointPoisson[trees] *= treeTable[trees][j][MutConfig[i][j]];
 
-							for (int trees = 0; trees < treeTableX; trees++) {
-								if (segs[trees][0] > 1) {
-									jointPoisson[trees] = 0.0;
-									for (int blocks = 0; blocks < segs[trees][0]; blocks++)
-										jointPoisson[trees] += treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-//										jointPoisson[trees] += double (segs[trees][blocks+2]/segs[trees][1]) * treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-//										jointPoisson[trees] += double (1/segs[trees][1]) * treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-								}
-								else
-									jointPoisson[trees] = treeTable[trees][0][0][i]*treeTable[trees][0][1][j]*treeTable[trees][0][2][k];
-								finalTable[count] += jointPoisson[trees];
-							}
-							totSum += finalTable[count];
-//							loglik += log(finalTable[count] / totTrees) * dataTable[count];
-							++count;
-						}
+						finalTable[i] += jointPoisson[trees];
 					}
+					totSum += finalTable[i];
 				}
 
-				for (size_t i = 0; i < finalTableSize; i++)
+				for (long int i = 0; i < finalTableSize; i++)
 					loglik += log(finalTable[i] / totSum) * dataTable[i];
 
 //				printf("%.2f\t%.5e\n",theta, loglik);
 				printf("%.2f\t%.2f\t%.5e\n",theta, rho, loglik);
 
-				for (int i = treeTableX-1; i >= 0; i--)
-					freed3matrix(treeTable[i], segs[i][0], treeTableY);
-				for (int i = treeTableX-1; i >= 0; i--)
-					free(segs[i]);
 			}	//	rho
 		}	//	theta
-		free(treeTable);
-		free(segs);
 	}
 	else {
 //		time(&likStartTime);
 
-//		totTrees = 0;
+		// calling ms
+		main_ms(argc-1, argv, treeTable);
 
-		main_ms(argc-1, argv, treeTable, segs);
-
-//		for (int trees = 0; trees < treeTableX; trees++)
-//			totTrees += segs[trees][0];
-
-		for (size_t i = 0; i < finalTableSize; i++)
+		totSum = 0.0;
+		for (long int i = 0; i < finalTableSize; i++) {
 			finalTable[i] = 0.0;
 
-		count = 0;
-		totSum = 0.0;
-		for (int i = 0; i < treeTableZ; i++) {
-			for (int j = 0; j < treeTableZ; j++) {
-				for (int k = 0; k < treeTableZ; k++) {
+			for (int trees = 0; trees < treeTableX; trees++) {
+				jointPoisson[trees] = 1.0;
+				for (int j = 0; j < treeTableY; j++)
+					jointPoisson[trees] *= treeTable[trees][j][MutConfig[i][j]];
 
-					for (int trees = 0; trees < treeTableX; trees++) {
-						if (segs[trees][0] > 1) {
-							jointPoisson[trees] = 0.0;
-							for (int blocks = 0; blocks < segs[trees][0]; blocks++)
-								jointPoisson[trees] += treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-//								jointPoisson[trees] += double (segs[trees][blocks+2]/segs[trees][1]) * treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-//								jointPoisson[trees] += double (1/segs[trees][1]) * treeTable[trees][blocks][0][i]*treeTable[trees][blocks][1][j]*treeTable[trees][blocks][2][k];
-						}
-						else
-							jointPoisson[trees] = treeTable[trees][0][0][i]*treeTable[trees][0][1][j]*treeTable[trees][0][2][k];
-						finalTable[count] += jointPoisson[trees];
-					}
-					totSum += finalTable[count];
-//					printf("%s : %.5e\n", int2string[count].c_str(), finalTable[count]/totTrees);
-					++count;
-				}
+				finalTable[i] += jointPoisson[trees];
 			}
+			totSum += finalTable[i];
 		}
 
-		for (size_t i = 0; i < finalTableSize; i++)
+		for (long int i = 0; i < finalTableSize; i++)
+//			printf("%.5e\n", finalTable[i]/totSum);
 			printf("%s : %.5e\n", int2string[i].c_str(), finalTable[i]/totSum);
 
 //		printf("\n%.5f\n", totSum);
@@ -219,12 +204,9 @@ int main(int argc, char* argv[]) {
 		//		time(&likEndTime);
 //		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
 
-		for (int i = treeTableX-1; i >= 0; i--)
-			freed3matrix(treeTable[i], segs[i][0], treeTableY);
-		free(treeTable);
-		freed2int_matrix(segs,treeTableX);
 	}
 
+	freed3matrix(treeTable, treeTableX, treeTableY);
 	free(finalTable);
 	free(dataTable);
 	free(jointPoisson);

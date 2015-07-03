@@ -556,8 +556,7 @@ if( !(chrom[ic].pseg =
 	   	   seglst[nsegs].next = seglst[i].next;
 	   	   seglst[i].next = nsegs;
 	   	   seglst[nsegs].beg = begs ;
-		   if( !(seglst[nsegs].ptree = (struct node *)calloc((unsigned)(2*nsam), sizeof(struct
-			 node)) )) perror("calloc error. re3.");
+		   if( !(seglst[nsegs].ptree = (struct node *)calloc((unsigned)(2*nsam), sizeof(struct node)) )) perror("calloc error. re3.");
 		   nnodes[nsegs] = nnodes[i];
 		   ptree1 = seglst[i].ptree;
 		   ptree2 = seglst[nsegs].ptree;

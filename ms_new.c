@@ -126,7 +126,7 @@ int count, ntbs, nseeds ;
 struct params pars ;
 
 
-int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs)
+int main_ms(int ms_argc, char *ms_argv[], double ***treeTable)
 {
 	int i, k, howmany, segsites, listX, listY;
 	char **list, **cmatrix(), **tbsparamstrs ;
@@ -134,7 +134,7 @@ int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs)
 	double probss, tmrca, ttot ;
 	void seedit( const char * ) ;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
-	int gensam( char **list, double *probss, double *ptmrca, double *pttot, double ****onetreeTable, int **onetreesegs) ;
+	int gensam( char **list, double *probss, double *ptmrca, double *pttot, double **onetreeTable) ;
 	void freecmatrix(char **m, int nsam);
 
 
@@ -194,7 +194,7 @@ int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs)
 //			for(k=0; k< ntbs; k++) printf("\t%s", tbsparamstrs[k] ) ;
 //		}
 //		printf("\n");
-        segsites = gensam( list, &probss, &tmrca, &ttot, &treeTable[count-1], &segs[count - 1]) ;
+        segsites = gensam( list, &probss, &tmrca, &ttot, treeTable[count-1]) ;
 //  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
 //        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
 //   	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
@@ -204,15 +204,8 @@ int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs)
 //		   for( i=0; i<segsites; i++)
 //              fprintf(pf,"%6.*lf ", pars.output_precision,posit[i] );
 //           fprintf(pf,"\n");
-//	       if( segsites > 0 ) {
+//	       if( segsites > 0 )
 //		          for(i=0;i<pars.cp.nsam; i++) { fprintf(pf,"%s\n", list[i] ); }
-//		          for(int j=0;j<segsites; j++) {
-//		        	  for(i=0;i<pars.cp.nsam; i++) {
-//		        		  fprintf(pf,"%c", list[i][j] );
-//		        	  }
-//	        		  fprintf(pf,"\n");
-//		          }
-//	       }
 //	    }
     }
 //	if( !pars.commandlineseedflag ) seedit( "end" );
@@ -225,9 +218,9 @@ int main_ms(int ms_argc, char *ms_argv[], double ****treeTable, int **segs)
 
 
 	int 
-gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double ****onetreeTable, int **onetreesegs)
+gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **onetreeTable)
 {
-	int nsegs, i, k, seg, ns, start, end, len, segsit ;
+	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
 	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
 	double *pk;
@@ -235,7 +228,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double ****
 	int segsitesin,nsites;
 	double theta, es ;
 	int nsam, mfreq ;
-	void prtree( struct node *ptree, int nsam, double **oneblockTable);
+	void prtree( struct node *ptree, int nsam, double *totSegBrLen);
 	void make_gametes(int nsam, int mfreq,  struct node *ptree, double tt, int newsites, int ns, char **list );
  	void ndes_setup( struct node *, int nsam );
 
@@ -251,28 +244,69 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double ****
 
 	if( pars.mp.treeflag ) {
 	  	ns = 0 ;
-    	*onetreeTable = (double ***) malloc(nsegs * sizeof(double **));
-	  	*onetreesegs = (int *) malloc((nsegs+2) * sizeof(int));
-	  	for (k=0;k<nsegs;k++) {
-	  		(*onetreeTable)[k] = malloc(treeTableY * sizeof(double *));
-	  		for (i=0;i<treeTableY;i++)
-	  			(*onetreeTable)[k][i] = malloc(treeTableZ * sizeof(double ));
-	  	}
 
-	  	(*onetreesegs)[0] = nsegs;
-	  	(*onetreesegs)[1] = nsites;
+
+	  	int *onetreesegs = (int *) malloc((nsegs+2) * sizeof(int));
+	  	double **totSegBrLen = (double **) malloc(nsegs * sizeof(double *));
+	  	for (k=0;k<nsegs;k++)
+	  		totSegBrLen[k] = (double *) malloc(treeTableY * sizeof(double));
+	  	double *totBrLen = (double *) malloc(treeTableY * sizeof(double));
+
+	  	onetreesegs[0] = nsegs;
+	  	onetreesegs[1] = nsites;
 	    for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
 	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) ){
 	    		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
 	    		start = seglst[seg].beg ;
 	    		len = end - start + 1 ;
 //	    		fprintf(stdout,"[%d]", len);
-	    		(*onetreesegs)[k+2] = len;
+	    		onetreesegs[k+2] = len;
 	    	}
-	    	prtree( seglst[seg].ptree, nsam, (*onetreeTable)[k]) ;
+	    	prtree( seglst[seg].ptree, nsam, totSegBrLen[k]) ;
 	    	if( (segsitesin == 0) && ( theta == 0.0 ) && ( pars.mp.timeflag == 0 ) )
 	    		free(seglst[seg].ptree) ;
 	    }
+
+	    for(i = 0; i < treeTableY; i++) {
+	    	totBrLen[i] = 0.0;
+		    for(k = 0; k < nsegs; k++) {
+		    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
+		    		totBrLen[i] += totSegBrLen[k][i] * onetreesegs[k+2];
+		    	else
+		    		totBrLen[i] += totSegBrLen[k][i];
+		    }
+	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
+	    		totBrLen[i] /= nsites;
+	    }
+
+	    for(i = 1; i < nsam; i++) {
+//	    	printf("***%d-ton branches***\n", i);
+    		if (totBrLen[i-1] > 0.0) {
+    			//last index reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
+    			for(j = 0; j < treeTableZ - 1; j++) {
+//    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
+    				onetreeTable[i-1][j] = gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta);
+    			}
+    			onetreeTable[i-1][j] = gsl_cdf_poisson_Q(j-1,totBrLen[i-1]*pars.mp.theta);
+
+//    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
+//    			printf("Total branch length = %5.5lf\n\n",totBrLen[i-1]);
+    		}
+    		else {
+//    			printf("Total branch length = 0\n\n");
+    			onetreeTable[i-1][0] = 1.0;
+    			for(j = 1; j < treeTableZ; j++)
+    				onetreeTable[i-1][j] = 0.0;
+    		}
+    	}
+//	    printf("\n");
+
+
+	    for (k=nsegs-1;k>=0;k--)
+	    	free(totSegBrLen[k]);
+    	free(totSegBrLen);
+	    free(totBrLen);
+	    free(onetreesegs);
 	}
 
 //	if( pars.mp.timeflag ) {
@@ -991,13 +1025,12 @@ ttimemf( ptree, nsam, mfreq)
 
 
 	void
-prtree( ptree, nsam, oneblockTable)
+prtree( ptree, nsam, totbrlen)
 	struct node *ptree;
 	int nsam;
-	double **oneblockTable;
+	double *totbrlen;
 {
 	int i, *descl, *descr, j, *desc_nds;
-	float *totbrlen;
 	void parens( struct node *ptree, int *descl, int *descr, int noden, int *desc_nds);
 
 	descl = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
@@ -1005,7 +1038,6 @@ prtree( ptree, nsam, oneblockTable)
 	for( i=0; i<2*nsam-1; i++) descl[i] = descr[i] = -1 ;
 
 	desc_nds = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
-	totbrlen = (float *)malloc( (unsigned)(nsam-1)*sizeof( float) );
 	for( i = 0; i< 2*nsam-2; i++)
 		desc_nds[i] = 0;
 	for( i = 0; i< nsam-1; i++)
@@ -1036,30 +1068,7 @@ prtree( ptree, nsam, oneblockTable)
 		}
 	}
 
-	for( i = 1; i < nsam; i++) {
-//		printf("***%d-ton branches***\n", i);
-		if (totbrlen[i-1] > 0.0) {
-//			last index reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
-			for(j = 0; j < treeTableZ - 1; j++) {
-//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totbrlen[i-1]*pars.mp.theta));
-				oneblockTable[i-1][j] = gsl_ran_poisson_pdf(j,totbrlen[i-1]*pars.mp.theta);
-			}
-			oneblockTable[i-1][j] = gsl_cdf_poisson_Q(j-1,totbrlen[i-1]*pars.mp.theta);
-
-//			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totbrlen[i-1]*pars.mp.theta));
-//			printf("Total branch length = %5.5lf\n\n",totbrlen[i-1]);
-		}
-		else {
-//			printf("Total branch length = 0\n\n");
-			oneblockTable[i-1][0] = 1.0;
-			for(j = 1; j < treeTableZ; j++)
-				oneblockTable[i-1][j] = 0.0;
-		}
-	}
-//	printf("\n");
-
 	free(desc_nds);
-	free(totbrlen);
 	free( descl ) ;
 	free( descr ) ;
 }
