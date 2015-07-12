@@ -107,7 +107,10 @@ double optimize_wrapper(const gsl_vector *vars, void *obj) {
 
 	main_theta = gsl_vector_get(vars, 0);
 	main_rho = gsl_vector_get(vars, 1);
-	return -computeLik();
+	if ((main_theta < 0) or (main_rho < 0))
+		return 999999;
+	else
+		return -computeLik();
 }
 
 
