@@ -41,10 +41,17 @@ knowledge of the CeCILL license and that you accept its terms.
 #ifndef MAIN_H_
 #define MAIN_H_
 
-extern int treeTableX;
-extern int treeTableY;
-extern int treeTableZ;
-extern double main_theta;
-extern double main_rho;
+extern "C" {
+int main_ms(int ms_argc, char *ms_argv[]);
+double *** d3matrix(int x, int y, int z);
+void freed3matrix(double ***m, int x, int y);
+double ** d2matrix(int x, int y);
+void freed2matrix(double **m, int x);
+int ** d2int_matrix(int x, int y);
+void freed2int_matrix(int **m, int x);
+
+double ranMT();
+int getMutConfig(int mutConfNum, int brClassNum);
+}
 
 #endif /* MAIN_H_ */

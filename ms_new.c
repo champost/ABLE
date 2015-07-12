@@ -106,7 +106,6 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
 
-#include "main.h"
 #include "ms_new.h"
 
 #define SITESINC 10
@@ -126,7 +125,7 @@ int count, ntbs, nseeds ;
 struct params pars ;
 
 
-int main_ms(int ms_argc, char *ms_argv[], double ***treeTable)
+int main_ms(int ms_argc, char *ms_argv[])
 {
 	int i, k, howmany, segsites, listX, listY;
 	char **list, **cmatrix(), **tbsparamstrs ;
@@ -134,7 +133,7 @@ int main_ms(int ms_argc, char *ms_argv[], double ***treeTable)
 	double probss, tmrca, ttot ;
 	void seedit( const char * ) ;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
-	int gensam( char **list, double *probss, double *ptmrca, double *pttot, double **onetreeTable) ;
+	int gensam( char **list, double *probss, double *ptmrca, double *pttot) ;
 	void freecmatrix(char **m, int nsam);
 
 
@@ -194,7 +193,7 @@ int main_ms(int ms_argc, char *ms_argv[], double ***treeTable)
 //			for(k=0; k< ntbs; k++) printf("\t%s", tbsparamstrs[k] ) ;
 //		}
 //		printf("\n");
-        segsites = gensam( list, &probss, &tmrca, &ttot, treeTable[count-1]) ;
+        segsites = gensam( list, &probss, &tmrca, &ttot) ;
 //  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
 //        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
 //   	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
@@ -218,7 +217,7 @@ int main_ms(int ms_argc, char *ms_argv[], double ***treeTable)
 
 
 	int 
-gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **onetreeTable)
+gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 {
 	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
@@ -231,6 +230,9 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **on
 	void prtree( struct node *ptree, int nsam, double *totSegBrLen);
 	void make_gametes(int nsam, int mfreq,  struct node *ptree, double tt, int newsites, int ns, char **list );
  	void ndes_setup( struct node *, int nsam );
+ 	double ** d2matrix(int x, int y);
+ 	void freed2matrix(double **m, int x);
+ 	int getMutConfig(int mutConfNum, int brClassNum);
 
 
 	nsites = pars.cp.nsites ;
@@ -246,11 +248,10 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **on
 	  	ns = 0 ;
 
 
+	  	double **onetreeTable = d2matrix(brClass, mutClass);
 	  	int *onetreesegs = (int *) malloc((nsegs+2) * sizeof(int));
-	  	double **totSegBrLen = (double **) malloc(nsegs * sizeof(double *));
-	  	for (k=0;k<nsegs;k++)
-	  		totSegBrLen[k] = (double *) malloc(treeTableY * sizeof(double));
-	  	double *totBrLen = (double *) malloc(treeTableY * sizeof(double));
+	  	double **totSegBrLen = d2matrix(nsegs, brClass);
+	  	double *totBrLen = (double *) malloc(brClass * sizeof(double));
 
 	  	onetreesegs[0] = nsegs;
 	  	onetreesegs[1] = nsites;
@@ -267,7 +268,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **on
 	    		free(seglst[seg].ptree) ;
 	    }
 
-	    for(i = 0; i < treeTableY; i++) {
+	    for(i = 0; i < brClass; i++) {
 	    	totBrLen[i] = 0.0;
 		    for(k = 0; k < nsegs; k++) {
 		    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
@@ -283,7 +284,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **on
 //	    	printf("***%d-ton branches***\n", i);
     		if (totBrLen[i-1] > 0.0) {
     			//last index reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
-    			for(j = 0; j < treeTableZ - 1; j++) {
+    			for(j = 0; j < mutClass - 1; j++) {
 //    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
     				onetreeTable[i-1][j] = gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta);
     			}
@@ -295,16 +296,24 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot, double **on
     		else {
 //    			printf("Total branch length = 0\n\n");
     			onetreeTable[i-1][0] = 1.0;
-    			for(j = 1; j < treeTableZ; j++)
+    			for(j = 1; j < mutClass; j++)
     				onetreeTable[i-1][j] = 0.0;
     		}
     	}
+
+		for (i = 0; i < finalTableSize; i++) {
+		    double jointPoisson = 1.0;
+			for (j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][getMutConfig(i, j)];
+			finalTable[i] += jointPoisson;
+			totSum += jointPoisson;
+		}
+
 //	    printf("\n");
 
 
-	    for (k=nsegs-1;k>=0;k--)
-	    	free(totSegBrLen[k]);
-    	free(totSegBrLen);
+	    freed2matrix(onetreeTable, brClass);
+	    freed2matrix(totSegBrLen, nsegs);
 	    free(totBrLen);
 	    free(onetreesegs);
 	}
