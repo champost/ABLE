@@ -56,10 +56,6 @@ int pick2(int n, int *i, int *j);
 int xover(int nsam,int ic, int is);
 int links(int c);
 
-extern int brClass;
-extern int mutClass;
+extern int brClass, mutClass, foldedBrClass;
 extern long int finalTableSize;
-extern double main_theta;
-extern double main_rho;
-extern double *finalTable;
-extern double totSum;
+extern double main_theta, main_rho, totSum, *finalTable;

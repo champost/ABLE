@@ -248,62 +248,64 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	  	ns = 0 ;
 
 
-	  	double **onetreeTable = d2matrix(brClass, mutClass);
-	  	int *onetreesegs = (int *) malloc((nsegs+2) * sizeof(int));
+	  	double **onetreeTable = d2matrix(foldedBrClass, mutClass);
+	  	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
 	  	double **totSegBrLen = d2matrix(nsegs, brClass);
-	  	double *totBrLen = (double *) malloc(brClass * sizeof(double));
+	  	double *totBrLen = (double *) malloc(foldedBrClass * sizeof(double));
 
-	  	onetreesegs[0] = nsegs;
-	  	onetreesegs[1] = nsites;
 	    for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
 	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) ){
 	    		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
 	    		start = seglst[seg].beg ;
 	    		len = end - start + 1 ;
 //	    		fprintf(stdout,"[%d]", len);
-	    		onetreesegs[k+2] = len;
+	    		onetreesegs[k] = len;
 	    	}
 	    	prtree( seglst[seg].ptree, nsam, totSegBrLen[k]) ;
 	    	if( (segsitesin == 0) && ( theta == 0.0 ) && ( pars.mp.timeflag == 0 ) )
 	    		free(seglst[seg].ptree) ;
 	    }
 
-	    for(i = 0; i < brClass; i++) {
-	    	totBrLen[i] = 0.0;
+	    for(i = 1; i <= foldedBrClass; i++) {
+	    	totBrLen[i-1] = 0.0;
+	    	int fold = foldedBrClass-i;
+
 		    for(k = 0; k < nsegs; k++) {
+		    	double totFoldedSegBrLen = totSegBrLen[k][i-1] + (fold * totSegBrLen[k][(nsam-i)-1]);
+
 		    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
-		    		totBrLen[i] += totSegBrLen[k][i] * onetreesegs[k+2];
+		    		totBrLen[i-1] += totFoldedSegBrLen * onetreesegs[k];
 		    	else
-		    		totBrLen[i] += totSegBrLen[k][i];
+		    		totBrLen[i-1] += totFoldedSegBrLen;
 		    }
 	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
-	    		totBrLen[i] /= nsites;
+	    		totBrLen[i-1] /= nsites;
 	    }
 
-	    for(i = 1; i < nsam; i++) {
-//	    	printf("***%d-ton branches***\n", i);
-    		if (totBrLen[i-1] > 0.0) {
-    			//last index reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
-    			for(j = 0; j < mutClass - 1; j++) {
-//    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
-    				onetreeTable[i-1][j] = gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta);
+	    for(i = 0; i < foldedBrClass; i++) {
+//	    	printf("***Folded %d-ton branches***\n", i+1);
+    		if (totBrLen[i] > 0.0) {
+    			// index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
+    			for(j = 0; j < mutClass-1; j++) {
+//    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i]*pars.mp.theta));
+    				onetreeTable[i][j] = gsl_ran_poisson_pdf(j,totBrLen[i]*pars.mp.theta);
     			}
-    			onetreeTable[i-1][j] = gsl_cdf_poisson_Q(j-1,totBrLen[i-1]*pars.mp.theta);
+    			onetreeTable[i][j] = gsl_cdf_poisson_Q(j-1,totBrLen[i]*pars.mp.theta);
 
-//    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
-//    			printf("Total branch length = %5.5lf\n\n",totBrLen[i-1]);
+//    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i]*pars.mp.theta));
+//    			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i]);
     		}
     		else {
-//    			printf("Total branch length = 0\n\n");
-    			onetreeTable[i-1][0] = 1.0;
+//    			printf("Total folded branch length = 0\n\n");
+    			onetreeTable[i][0] = 1.0;
     			for(j = 1; j < mutClass; j++)
-    				onetreeTable[i-1][j] = 0.0;
+    				onetreeTable[i][j] = 0.0;
     		}
     	}
 
 		for (i = 0; i < finalTableSize; i++) {
 		    double jointPoisson = 1.0;
-			for (j = 0; j < brClass; j++)
+			for (j = 0; j < foldedBrClass; j++)
 				jointPoisson *= onetreeTable[j][getMutConfig(i, j)];
 			finalTable[i] += jointPoisson;
 			totSum += jointPoisson;
@@ -312,7 +314,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //	    printf("\n");
 
 
-	    freed2matrix(onetreeTable, brClass);
+	    freed2matrix(onetreeTable, foldedBrClass);
 	    freed2matrix(totSegBrLen, nsegs);
 	    free(totBrLen);
 	    free(onetreesegs);

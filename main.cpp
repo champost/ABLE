@@ -60,7 +60,7 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass;
+int brClass, mutClass, foldedBrClass;
 long int finalTableSize;
 double main_theta, main_rho, totSum, *finalTable;
 //**********************************
@@ -77,7 +77,7 @@ bool estimate;
 
 double ranMT() { return(rMT()); }
 
-int getMutConfig(int mutConfNum, int brClassNum) { return MutConfig[mutConfNum][brClassNum]; }
+int getMutConfig(int mutConfNum, int foldedBrClassNum) { return MutConfig[mutConfNum][foldedBrClassNum]; }
 
 double computeLik() {
 
@@ -122,11 +122,14 @@ void evalMutConfigs() {
 		rem = 0;
 		stringstream stst;
 		stst << ")";
-		for (int j = 0; j < brClass; j++) {
+		for (int j = 0; j < foldedBrClass; j++) {
 			if (quo) {
 				rem = quo % mutClass;
 				quo /= mutClass;
-				stst << rem;
+				if (rem == mutClass-1)
+					stst << rem-1 << ">";
+				else
+					stst << rem;
 				MutConfig[i].push_back(rem);
 			}
 			else {
@@ -134,7 +137,7 @@ void evalMutConfigs() {
 				MutConfig[i].push_back(0);
 			}
 
-			if (j < brClass - 1)
+			if (j < foldedBrClass - 1)
 				stst << ",";
 		}
 		stst << "(";
@@ -166,12 +169,16 @@ int main(int argc, char* argv[]) {
 	ms_argc = argc - 1;
 	ms_argv = argv;
 
-	brClass = nsam-1;	//4-1=3
-	mutClass = kmax+2;	//3+2=5
-	finalTableSize = (long int) pow(mutClass,brClass);	//5^3=125
+	brClass = nsam-1;
+	if (brClass % 2)
+		foldedBrClass = (brClass+1) / 2;
+	else
+		foldedBrClass = brClass / 2;
+	mutClass = kmax+2;
+	finalTableSize = (long int) pow(mutClass,foldedBrClass);
 
-	finalTable = (double *) malloc(finalTableSize * sizeof(double));	//5^3=125
-	dataTable = (double *) malloc(finalTableSize * sizeof(double));	//5^3=125
+	finalTable = (double *) malloc(finalTableSize * sizeof(double));
+	dataTable = (double *) malloc(finalTableSize * sizeof(double));
 
 	evalMutConfigs();
 
