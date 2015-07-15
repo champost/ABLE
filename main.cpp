@@ -91,7 +91,8 @@ double computeLik() {
 	double loglik = 0.0;
 	if (estimate) {
 		for (long int i = 0; i < finalTableSize; i++)
-			loglik += log(finalTable[i] / totSum) * dataTable[i];
+			if (finalTable[i] > 0)
+				loglik += log(finalTable[i] / totSum) * dataTable[i];
 	}
 	else {
 		for (long int i = 0; i < finalTableSize; i++)
@@ -196,8 +197,13 @@ int main(int argc, char* argv[]) {
 
 		/* Starting point */
 		x = gsl_vector_alloc (npar);
-		gsl_vector_set (x,0,1);
-		gsl_vector_set (x,1,1);
+
+		gsl_vector_set (x,0,ranMT()*10);
+		gsl_vector_set (x,1,ranMT()*10);
+		printf ("Start coordinates : \n");
+		for (i = 0; i < npar; i++)
+			printf ("%.6f ", gsl_vector_get (x, i));
+		printf ("\n");
 
 		gsl_multimin_function minex_func;
 		minex_func.f = optimize_wrapper;
@@ -225,9 +231,15 @@ int main(int argc, char* argv[]) {
 
 				for (i = 0; i < npar; i++)
 					printf ("%.6f ", gsl_vector_get (s->x, i));
-				//			printf ("f() = %.6f size = %.6f\n", s->fval, size);
-				printf ("f() = %.6f\n", s->fval);
+//				printf ("LnL = %.6f size = %.5e\n", -s->fval, size);
+				printf ("LnL = %.6f\n", -s->fval);
 			}
+//			else {
+//				printf ("%5d ", iter);
+//				for (i = 0; i < npar; i++)
+//					printf ("%.6f ", gsl_vector_get (s->x, i));
+//				printf ("LnL = %.6f\n", -s->fval);
+//			}
 
 		} while (status == GSL_CONTINUE && iter < 1000);
 
