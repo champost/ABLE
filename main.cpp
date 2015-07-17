@@ -165,8 +165,8 @@ void readMutConfigs() {
 int main(int argc, char* argv[]) {
 
 //	time_t likStartTime, likEndTime;
-	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = 3;
-	ms_argc = argc - 1;
+	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = atoi(argv[argc-1]);
+	ms_argc = argc - 2;
 	ms_argv = argv;
 
 	brClass = nsam-1;
@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
 
 	evalMutConfigs();
 
-	if (atoi(argv[argc-1])) {
+	if (atoi(argv[argc-2])) {
 
 		estimate = true;
 

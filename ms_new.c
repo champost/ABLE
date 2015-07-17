@@ -280,26 +280,24 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 		    }
 	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
 	    		totBrLen[i-1] /= nsites;
-	    }
 
-	    for(i = 0; i < foldedBrClass; i++) {
-//	    	printf("***Folded %d-ton branches***\n", i+1);
-    		if (totBrLen[i] > 0.0) {
+//	    	printf("***Folded %d-ton branches***\n", i);
+    		if (totBrLen[i-1] > 0.0) {
     			// index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
     			for(j = 0; j < mutClass-1; j++) {
-//    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i]*pars.mp.theta));
-    				onetreeTable[i][j] = gsl_ran_poisson_pdf(j,totBrLen[i]*pars.mp.theta);
+//    				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
+    				onetreeTable[i-1][j] = gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta);
     			}
-    			onetreeTable[i][j] = gsl_cdf_poisson_Q(j-1,totBrLen[i]*pars.mp.theta);
+    			onetreeTable[i-1][j] = gsl_cdf_poisson_Q(j-1,totBrLen[i-1]*pars.mp.theta);
 
-//    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i]*pars.mp.theta));
-//    			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i]);
+//    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
+//    			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
     		}
     		else {
 //    			printf("Total folded branch length = 0\n\n");
-    			onetreeTable[i][0] = 1.0;
+    			onetreeTable[i-1][0] = 1.0;
     			for(j = 1; j < mutClass; j++)
-    				onetreeTable[i][j] = 0.0;
+    				onetreeTable[i-1][j] = 0.0;
     		}
     	}
 
@@ -1041,16 +1039,14 @@ prtree( ptree, nsam, totbrlen)
 	int nsam;
 	double *totbrlen;
 {
-	int i, *descl, *descr, j, *desc_nds;
-	void parens( struct node *ptree, int *descl, int *descr, int noden, int *desc_nds);
+	int i, *descl, *descr, j;
+	void parens( struct node *ptree, int *descl, int *descr, int noden);
+	void ndes_setup(struct node *ptree, int nsam);
 
 	descl = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
 	descr = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
 	for( i=0; i<2*nsam-1; i++) descl[i] = descr[i] = -1 ;
 
-	desc_nds = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
-	for( i = 0; i< 2*nsam-2; i++)
-		desc_nds[i] = 0;
 	for( i = 0; i< nsam-1; i++)
 		totbrlen[i] = 0.0;
 
@@ -1061,16 +1057,18 @@ prtree( ptree, nsam, totbrlen)
 			descr[(ptree+i)->abv] = i ;
 	}
 
-	parens( ptree, descl, descr, 2*nsam-2, desc_nds);
+//	parens( ptree, descl, descr, 2*nsam-2);
+
+	ndes_setup(ptree, nsam);
 
 //	printf("\n");
-//	for( i = 0; i< 2*nsam-2; i++)
-//		printf("%d  ", desc_nds[i]);
-//	printf("\n");
+//	for( i = 0; i< 2*nsam-1; i++)
+//		printf("%d : %d, %d, %d\n", i+1, ptree[i].ndes, descl[i]+1, descr[i]+1);
+//	printf("\n\n");
 
 	for( i = 1; i < nsam; i++) {
 		for(j = 0; j < 2*nsam-2; j++) {
-			if (desc_nds[j] == i) {
+			if (ptree[j].ndes == i) {
 				if (i == 1)
 					totbrlen[i-1] += ptree[ptree[j].abv].time;
 				else
@@ -1079,43 +1077,29 @@ prtree( ptree, nsam, totbrlen)
 		}
 	}
 
-	free(desc_nds);
 	free( descl ) ;
 	free( descr ) ;
 }
 
-	void
-parens( struct node *ptree, int *descl, int *descr,  int noden, int *desc_nds)
+void
+parens( struct node *ptree, int *descl, int *descr,  int noden)
 {
-//	double time ;
-//
-//	if( descl[noden] == -1 ) {
-//		printf("%d:%5.3lf", noden+1, (ptree+ ((ptree+noden)->abv))->time );
-//		desc_nds[noden] = 1;
-//	}
-//	else{
-//		printf("(");
-//		parens( ptree, descl,descr, descl[noden], desc_nds) ;
-//		printf(",");
-//		parens(ptree, descl, descr, descr[noden], desc_nds) ;
-//		if( (ptree+noden)->abv == 0 )
-//			printf(");\n");
-//		else {
-//			time = (ptree + (ptree+noden)->abv )->time - (ptree+noden)->time ;
-//			printf(")%d:%5.3lf", noden+1, time );
-//		}
-//		desc_nds[noden] = desc_nds[descl[noden]] + desc_nds[descr[noden]];
-//	}
+double time ;
 
-
-	if( descl[noden] == -1 )
-		desc_nds[noden] = 1;
-	else {
-		parens( ptree, descl,descr, descl[noden], desc_nds) ;
-		parens(ptree, descl, descr, descr[noden], desc_nds) ;
-		desc_nds[noden] = desc_nds[descl[noden]] + desc_nds[descr[noden]];
-	}
-
+if( descl[noden] == -1 ) {
+printf("%d:%5.3lf", noden+1, (ptree+ ((ptree+noden)->abv))->time );
+}
+else{
+printf("(");
+parens( ptree, descl,descr, descl[noden] ) ;
+printf(",");
+parens(ptree, descl, descr, descr[noden] ) ;
+if( (ptree+noden)->abv == 0 ) printf(");\n");
+else {
+  time = (ptree + (ptree+noden)->abv )->time - (ptree+noden)->time ;
+  printf("):%5.3lf", time );
+  }
+    }
 }
 
 /***  pickb : returns a random branch from the tree. The probability of picking
