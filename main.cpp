@@ -60,14 +60,16 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass, foldedBrClass;
+int brClass, mutClass, foldBrClass, allBrClasses;
 long int finalTableSize;
-double main_theta, main_rho, totSum, *finalTable;
+double main_theta, main_rho, totProbSum, *finalTable;
 //**********************************
 
 MTRand rMT;
-map<int, string> int2string;
+map<int, string> mutConfig2Str;
 map<int, vector<int> > MutConfig;
+map<vector<int>, int> intVec2BrConfig;
+vector<int> npopVec;
 
 int ms_argc;
 char **ms_argv;
@@ -77,11 +79,16 @@ bool estimate;
 
 double ranMT() { return(rMT()); }
 
-int getMutConfig(int mutConfNum, int foldedBrClassNum) { return MutConfig[mutConfNum][foldedBrClassNum]; }
+int getMutConfig(int mutConfNum, int brClassNum) { return MutConfig[mutConfNum][brClassNum]; }
+
+int getBrConfigNum(int *brConfVec) {
+	vector<int> vec(brConfVec, brConfVec+npopVec.size());
+	return intVec2BrConfig[vec];
+}
 
 double computeLik() {
 
-	totSum = 0.0;
+	totProbSum = 0.0;
 	for (long int i = 0; i < finalTableSize; i++)
 		finalTable[i] = 0.0;
 
@@ -92,12 +99,12 @@ double computeLik() {
 	if (estimate) {
 		for (long int i = 0; i < finalTableSize; i++)
 			if (finalTable[i] > 0)
-				loglik += log(finalTable[i] / totSum) * dataTable[i];
+				loglik += log(finalTable[i] / totProbSum) * dataTable[i];
 	}
 	else {
 		for (long int i = 0; i < finalTableSize; i++)
-//			printf("%.5e\n", finalTable[i]/totSum);
-			printf("%s : %.5e\n", int2string[i].c_str(), finalTable[i]/totSum);
+//			printf("%.5e\n", finalTable[i]/totProbSum);
+			printf("%s : %.5e\n", mutConfig2Str[i].c_str(), finalTable[i]/totProbSum);
 	}
 
 	return loglik;
@@ -115,6 +122,7 @@ double optimize_wrapper(const gsl_vector *vars, void *obj) {
 }
 
 
+//	conversion from decimal to base-mutClass
 void evalMutConfigs() {
 	int quo, rem;
 	for (long int i = 0; i < finalTableSize; i++) {
@@ -122,7 +130,7 @@ void evalMutConfigs() {
 		rem = 0;
 		stringstream stst;
 		stst << ")";
-		for (int j = 0; j < foldedBrClass; j++) {
+		for (int j = 0; j < brClass; j++) {
 			if (quo) {
 				rem = quo % mutClass;
 				quo /= mutClass;
@@ -137,13 +145,13 @@ void evalMutConfigs() {
 				MutConfig[i].push_back(0);
 			}
 
-			if (j < foldedBrClass - 1)
+			if (j < brClass - 1)
 				stst << ",";
 		}
 		stst << "(";
 		string config = stst.str();
 		reverse(config.begin(),config.end());
-		int2string[i] = config;
+		mutConfig2Str[i] = config;
 		reverse(MutConfig[i].begin(),MutConfig[i].end());
 //		cout << config << endl;
 	}
@@ -162,27 +170,117 @@ void readMutConfigs() {
 }
 
 
+void readPopSizes(int npops) {
+	string line;
+	ifstream ifs("popconfig.txt",ios::in);
+	getline(ifs,line);
+	stringstream stst;
+	stst << line;
+	for (int i = 0; i < npops; i++) {
+		int tmp;
+		stst >> tmp;
+		npopVec.push_back(tmp);
+	}
+	ifs.close();
+}
+
+
+//	conversion from decimal to base-(maxPopSize+1)
+void evalBranchConfigs() {
+	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
+	bool skipConfig;
+	maxPopSize = totPopSum = npopVec[0];
+
+	for (size_t i = 1; i < npopVec.size(); i++) {
+		totPopSum += npopVec[i];
+		if (npopVec[i] > maxPopSize)
+			maxPopSize = npopVec[i];
+	}
+	++maxPopSize;
+
+	for (long int i = 1; i <= (long int) pow(maxPopSize,npopVec.size()); i++) {
+		quo = i;
+		rem = 0;
+		stringstream stst;
+		stst << ")";
+		sumConfig = 0;
+		skipConfig = false;
+		vector<int> vec;
+
+		for (size_t j = 0; j < npopVec.size(); j++) {
+			if (quo) {
+				rem = quo % (maxPopSize);
+				quo /= (maxPopSize);
+				stst << rem;
+				sumConfig += rem;
+				if (rem > npopVec[npopVec.size()-1-j]) {
+					skipConfig = true;
+					break;
+				}
+				vec.push_back(rem);
+			}
+			else {
+				stst << "0";
+				vec.push_back(0);
+			}
+
+			if (j < npopVec.size() - 1)
+				stst << ",";
+		}
+
+		if (sumConfig == totPopSum)
+			break;
+
+		if (!skipConfig) {
+			stst << "(";
+			string config = stst.str();
+			reverse(config.begin(),config.end());
+			reverse(vec.begin(),vec.end());
+			intVec2BrConfig[vec] = count;
+			++count;
+//			printf("%d\t%d\t%s\n", i, count, config.c_str());
+		}
+	}
+}
+
+
 int main(int argc, char* argv[]) {
 
 //	time_t likStartTime, likEndTime;
-	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = atoi(argv[argc-1]);
-	ms_argc = argc - 2;
+	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
+	char brFold = argv[argc-1][0];
+	ms_argc = argc - 4;
 	ms_argv = argv;
 
-	brClass = nsam-1;
-	if (brClass % 2)
-		foldedBrClass = (brClass+1) / 2;
-	else
-		foldedBrClass = brClass / 2;
+	readPopSizes(npopSize);
+
+	brClass = npopVec[0]+1;
+	for (size_t i = 1; i < npopVec.size(); i++)
+		brClass *= (npopVec[i]+1);
+	brClass -= 2;
+	allBrClasses = brClass;
+	foldBrClass = 0;
+
+	//	fold the branch classes
+	if (brFold == 'f') {
+		if (brClass % 2)
+			brClass = (brClass+1) / 2;
+		else
+			brClass = brClass / 2;
+		foldBrClass = 1;
+	}
+
+	evalBranchConfigs();
+
 	mutClass = kmax+2;
-	finalTableSize = (long int) pow(mutClass,foldedBrClass);
+	finalTableSize = (long int) pow(mutClass, brClass);
 
 	finalTable = (double *) malloc(finalTableSize * sizeof(double));
 	dataTable = (double *) malloc(finalTableSize * sizeof(double));
 
 	evalMutConfigs();
 
-	if (atoi(argv[argc-2])) {
+	if (atoi(argv[argc-4])) {
 
 		estimate = true;
 

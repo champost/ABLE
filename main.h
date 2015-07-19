@@ -52,6 +52,7 @@ void freed2int_matrix(int **m, int x);
 
 double ranMT();
 int getMutConfig(int mutConfNum, int brClassNum);
+int getBrConfigNum(int *brConfVec);
 }
 
 #endif /* MAIN_H_ */

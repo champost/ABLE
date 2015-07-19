@@ -227,9 +227,10 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	int segsitesin,nsites;
 	double theta, es ;
 	int nsam, mfreq ;
-	void prtree( struct node *ptree, int nsam, double *totSegBrLen);
+	void prtree( struct node *ptree, int nsam);
 	void make_gametes(int nsam, int mfreq,  struct node *ptree, double tt, int newsites, int ns, char **list );
  	void ndes_setup( struct node *, int nsam );
+ 	void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen);
  	double ** d2matrix(int x, int y);
  	void freed2matrix(double **m, int x);
  	int getMutConfig(int mutConfNum, int brClassNum);
@@ -248,10 +249,10 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	  	ns = 0 ;
 
 
-	  	double **onetreeTable = d2matrix(foldedBrClass, mutClass);
+	  	double **onetreeTable = d2matrix(brClass, mutClass);
 	  	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
-	  	double **totSegBrLen = d2matrix(nsegs, brClass);
-	  	double *totBrLen = (double *) malloc(foldedBrClass * sizeof(double));
+	  	double **totSegBrLen = d2matrix(nsegs, allBrClasses);
+	  	double *totBrLen = (double *) malloc(brClass * sizeof(double));
 
 	    for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
 	    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) ){
@@ -261,17 +262,17 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //	    		fprintf(stdout,"[%d]", len);
 	    		onetreesegs[k] = len;
 	    	}
-	    	prtree( seglst[seg].ptree, nsam, totSegBrLen[k]) ;
+//	    	prtree( seglst[seg].ptree, nsam) ;
+	    	evalTreeBranchConfigs(seglst[seg].ptree, nsam, totSegBrLen[k]);
 	    	if( (segsitesin == 0) && ( theta == 0.0 ) && ( pars.mp.timeflag == 0 ) )
 	    		free(seglst[seg].ptree) ;
 	    }
 
-	    for(i = 1; i <= foldedBrClass; i++) {
+	    for(i = 1; i <= brClass; i++) {
 	    	totBrLen[i-1] = 0.0;
-	    	int fold = foldedBrClass-i;
 
 		    for(k = 0; k < nsegs; k++) {
-		    	double totFoldedSegBrLen = totSegBrLen[k][i-1] + (fold * totSegBrLen[k][(nsam-i)-1]);
+		    	double totFoldedSegBrLen = totSegBrLen[k][i-1] + (foldBrClass * totSegBrLen[k][allBrClasses-i]);
 
 		    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
 		    		totBrLen[i-1] += totFoldedSegBrLen * onetreesegs[k];
@@ -303,16 +304,16 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
 		for (i = 0; i < finalTableSize; i++) {
 		    double jointPoisson = 1.0;
-			for (j = 0; j < foldedBrClass; j++)
+			for (j = 0; j < brClass; j++)
 				jointPoisson *= onetreeTable[j][getMutConfig(i, j)];
 			finalTable[i] += jointPoisson;
-			totSum += jointPoisson;
+			totProbSum += jointPoisson;
 		}
 
 //	    printf("\n");
 
 
-	    freed2matrix(onetreeTable, foldedBrClass);
+	    freed2matrix(onetreeTable, brClass);
 	    freed2matrix(totSegBrLen, nsegs);
 	    free(totBrLen);
 	    free(onetreesegs);
@@ -415,6 +416,69 @@ ndes_setup(struct node *ptree, int nsam )
 	for( i = nsam; i< 2*nsam -1; i++) (ptree+i)->ndes = 0 ;
 	for( i= 0; i< 2*nsam -2 ; i++)  (ptree+((ptree+i)->abv))->ndes += (ptree+i)->ndes ;
 
+}
+
+void ndes_and_branch_setup(struct node *ptree, int nsam) {
+	int i ;
+
+	for(i = 0; i < nsam; i++)
+		ptree[i].ndes = 1 ;
+
+	for(i = nsam; i < 2*nsam - 1; i++)
+		ptree[i].ndes = 0 ;
+
+	for(i = 0; i < 2*nsam - 2; i++) {
+		ptree[(ptree[i].abv)].ndes += ptree[i].ndes ;
+		ptree[i].brLength = ptree[ptree[i].abv].time - ptree[i].time;
+	}
+	//	ROOT!
+	ptree[2*nsam -1].brLength = 0 ;
+}
+
+void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen) {
+	int i, j, sum;
+
+	void ndes_and_branch_setup(struct node *ptree, int nsam);
+	int ** d2int_matrix(int x, int y);
+	void freed2int_matrix(int **m, int x);
+	int getBrConfigNum(int *brConfVec);
+
+	int **branchConfig = d2int_matrix(2*nsam - 2, pars.cp.npop);
+
+	ndes_and_branch_setup(ptree, nsam);
+
+	for(i = 0; i < 2*nsam - 2; i++)
+		for(j = 0; j < pars.cp.npop; j++)
+			branchConfig[i][j] = 0;
+
+	sum = 0;
+	for(i = 0; i < pars.cp.npop; i++) {
+		for(j = 1; j <= pars.cp.config[i]; j++) {
+			branchConfig[sum][i] = 1;
+			++sum;
+		}
+	}
+
+	for(i = 0; i < 2*nsam - 2; i++)
+		for(j = 0; j < pars.cp.npop; j++)
+			if (ptree[i].abv != 2*nsam - 2)
+				branchConfig[ptree[i].abv][j] += branchConfig[i][j];
+
+	for(i = 0; i < allBrClasses; i++) {
+		totbrlen[i] = 0.0;
+		for(j = 0; j < 2*nsam-2; j++)
+			if (getBrConfigNum(branchConfig[j]) == i)
+				totbrlen[i] += ptree[j].brLength;
+	}
+
+	//******************************************************************************
+//	printf("\n");
+//	for(i = 0; i < allBrClasses; i++)
+//		printf("%5.3f\n",totbrlen[i]);
+//	exit(-1);
+	//******************************************************************************
+
+	freed2int_matrix(branchConfig, 2*nsam-2);
 }
 
 	void
@@ -1034,72 +1098,45 @@ ttimemf( ptree, nsam, mfreq)
 
 
 	void
-prtree( ptree, nsam, totbrlen)
+prtree( ptree, nsam)
 	struct node *ptree;
 	int nsam;
-	double *totbrlen;
 {
-	int i, *descl, *descr, j;
-	void parens( struct node *ptree, int *descl, int *descr, int noden);
-	void ndes_setup(struct node *ptree, int nsam);
+	double t;
+	int i, *descl, *descr ;
+	void parens( struct node *ptree, int *descl, int *descr, int noden );
 
 	descl = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
 	descr = (int *)malloc( (unsigned)(2*nsam-1)*sizeof( int) );
 	for( i=0; i<2*nsam-1; i++) descl[i] = descr[i] = -1 ;
-
-	for( i = 0; i< nsam-1; i++)
-		totbrlen[i] = 0.0;
-
 	for( i = 0; i< 2*nsam-2; i++){
-		if( descl[(ptree+i)->abv] == -1 )
-			descl[(ptree+i)->abv] = i ;
-		else
-			descr[(ptree+i)->abv] = i ;
-	}
-
-//	parens( ptree, descl, descr, 2*nsam-2);
-
-	ndes_setup(ptree, nsam);
-
-//	printf("\n");
-//	for( i = 0; i< 2*nsam-1; i++)
-//		printf("%d : %d, %d, %d\n", i+1, ptree[i].ndes, descl[i]+1, descr[i]+1);
-//	printf("\n\n");
-
-	for( i = 1; i < nsam; i++) {
-		for(j = 0; j < 2*nsam-2; j++) {
-			if (ptree[j].ndes == i) {
-				if (i == 1)
-					totbrlen[i-1] += ptree[ptree[j].abv].time;
-				else
-					totbrlen[i-1] += ptree[ptree[j].abv].time - ptree[j].time;
-			}
-		}
-	}
-
+	  if( descl[ (ptree+i)->abv ] == -1 ) descl[(ptree+i)->abv] = i ;
+	  else descr[ (ptree+i)->abv] = i ;
+	 }
+	parens( ptree, descl, descr, 2*nsam-2);
 	free( descl ) ;
 	free( descr ) ;
 }
 
-void
+	void
 parens( struct node *ptree, int *descl, int *descr,  int noden)
 {
-double time ;
+	double time ;
 
-if( descl[noden] == -1 ) {
-printf("%d:%5.3lf", noden+1, (ptree+ ((ptree+noden)->abv))->time );
-}
-else{
-printf("(");
-parens( ptree, descl,descr, descl[noden] ) ;
-printf(",");
-parens(ptree, descl, descr, descr[noden] ) ;
-if( (ptree+noden)->abv == 0 ) printf(");\n");
-else {
-  time = (ptree + (ptree+noden)->abv )->time - (ptree+noden)->time ;
-  printf("):%5.3lf", time );
-  }
-    }
+	if( descl[noden] == -1 ) {
+	printf("%d:%5.3lf", noden+1, (ptree+ ((ptree+noden)->abv))->time );
+	}
+	else{
+	printf("(");
+	parens( ptree, descl,descr, descl[noden] ) ;
+	printf(",");
+	parens(ptree, descl, descr, descr[noden] ) ;
+	if( (ptree+noden)->abv == 0 ) printf(");\n");
+	else {
+	  time = (ptree + (ptree+noden)->abv )->time - (ptree+noden)->time ;
+	  printf(")%d:%5.3lf", noden+1, time );
+	  }
+		}
 }
 
 /***  pickb : returns a random branch from the tree. The probability of picking

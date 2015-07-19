@@ -38,6 +38,7 @@ struct node{
 	int abv;
 	int ndes;
 	float time;
+	float brLength;
 };
 
 
@@ -56,6 +57,6 @@ int pick2(int n, int *i, int *j);
 int xover(int nsam,int ic, int is);
 int links(int c);
 
-extern int brClass, mutClass, foldedBrClass;
+extern int brClass, mutClass, foldBrClass, allBrClasses;
 extern long int finalTableSize;
-extern double main_theta, main_rho, totSum, *finalTable;
+extern double main_theta, main_rho, totProbSum, *finalTable;
