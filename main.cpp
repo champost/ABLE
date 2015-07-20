@@ -63,6 +63,7 @@ using namespace std;
 int brClass, mutClass, foldBrClass, allBrClasses;
 long int finalTableSize;
 double main_theta, main_rho, totProbSum, *finalTable;
+double main_div_time;
 //**********************************
 
 MTRand rMT;
@@ -115,6 +116,7 @@ double optimize_wrapper(const gsl_vector *vars, void *obj) {
 
 	main_theta = gsl_vector_get(vars, 0);
 	main_rho = gsl_vector_get(vars, 1);
+	main_div_time = gsl_vector_get(vars, 2);
 	if ((main_theta < 0) or (main_rho < 0))
 		return 999999;
 	else
@@ -211,12 +213,12 @@ void evalBranchConfigs() {
 			if (quo) {
 				rem = quo % (maxPopSize);
 				quo /= (maxPopSize);
-				stst << rem;
-				sumConfig += rem;
 				if (rem > npopVec[npopVec.size()-1-j]) {
 					skipConfig = true;
 					break;
 				}
+				stst << rem;
+				sumConfig += rem;
 				vec.push_back(rem);
 			}
 			else {
@@ -239,6 +241,7 @@ void evalBranchConfigs() {
 			intVec2BrConfig[vec] = count;
 			++count;
 //			printf("%d\t%d\t%s\n", i, count, config.c_str());
+//			printf("%d\t%s\n", count, config.c_str());
 		}
 	}
 }
@@ -289,7 +292,7 @@ int main(int argc, char* argv[]) {
 		const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
 		gsl_multimin_fminimizer *s = NULL;
 		gsl_vector *ss, *x;
-		size_t npar = 2;
+		size_t npar = 3;
 		size_t iter = 0, i;
 		int status;
 		double size;
@@ -305,6 +308,7 @@ int main(int argc, char* argv[]) {
 
 		gsl_vector_set (x,0,ranMT()*10);
 		gsl_vector_set (x,1,ranMT()*10);
+		gsl_vector_set (x,2,ranMT()*10);
 		printf ("Start coordinates : \n");
 		for (i = 0; i < npar; i++)
 			printf ("%.6f ", gsl_vector_get (x, i));
@@ -337,7 +341,7 @@ int main(int argc, char* argv[]) {
 				for (i = 0; i < npar; i++)
 					printf ("%.6f ", gsl_vector_get (s->x, i));
 //				printf ("LnL = %.6f size = %.5e\n", -s->fval, size);
-				printf ("LnL = %.6f\n", -s->fval);
+				printf ("LnL = %.6f\n\n", -s->fval);
 			}
 //			else {
 //				printf ("%5d ", iter);

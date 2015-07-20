@@ -152,6 +152,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 //*******************************************************
 	if (atoi(ms_argv[ms_argc])) {
 		pars.mp.theta = main_theta;
+		pars.cp.deventlist[0].time = main_div_time;
 		if (pars.cp.r > 0.0 )
 			pars.cp.r =	main_rho;
 	}
