@@ -61,8 +61,7 @@ using namespace std;
 
 //************ EXTERN **************
 int brClass, mutClass, foldBrClass, allBrClasses;
-long int finalTableSize;
-double main_theta, main_rho, totProbSum, *finalTable;
+double main_theta, main_rho;
 double main_div_time;
 //**********************************
 
@@ -71,16 +70,33 @@ map<int, string> mutConfig2Str;
 map<int, vector<int> > MutConfig;
 map<vector<int>, int> intVec2BrConfig;
 vector<int> npopVec;
+vector<double> dataTable;
+vector<double> finalTable;
 
 int ms_argc;
 char **ms_argv;
-double *dataTable;
 bool estimate;
+long int finalTableSize;
+double totProbSum;
+
 
 
 double ranMT() { return(rMT()); }
 
-int getMutConfig(int mutConfNum, int brClassNum) { return MutConfig[mutConfNum][brClassNum]; }
+void calcFinalTable(double **onetreeTable) {
+	totProbSum = 0.0;
+
+	for (int i = 0; i < finalTableSize; i++) {
+		finalTable.push_back(0);
+	    double jointPoisson = 1.0;
+
+		for (int j = 0; j < brClass; j++)
+			jointPoisson *= onetreeTable[j][MutConfig[i][j]];
+
+		finalTable[i] += jointPoisson;
+		totProbSum += jointPoisson;
+	}
+}
 
 int getBrConfigNum(int *brConfVec) {
 	vector<int> vec(brConfVec, brConfVec+npopVec.size());
@@ -88,11 +104,6 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 double computeLik() {
-
-	totProbSum = 0.0;
-	for (long int i = 0; i < finalTableSize; i++)
-		finalTable[i] = 0.0;
-
 	// calling ms
 	main_ms(ms_argc, ms_argv);
 
@@ -161,13 +172,10 @@ void evalMutConfigs() {
 
 
 void readMutConfigs() {
-	int count = 0;
 	string line;
 	ifstream ifs("marginals_only.txt",ios::in);
-	while (getline(ifs,line)) {
-		dataTable[count] = atof(line.c_str());
-		++count;
-	}
+	while (getline(ifs,line))
+		dataTable.push_back(atof(line.c_str()));
 	ifs.close();
 }
 
@@ -249,7 +257,7 @@ void evalBranchConfigs() {
 
 int main(int argc, char* argv[]) {
 
-//	time_t likStartTime, likEndTime;
+	time_t likStartTime, likEndTime;
 	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
 	char brFold = argv[argc-1][0];
 	ms_argc = argc - 4;
@@ -277,9 +285,6 @@ int main(int argc, char* argv[]) {
 
 	mutClass = kmax+2;
 	finalTableSize = (long int) pow(mutClass, brClass);
-
-	finalTable = (double *) malloc(finalTableSize * sizeof(double));
-	dataTable = (double *) malloc(finalTableSize * sizeof(double));
 
 	evalMutConfigs();
 
@@ -369,18 +374,15 @@ int main(int argc, char* argv[]) {
 //		}	//	theta
 	}
 	else {
-//		time(&likStartTime);
+		time(&likStartTime);
 
 		estimate = false;
 		computeLik();
 
-//		time(&likEndTime);
-//		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
+		time(&likEndTime);
+		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
 
 	}
-
-	free(finalTable);
-	free(dataTable);
 
 	return 0;
 }

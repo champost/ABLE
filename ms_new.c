@@ -234,7 +234,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
  	void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen);
  	double ** d2matrix(int x, int y);
  	void freed2matrix(double **m, int x);
- 	int getMutConfig(int mutConfNum, int brClassNum);
+ 	void calcFinalTable(double **onetreeTable);
 
 
 	nsites = pars.cp.nsites ;
@@ -303,13 +303,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
     		}
     	}
 
-		for (i = 0; i < finalTableSize; i++) {
-		    double jointPoisson = 1.0;
-			for (j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][getMutConfig(i, j)];
-			finalTable[i] += jointPoisson;
-			totProbSum += jointPoisson;
-		}
+	    calcFinalTable(onetreeTable);
 
 //	    printf("\n");
 

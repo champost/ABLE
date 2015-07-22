@@ -58,6 +58,5 @@ int xover(int nsam,int ic, int is);
 int links(int c);
 
 extern int brClass, mutClass, foldBrClass, allBrClasses;
-extern long int finalTableSize;
-extern double main_theta, main_rho, totProbSum, *finalTable;
+extern double main_theta, main_rho;
 extern double main_div_time;

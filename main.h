@@ -51,7 +51,7 @@ int ** d2int_matrix(int x, int y);
 void freed2int_matrix(int **m, int x);
 
 double ranMT();
-int getMutConfig(int mutConfNum, int brClassNum);
+void calcFinalTable(double **onetreeTable);
 int getBrConfigNum(int *brConfVec);
 }
 
