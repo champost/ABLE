@@ -194,7 +194,9 @@ int main_ms(int ms_argc, char *ms_argv[])
 //			for(k=0; k< ntbs; k++) printf("\t%s", tbsparamstrs[k] ) ;
 //		}
 //		printf("\n");
+
         segsites = gensam( list, &probss, &tmrca, &ttot) ;
+
 //  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
 //        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
 //   	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
@@ -264,7 +266,9 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	    		onetreesegs[k] = len;
 	    	}
 //	    	prtree( seglst[seg].ptree, nsam) ;
+
 	    	evalTreeBranchConfigs(seglst[seg].ptree, nsam, totSegBrLen[k]);
+
 	    	if( (segsitesin == 0) && ( theta == 0.0 ) && ( pars.mp.timeflag == 0 ) )
 	    		free(seglst[seg].ptree) ;
 	    }

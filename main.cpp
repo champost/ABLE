@@ -75,26 +75,21 @@ vector<double> finalTable;
 
 int ms_argc;
 char **ms_argv;
+int ntrees;
 bool estimate;
 long int finalTableSize;
-double totProbSum;
-
 
 
 double ranMT() { return(rMT()); }
 
 void calcFinalTable(double **onetreeTable) {
-	totProbSum = 0.0;
-
 	for (int i = 0; i < finalTableSize; i++) {
-		finalTable.push_back(0);
 	    double jointPoisson = 1.0;
 
 		for (int j = 0; j < brClass; j++)
 			jointPoisson *= onetreeTable[j][MutConfig[i][j]];
 
 		finalTable[i] += jointPoisson;
-		totProbSum += jointPoisson;
 	}
 }
 
@@ -104,6 +99,8 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 double computeLik() {
+	finalTable = vector<double> (finalTableSize, 0);
+
 	// calling ms
 	main_ms(ms_argc, ms_argv);
 
@@ -111,12 +108,12 @@ double computeLik() {
 	if (estimate) {
 		for (long int i = 0; i < finalTableSize; i++)
 			if (finalTable[i] > 0)
-				loglik += log(finalTable[i] / totProbSum) * dataTable[i];
+				loglik += log(finalTable[i] / ntrees) * dataTable[i];
 	}
 	else {
 		for (long int i = 0; i < finalTableSize; i++)
 //			printf("%.5e\n", finalTable[i]/totProbSum);
-			printf("%s : %.5e\n", mutConfig2Str[i].c_str(), finalTable[i]/totProbSum);
+			printf("%s : %.5e\n", mutConfig2Str[i].c_str(), finalTable[i]/ntrees);
 	}
 
 	return loglik;
@@ -258,10 +255,11 @@ void evalBranchConfigs() {
 int main(int argc, char* argv[]) {
 
 	time_t likStartTime, likEndTime;
-	int nsam = atoi(argv[1]), ntrees = atoi(argv[2]), kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
+	int nsam = atoi(argv[1]), kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
 	char brFold = argv[argc-1][0];
 	ms_argc = argc - 4;
 	ms_argv = argv;
+	ntrees = atoi(argv[2]);
 
 	readPopSizes(npopSize);
 
