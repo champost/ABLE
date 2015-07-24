@@ -119,7 +119,7 @@ struct segl {
         int next;
         };
 
-double *posit ;
+//double *posit ;
 double segfac ;
 int count, ntbs, nseeds ;
 struct params pars ;
@@ -135,6 +135,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
 	int gensam( char **list, double *probss, double *ptmrca, double *pttot) ;
 	void freecmatrix(char **m, int nsam);
+ 	void freed2matrix(double **m, int x);
 
 
 //	ntbs = 0 ;   /* these next few lines are for reading in parameters from a file (for each sample) */
@@ -163,13 +164,13 @@ int main_ms(int ms_argc, char *ms_argv[])
 
 	if( pars.mp.segsitesin ==  0 ) {
 	     list = cmatrix(pars.cp.nsam,maxsites+1);
-	     posit = (double *)malloc( (unsigned)( maxsites*sizeof( double)) ) ;
+//	     posit = (double *)malloc( (unsigned)( maxsites*sizeof( double)) ) ;
 	     listX = pars.cp.nsam;
 	     listY = maxsites+1;
 	}
 	else {
 	     list = cmatrix(pars.cp.nsam, pars.mp.segsitesin+1 ) ;
-	     posit = (double *)malloc( (unsigned)( pars.mp.segsitesin*sizeof( double)) ) ;
+//	     posit = (double *)malloc( (unsigned)( pars.mp.segsitesin*sizeof( double)) ) ;
 	     if( pars.mp.theta > 0.0 ){
 		    segfac = 1.0 ;
 		    for(  i= pars.mp.segsitesin; i > 1; i--) segfac *= i ;
@@ -213,6 +214,13 @@ int main_ms(int ms_argc, char *ms_argv[])
 //	if( !pars.commandlineseedflag ) seedit( "end" );
 
 	freecmatrix(list, listX);
+
+	// based on Valgrind Memcheck
+	free(pars.cp.config);
+	free(pars.cp.size);
+	free(pars.cp.alphag);
+	free(pars.cp.deventlist);
+	freed2matrix(pars.cp.mig_mat, pars.cp.npop);
 
 	return 0;
 }
@@ -318,6 +326,11 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	    freed2matrix(totSegBrLen, nsegs);
 	    free(totBrLen);
 	    free(onetreesegs);
+
+		// based on Valgrind Memcheck
+	    for(seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++)
+	    	free(seglst[seg].ptree);
+
 	}
 
 //	if( pars.mp.timeflag ) {
