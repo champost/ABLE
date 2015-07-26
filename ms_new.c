@@ -286,7 +286,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
 		    for(k = 0; k < nsegs; k++) {
 		    	double totFoldedSegBrLen = totSegBrLen[k][i-1] + (foldBrClass * totSegBrLen[k][allBrClasses-i]);
-			    if ((i-1) == (allBrClasses-i))
+			    if (foldBrClass && ((i-1) == (allBrClasses-i)))
 			    	totFoldedSegBrLen /= 2;
 
 		    	if( (pars.cp.r > 0.0 ) || (pars.cp.f > 0.0) )
