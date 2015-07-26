@@ -66,12 +66,10 @@ double main_div_time;
 //**********************************
 
 MTRand rMT;
-map<int, string> mutConfig2Str;
-map<int, vector<int> > MutConfig;
 map<vector<int>, int> intVec2BrConfig;
 vector<int> npopVec;
 vector<double> dataTable;
-vector<double> finalTable;
+map<long int, double> finalTableMap;
 
 int ms_argc;
 char **ms_argv;
@@ -82,41 +80,95 @@ long int finalTableSize;
 
 double ranMT() { return(rMT()); }
 
-void calcFinalTable(double **onetreeTable) {
-	for (int i = 0; i < finalTableSize; i++) {
-	    double jointPoisson = 1.0;
-
-		for (int j = 0; j < brClass; j++)
-			jointPoisson *= onetreeTable[j][MutConfig[i][j]];
-
-		finalTable[i] += jointPoisson;
+//	conversion from decimal to base-mutClass
+vector<int> getMutConfigVec(long int i) {
+	int quo = i;
+	int rem = 0;
+	vector<int> MutConfig;
+	for (int j = 0; j < brClass; j++) {
+		if (quo) {
+			rem = quo % mutClass;
+			quo /= mutClass;
+			MutConfig.push_back(rem);
+		}
+		else
+			MutConfig.push_back(0);
 	}
+	reverse(MutConfig.begin(),MutConfig.end());
+
+	return MutConfig;
 }
+
+
+//	conversion from decimal to base-mutClass
+string getMutConfigStr(long int i) {
+	int quo = i;
+	int rem = 0;
+	stringstream stst;
+	stst << ")";
+	for (int j = 0; j < brClass; j++) {
+		if (quo) {
+			rem = quo % mutClass;
+			quo /= mutClass;
+			if (rem == mutClass-1)
+				stst << rem-1 << ">";
+			else
+				stst << rem;
+		}
+		else
+			stst << "0";
+
+		if (j < brClass - 1)
+			stst << ",";
+	}
+	stst << "(";
+	string config = stst.str();
+	reverse(config.begin(),config.end());
+
+	return config;
+}
+
 
 int getBrConfigNum(int *brConfVec) {
 	vector<int> vec(brConfVec, brConfVec+npopVec.size());
 	return intVec2BrConfig[vec];
 }
 
-double computeLik() {
-	finalTable = vector<double> (finalTableSize, 0);
 
+double computeLik() {
 	// calling ms
 	main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
 	if (estimate) {
-		for (long int i = 0; i < finalTableSize; i++)
-			if (finalTable[i] > 0)
-				loglik += log(finalTable[i] / ntrees) * dataTable[i];
+		for (map<long int, double>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++)
+			loglik += log(it->second / ntrees) * dataTable[it->first];
 	}
 	else {
-		for (long int i = 0; i < finalTableSize; i++)
-//			printf("%.5e\n", finalTable[i]/totProbSum);
-			printf("%s : %.5e\n", mutConfig2Str[i].c_str(), finalTable[i]/ntrees);
+		for (map<long int, double>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++)
+			printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), it->second/ntrees);
 	}
 
+
 	return loglik;
+}
+
+
+void calcFinalTable(double **onetreeTable) {
+	for (long int i = 0; i < finalTableSize; i++) {
+	    double jointPoisson = 1.0;
+
+	    vector<int> vec = getMutConfigVec(i);;
+		for (int j = 0; j < brClass; j++)
+			jointPoisson *= onetreeTable[j][vec[j]];
+
+		if (jointPoisson > 0.0) {
+			if (finalTableMap.find(i) == finalTableMap.end())
+				finalTableMap[i] = jointPoisson;
+			else
+				finalTableMap[i] += jointPoisson;
+		}
+	}
 }
 
 
@@ -129,42 +181,6 @@ double optimize_wrapper(const gsl_vector *vars, void *obj) {
 		return 999999;
 	else
 		return -computeLik();
-}
-
-
-//	conversion from decimal to base-mutClass
-void evalMutConfigs() {
-	int quo, rem;
-	for (long int i = 0; i < finalTableSize; i++) {
-		quo = i;
-		rem = 0;
-		stringstream stst;
-		stst << ")";
-		for (int j = 0; j < brClass; j++) {
-			if (quo) {
-				rem = quo % mutClass;
-				quo /= mutClass;
-				if (rem == mutClass-1)
-					stst << rem-1 << ">";
-				else
-					stst << rem;
-				MutConfig[i].push_back(rem);
-			}
-			else {
-				stst << "0";
-				MutConfig[i].push_back(0);
-			}
-
-			if (j < brClass - 1)
-				stst << ",";
-		}
-		stst << "(";
-		string config = stst.str();
-		reverse(config.begin(),config.end());
-		mutConfig2Str[i] = config;
-		reverse(MutConfig[i].begin(),MutConfig[i].end());
-//		cout << config << endl;
-	}
 }
 
 
@@ -208,8 +224,8 @@ void evalBranchConfigs() {
 	for (long int i = 1; i <= (long int) pow(maxPopSize,npopVec.size()); i++) {
 		quo = i;
 		rem = 0;
-		stringstream stst;
-		stst << ")";
+//		stringstream stst;
+//		stst << ")";
 		sumConfig = 0;
 		skipConfig = false;
 		vector<int> vec;
@@ -222,26 +238,26 @@ void evalBranchConfigs() {
 					skipConfig = true;
 					break;
 				}
-				stst << rem;
+//				stst << rem;
 				sumConfig += rem;
 				vec.push_back(rem);
 			}
 			else {
-				stst << "0";
+//				stst << "0";
 				vec.push_back(0);
 			}
 
-			if (j < npopVec.size() - 1)
-				stst << ",";
+//			if (j < npopVec.size() - 1)
+//				stst << ",";
 		}
 
 		if (sumConfig == totPopSum)
 			break;
 
 		if (!skipConfig) {
-			stst << "(";
-			string config = stst.str();
-			reverse(config.begin(),config.end());
+//			stst << "(";
+//			string config = stst.str();
+//			reverse(config.begin(),config.end());
 			reverse(vec.begin(),vec.end());
 			intVec2BrConfig[vec] = count;
 			++count;
@@ -283,8 +299,6 @@ int main(int argc, char* argv[]) {
 
 	mutClass = kmax+2;
 	finalTableSize = (long int) pow(mutClass, brClass);
-
-	evalMutConfigs();
 
 	if (atoi(argv[argc-4])) {
 
