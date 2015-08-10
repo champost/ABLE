@@ -446,7 +446,7 @@ void ndes_and_branch_setup(struct node *ptree, int nsam) {
 		ptree[i].brLength = ptree[ptree[i].abv].time - ptree[i].time;
 	}
 	//	ROOT!
-	ptree[2*nsam -1].brLength = 0 ;
+	ptree[2*nsam -2].brLength = 0 ;
 }
 
 void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen) {

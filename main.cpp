@@ -68,13 +68,14 @@ double main_div_time;
 MTRand rMT;
 map<vector<int>, int> intVec2BrConfig;
 vector<int> npopVec;
-vector<double> dataTable;
-map<long int, double> finalTableMap;
+map<vector<int>, double> dataConfigs;
+map<vector<int>, double> selectConfigsMap;
+map<long int, double> allConfigsMap;
 
 int ms_argc;
 char **ms_argv;
 int ntrees;
-bool estimate;
+int estimate;
 long int finalTableSize;
 
 
@@ -129,6 +130,18 @@ string getMutConfigStr(long int i) {
 }
 
 
+string getMutConfigStr(vector<int> configVec) {
+	int size = configVec.size();
+	stringstream stst;
+	stst << "(";
+	for (int j = 0; j < size-1; j++)
+		stst << configVec[j] << ",";
+	stst << configVec[size-1] << ")";
+
+	return stst.str();
+}
+
+
 int getBrConfigNum(int *brConfVec) {
 	vector<int> vec(brConfVec, brConfVec+npopVec.size());
 	return intVec2BrConfig[vec];
@@ -141,32 +154,42 @@ double computeLik() {
 
 	double loglik = 0.0;
 	if (estimate) {
-		for (map<long int, double>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++)
-			loglik += log(it->second / ntrees) * dataTable[it->first];
+		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
+			loglik += log(it->second / ntrees) * dataConfigs[it->first];
 	}
 	else {
-		for (map<long int, double>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++)
+		for (map<long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
 			printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), it->second/ntrees);
 	}
-
 
 	return loglik;
 }
 
 
 void calcFinalTable(double **onetreeTable) {
-	for (long int i = 0; i < finalTableSize; i++) {
-	    double jointPoisson = 1.0;
+	if (estimate) {
+		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		    double jointPoisson = 1.0;
 
-	    vector<int> vec = getMutConfigVec(i);;
-		for (int j = 0; j < brClass; j++)
-			jointPoisson *= onetreeTable[j][vec[j]];
+		    vector<int> vec = it->first;
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
 
-		if (jointPoisson > 0.0) {
-			if (finalTableMap.find(i) == finalTableMap.end())
-				finalTableMap[i] = jointPoisson;
-			else
-				finalTableMap[i] += jointPoisson;
+			if (jointPoisson > 0.0)
+				selectConfigsMap[vec] += jointPoisson;
+		}
+
+	}
+	else {
+		for (long int i = 0; i < finalTableSize; i++) {
+		    double jointPoisson = 1.0;
+
+		    vector<int> vec = getMutConfigVec(i);
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
+
+			if (jointPoisson > 0.0)
+				allConfigsMap[i] += jointPoisson;
 		}
 	}
 }
@@ -177,19 +200,43 @@ double optimize_wrapper(const gsl_vector *vars, void *obj) {
 	main_theta = gsl_vector_get(vars, 0);
 	main_rho = gsl_vector_get(vars, 1);
 	main_div_time = gsl_vector_get(vars, 2);
-	if ((main_theta < 0) or (main_rho < 0))
+	if ((main_theta < 0) or (main_rho < 0) or (main_div_time < 0))
 		return 999999;
 	else
 		return -computeLik();
 }
 
 
-void readMutConfigs() {
-	string line;
-	ifstream ifs("marginals_only.txt",ios::in);
-	while (getline(ifs,line))
-		dataTable.push_back(atof(line.c_str()));
-	ifs.close();
+void Tokenize(const string& str, vector<string>& tokens, const string& delimiters){
+    // Skip delimiters at beginning.
+    string::size_type lastPos = str.find_first_not_of(delimiters, 0);
+    // Find first "non-delimiter".
+    string::size_type pos     = str.find_first_of(delimiters, lastPos);
+
+    while (string::npos != pos || string::npos != lastPos)
+    {
+        // Found a token, add it to the vector.
+        tokens.push_back(str.substr(lastPos, pos - lastPos));
+        // Skip delimiters.  Note the "not_of"
+        lastPos = str.find_first_not_of(delimiters, pos);
+        // Find next "non-delimiter"
+        pos = str.find_first_of(delimiters, lastPos);
+    }
+}
+
+
+void TrimSpaces(string& str)  {
+	// Trim Both leading and trailing spaces
+	size_t startpos = str.find_first_not_of(" \t\r\n"); // Find the first character position after excluding leading blank spaces
+	size_t endpos = str.find_last_not_of(" \t\r\n"); // Find the first character position from reverse af
+
+	// if all spaces or empty return an empty string
+	if(( string::npos == startpos ) || ( string::npos == endpos))
+	{
+		str = "";
+	}
+	else
+		str = str.substr( startpos, endpos-startpos+1 );
 }
 
 
@@ -203,6 +250,36 @@ void readPopSizes(int npops) {
 		int tmp;
 		stst >> tmp;
 		npopVec.push_back(tmp);
+	}
+	ifs.close();
+}
+
+
+void readDataConfigs() {
+	string line, del, keyVec;
+	vector<string> tokens;
+	vector<int> config;
+	double val;
+
+	ifstream ifs("dataconfig.txt",ios::in);
+	while (getline(ifs,line)) {
+		del = ":";
+		tokens.clear();
+		Tokenize(line, tokens, del);
+		for(unsigned int j=0;j<tokens.size();j++){
+			TrimSpaces(tokens[j]);
+		}
+		keyVec = tokens[0];
+		val = atof(tokens[1].c_str());
+
+		del = "(,)";
+		tokens.clear();
+		Tokenize(keyVec, tokens, del);
+		for(unsigned int j=0;j<tokens.size();j++){
+			TrimSpaces(tokens[j]);
+			config.push_back(atoi(tokens[j].c_str()));
+		}
+		dataConfigs[config] = val;
 	}
 	ifs.close();
 }
@@ -271,11 +348,13 @@ void evalBranchConfigs() {
 int main(int argc, char* argv[]) {
 
 	time_t likStartTime, likEndTime;
-	int nsam = atoi(argv[1]), kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
+//	int nsam = atoi(argv[1]);
+	int kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
 	char brFold = argv[argc-1][0];
 	ms_argc = argc - 4;
 	ms_argv = argv;
 	ntrees = atoi(argv[2]);
+	estimate = atoi(argv[argc-4]);
 
 	readPopSizes(npopSize);
 
@@ -298,13 +377,31 @@ int main(int argc, char* argv[]) {
 	evalBranchConfigs();
 
 	mutClass = kmax+2;
-	finalTableSize = (long int) pow(mutClass, brClass);
 
-	if (atoi(argv[argc-4])) {
+	if (estimate == 2) {
+		readDataConfigs();
 
-		estimate = true;
+		main_theta = 1.0;
+		main_rho = 1.0;
+		main_div_time = 1.25;
+		printf("%.2f\t%.2f\t%.2f\t%.6f\n",main_theta, main_rho, main_div_time, computeLik());
 
-		readMutConfigs();
+
+//		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
+//			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
+//
+//				main_theta = theta;
+//				main_rho = rho;
+//
+////				printf("%.2f\t%.5e\n",theta, computeLik());
+//				printf("%.2f\t%.2f\t%.5e\n",theta, rho, computeLik());
+//
+//			}	//	rho
+//		}	//	theta
+	}
+	else if (estimate == 1) {
+
+		readDataConfigs();
 
 		const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
 		gsl_multimin_fminimizer *s = NULL;
@@ -364,7 +461,8 @@ int main(int argc, char* argv[]) {
 //				printf ("%5d ", iter);
 //				for (i = 0; i < npar; i++)
 //					printf ("%.6f ", gsl_vector_get (s->x, i));
-//				printf ("LnL = %.6f\n", -s->fval);
+//				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
+////				printf ("LnL = %.6f\n", -s->fval);
 //			}
 
 		} while (status == GSL_CONTINUE && iter < 1000);
@@ -372,28 +470,17 @@ int main(int argc, char* argv[]) {
 		gsl_vector_free(x);
 		gsl_vector_free(ss);
 		gsl_multimin_fminimizer_free (s);
-
-//		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
-//			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
-//
-//				main_theta = theta;
-//				main_rho = rho;
-//
-////				printf("%.2f\t%.5e\n",theta, computeLik());
-//				printf("%.2f\t%.2f\t%.5e\n",theta, rho, computeLik());
-//
-//			}	//	rho
-//		}	//	theta
 	}
-	else {
+	else if (estimate == 0) {
+		finalTableSize = (long int) pow(mutClass, brClass);
+//		printf("\n\nfinalTableSize : %d", finalTableSize);
+
 		time(&likStartTime);
 
-		estimate = false;
 		computeLik();
 
 		time(&likEndTime);
 		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
-
 	}
 
 	return 0;
