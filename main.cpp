@@ -153,11 +153,19 @@ double computeLik() {
 	main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
-	if (estimate) {
+	if (estimate == 2) {
+		ofstream ifs("tmp.txt",ios::out);
+		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
+			ifs << getMutConfigStr(it->first) << " : " << it->second / ntrees << endl;
+			loglik += log(it->second / ntrees) * dataConfigs[it->first];
+		}
+		ifs.close();
+	}
+	else if (estimate == 1) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / ntrees) * dataConfigs[it->first];
 	}
-	else {
+	else if (estimate == 0) {
 		for (map<long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
 			printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), it->second/ntrees);
 	}
@@ -280,6 +288,7 @@ void readDataConfigs() {
 			config.push_back(atoi(tokens[j].c_str()));
 		}
 		dataConfigs[config] = val;
+		config.clear();
 	}
 	ifs.close();
 }
@@ -384,7 +393,7 @@ int main(int argc, char* argv[]) {
 		main_theta = 1.0;
 		main_rho = 1.0;
 		main_div_time = 1.25;
-		printf("%.2f\t%.2f\t%.2f\t%.6f\n",main_theta, main_rho, main_div_time, computeLik());
+		computeLik();
 
 
 //		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
@@ -420,9 +429,9 @@ int main(int argc, char* argv[]) {
 		/* Starting point */
 		x = gsl_vector_alloc (npar);
 
-		gsl_vector_set (x,0,ranMT()*10);
-		gsl_vector_set (x,1,ranMT()*10);
-		gsl_vector_set (x,2,ranMT()*10);
+		gsl_vector_set (x,0,ranMT());
+		gsl_vector_set (x,1,ranMT());
+		gsl_vector_set (x,2,ranMT());
 		printf ("Start coordinates : \n");
 		for (i = 0; i < npar; i++)
 			printf ("%.6f ", gsl_vector_get (x, i));
@@ -445,7 +454,7 @@ int main(int argc, char* argv[]) {
 
 			size = gsl_multimin_fminimizer_size (s);
 			//status = gsl_multimin_test_size (size, 1e-2);
-			status = gsl_multimin_test_size (size, 0.00001); //since we want more precision
+			status = gsl_multimin_test_size (size, 0.001); //since we want more precision
 
 			if (status == GSL_SUCCESS) {
 				printf ("Converged to a maximum at\n");
