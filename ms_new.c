@@ -141,7 +141,9 @@ int main_ms(int ms_argc, char *ms_argv[])
 //	ntbs = 0 ;   /* these next few lines are for reading in parameters from a file (for each sample) */
 //	tbsparamstrs = (char **)malloc( ms_argc*sizeof(char *) ) ;
 //
-//	for( i=0; i<ms_argc; i++) printf("%s ",ms_argv[i]);
+//	for( i=1; i<ms_argc; i++)
+//		printf("%s ",ms_argv[i]);
+//	printf("\n");
 //	for( i =0; i<ms_argc; i++) tbsparamstrs[i] = (char *)malloc(30*sizeof(char) ) ;
 //	for( i = 1; i<ms_argc ; i++)
 //			if( strcmp( ms_argv[i],"tbs") == 0 )  ms_argv[i] = tbsparamstrs[ ntbs++] ;
@@ -150,15 +152,6 @@ int main_ms(int ms_argc, char *ms_argv[])
 
 //	if( ntbs > 0 )  for( k=0; k<ntbs; k++)  scanf(" %s", tbsparamstrs[k] );
 	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
-//*******************************************************
-	if (atoi(ms_argv[ms_argc])) {
-		pars.mp.theta = main_theta;
-		pars.cp.deventlist[0].time = main_div_time;
-		if (pars.cp.r > 0.0 )
-			pars.cp.r =	main_rho;
-	}
-//*******************************************************
-
 //	if( !pars.commandlineseedflag ) seedit( "s");
 	pf = stdout ;
 

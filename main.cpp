@@ -61,8 +61,6 @@ using namespace std;
 
 //************ EXTERN **************
 int brClass, mutClass, foldBrClass, allBrClasses;
-double main_theta, main_rho;
-double main_div_time;
 //**********************************
 
 MTRand rMT;
@@ -71,6 +69,7 @@ vector<int> npopVec;
 map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
 map<long int, double> allConfigsMap;
+vector<int> tbsIdx;
 
 int ms_argc;
 char **ms_argv;
@@ -154,20 +153,23 @@ double computeLik() {
 
 	double loglik = 0.0;
 	if (estimate == 2) {
-		ofstream ifs("tmp.txt",ios::out);
+		ofstream ofs("tmp.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
-			ifs << getMutConfigStr(it->first) << " : " << it->second / ntrees << endl;
+			ofs << getMutConfigStr(it->first) << " : " << it->second / ntrees << endl;
 			loglik += log(it->second / ntrees) * dataConfigs[it->first];
 		}
-		ifs.close();
+		ofs.close();
+		selectConfigsMap.clear();
 	}
 	else if (estimate == 1) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / ntrees) * dataConfigs[it->first];
+		selectConfigsMap.clear();
 	}
 	else if (estimate == 0) {
 		for (map<long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
 			printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), it->second/ntrees);
+		allConfigsMap.clear();
 	}
 
 	return loglik;
@@ -204,14 +206,18 @@ void calcFinalTable(double **onetreeTable) {
 
 
 double optimize_wrapper(const gsl_vector *vars, void *obj) {
+	for (size_t i = 0; i < tbsIdx.size(); i++) {
+		double par = gsl_vector_get(vars, i);
+		if ((par <= 0) || (par > 5))
+			return 999999;
+		else {
+			stringstream stst;
+			stst << par;
+			stst >> ms_argv[tbsIdx[i]];
+		}
+	}
 
-	main_theta = gsl_vector_get(vars, 0);
-	main_rho = gsl_vector_get(vars, 1);
-	main_div_time = gsl_vector_get(vars, 2);
-	if ((main_theta < 0) or (main_rho < 0) or (main_div_time < 0))
-		return 999999;
-	else
-		return -computeLik();
+	return -computeLik();
 }
 
 
@@ -248,12 +254,40 @@ void TrimSpaces(string& str)  {
 }
 
 
+void readParams(int argc, char* argv[]) {
+	string line;
+	ifstream ifs("params.txt",ios::in);
+	getline(ifs,line);
+	stringstream stst(line);
+	ifs.close();
+
+	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
+	for(int i =0; i < argc; i++)
+		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
+
+	for (int i = 0; i < argc; i++) {
+		if (string(argv[i]) == "tbs") {
+			if (estimate) {
+				stst >> ms_argv[i];
+				tbsIdx.push_back(i);
+			}
+			else {
+				cerr << "Cannot proceed with BlockLik" << endl;
+				cerr << "\"tbs\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
+				exit(-1);
+			}
+		}
+		else
+			ms_argv[i] = argv[i];
+	}
+}
+
+
 void readPopSizes(int npops) {
 	string line;
 	ifstream ifs("popconfig.txt",ios::in);
 	getline(ifs,line);
-	stringstream stst;
-	stst << line;
+	stringstream stst(line);
 	for (int i = 0; i < npops; i++) {
 		int tmp;
 		stst >> tmp;
@@ -361,12 +395,13 @@ int main(int argc, char* argv[]) {
 	int kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
 	char brFold = argv[argc-1][0];
 	ms_argc = argc - 4;
-	ms_argv = argv;
 	ntrees = atoi(argv[2]);
 	estimate = atoi(argv[argc-4]);
 
+	readParams(argc, argv);
 	readPopSizes(npopSize);
 
+	mutClass = kmax+2;
 	brClass = npopVec[0]+1;
 	for (size_t i = 1; i < npopVec.size(); i++)
 		brClass *= (npopVec[i]+1);
@@ -385,16 +420,18 @@ int main(int argc, char* argv[]) {
 
 	evalBranchConfigs();
 
-	mutClass = kmax+2;
-
 	if (estimate == 2) {
 		readDataConfigs();
 
-		main_theta = 1.0;
-		main_rho = 1.0;
-		main_div_time = 1.25;
-		computeLik();
-
+		for (size_t i = 0; i < tbsIdx.size(); i++) {
+			if (string(ms_argv[tbsIdx[i]]) == "tbs") {
+				stringstream stst;
+				stst << ranMT();
+				stst >> ms_argv[tbsIdx[i]];
+			}
+			printf ("%.6f ", atof(ms_argv[tbsIdx[i]]));
+		}
+		printf("LnL : %.6f\n", computeLik());
 
 //		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
 //			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
@@ -415,8 +452,13 @@ int main(int argc, char* argv[]) {
 		const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
 		gsl_multimin_fminimizer *s = NULL;
 		gsl_vector *ss, *x;
-		size_t npar = 3;
-		size_t iter = 0, i;
+		size_t npar = tbsIdx.size();
+		if (npar == 0) {
+			cerr << "Cannot proceed with inference" << endl;
+			cerr << "Parameters to be inferred haven't been specified. Please use \"tbs\" arguments to specify them on the command line" << endl;
+			exit(-1);
+		}
+		int iter = 0;
 		int status;
 		double size;
 
@@ -424,17 +466,20 @@ int main(int argc, char* argv[]) {
 		ss = gsl_vector_alloc (npar);
 
 		/* Set all step sizes to .01 */ //Note that it was originally 1
-		gsl_vector_set_all (ss, 1);
+		gsl_vector_set_all (ss, 0.3);
 
 		/* Starting point */
 		x = gsl_vector_alloc (npar);
 
-		gsl_vector_set (x,0,ranMT());
-		gsl_vector_set (x,1,ranMT());
-		gsl_vector_set (x,2,ranMT());
 		printf ("Start coordinates : \n");
-		for (i = 0; i < npar; i++)
+		for (size_t i = 0; i < npar; i++) {
+			if (string(ms_argv[tbsIdx[i]]) == "tbs")
+				gsl_vector_set (x,i,ranMT());
+			else
+				gsl_vector_set (x,i,atof(ms_argv[tbsIdx[i]]));
+
 			printf ("%.6f ", gsl_vector_get (x, i));
+		}
 		printf ("\n");
 
 		gsl_multimin_function minex_func;
@@ -459,20 +504,21 @@ int main(int argc, char* argv[]) {
 			if (status == GSL_SUCCESS) {
 				printf ("Converged to a maximum at\n");
 
-				//printf ("%5d ", iter);
+//				printf ("%5d ", iter);
 
-				for (i = 0; i < npar; i++)
+				for (size_t i = 0; i < npar; i++)
 					printf ("%.6f ", gsl_vector_get (s->x, i));
 //				printf ("LnL = %.6f size = %.5e\n", -s->fval, size);
 				printf ("LnL = %.6f\n\n", -s->fval);
 			}
-//			else {
-//				printf ("%5d ", iter);
-//				for (i = 0; i < npar; i++)
-//					printf ("%.6f ", gsl_vector_get (s->x, i));
-//				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
-////				printf ("LnL = %.6f\n", -s->fval);
-//			}
+			else {
+				printf ("%5d ", iter);
+				for (size_t i = 0; i < npar; i++)
+					printf ("%.6f ", gsl_vector_get (s->x, i));
+//				printf ("LnL = %.6f size = %.6f\n", s->fval, size);
+				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
+//				printf ("LnL = %.6f\n", -s->fval);
+			}
 
 		} while (status == GSL_CONTINUE && iter < 1000);
 
