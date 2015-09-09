@@ -68,20 +68,21 @@ map<vector<int>, int> intVec2BrConfig;
 vector<int> npopVec;
 map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
-map<long int, double> allConfigsMap;
+map<unsigned long int, double> allConfigsMap;
+//vector<double> allConfigsLnL;
 vector<int> tbsIdx;
 
 int ms_argc;
 char **ms_argv;
-int ntrees;
+int ntrees, treesSampled;
 int estimate;
-long int finalTableSize;
+unsigned long int finalTableSize;
 
 
 double ranMT() { return(rMT()); }
 
 //	conversion from decimal to base-mutClass
-vector<int> getMutConfigVec(long int i) {
+vector<int> getMutConfigVec(unsigned long int i) {
 	int quo = i;
 	int rem = 0;
 	vector<int> MutConfig;
@@ -101,7 +102,7 @@ vector<int> getMutConfigVec(long int i) {
 
 
 //	conversion from decimal to base-mutClass
-string getMutConfigStr(long int i) {
+string getMutConfigStr(unsigned long int i) {
 	int quo = i;
 	int rem = 0;
 	stringstream stst;
@@ -148,6 +149,8 @@ int getBrConfigNum(int *brConfVec) {
 
 
 double computeLik() {
+	treesSampled = 0;
+
 	// calling ms
 	main_ms(ms_argc, ms_argv);
 
@@ -155,28 +158,42 @@ double computeLik() {
 	if (estimate == 2) {
 		ofstream ofs("tmp.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
-			ofs << getMutConfigStr(it->first) << " : " << it->second / ntrees << endl;
-			loglik += log(it->second / ntrees) * dataConfigs[it->first];
+			ofs << getMutConfigStr(it->first) << " : " << it->second / treesSampled << endl;
+			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		}
 		ofs.close();
 		selectConfigsMap.clear();
 	}
 	else if (estimate == 1) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
-			loglik += log(it->second / ntrees) * dataConfigs[it->first];
+			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		selectConfigsMap.clear();
 	}
 	else if (estimate == 0) {
-		for (map<long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
-			printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), it->second/ntrees);
+		for (map<unsigned long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
+			printf("%s : %.5e\n",getMutConfigStr(it->first).c_str(), it->second/treesSampled);
 		allConfigsMap.clear();
 	}
+
+//	double average = 0.0, variance = 0.0;
+//	for (int j = 0; j < treesSampled; j++)
+//		average += allConfigsLnL[j];
+//	average /= treesSampled;
+//
+//	for (int j = 0; j < treesSampled; j++)
+//		variance += pow((average - allConfigsLnL[j]),2);
+//	variance /= (treesSampled - 1);
+//	printf("avgLnL : %.5f; varLnL : %.5f\n", average, variance);
+//	allConfigsLnL.clear();
 
 	return loglik;
 }
 
 
 void calcFinalTable(double **onetreeTable) {
+
+	++treesSampled;
+
 	if (estimate) {
 		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
 		    double jointPoisson = 1.0;
@@ -188,19 +205,22 @@ void calcFinalTable(double **onetreeTable) {
 			if (jointPoisson > 0.0)
 				selectConfigsMap[vec] += jointPoisson;
 		}
-
 	}
 	else {
-		for (long int i = 0; i < finalTableSize; i++) {
+//		double loglik = 0.0;
+		for (unsigned long int i = 0; i < finalTableSize; i++) {
 		    double jointPoisson = 1.0;
 
 		    vector<int> vec = getMutConfigVec(i);
 			for (int j = 0; j < brClass; j++)
 				jointPoisson *= onetreeTable[j][vec[j]];
 
-			if (jointPoisson > 0.0)
+			if (jointPoisson > 0.0) {
 				allConfigsMap[i] += jointPoisson;
+//				loglik += jointPoisson * log(jointPoisson);
+			}
 		}
+//		allConfigsLnL.push_back(loglik);
 	}
 }
 
@@ -341,7 +361,7 @@ void evalBranchConfigs() {
 	}
 	++maxPopSize;
 
-	for (long int i = 1; i <= (long int) pow(maxPopSize,npopVec.size()); i++) {
+	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,npopVec.size()); i++) {
 		quo = i;
 		rem = 0;
 //		stringstream stst;
@@ -466,7 +486,7 @@ int main(int argc, char* argv[]) {
 		ss = gsl_vector_alloc (npar);
 
 		/* Set all step sizes to .01 */ //Note that it was originally 1
-		gsl_vector_set_all (ss, 0.3);
+		gsl_vector_set_all (ss, 1);
 
 		/* Starting point */
 		x = gsl_vector_alloc (npar);
@@ -515,9 +535,8 @@ int main(int argc, char* argv[]) {
 				printf ("%5d ", iter);
 				for (size_t i = 0; i < npar; i++)
 					printf ("%.6f ", gsl_vector_get (s->x, i));
-//				printf ("LnL = %.6f size = %.6f\n", s->fval, size);
-				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
-//				printf ("LnL = %.6f\n", -s->fval);
+//				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
+				printf ("LnL = %.6f\n", -s->fval);
 			}
 
 		} while (status == GSL_CONTINUE && iter < 1000);
@@ -528,7 +547,13 @@ int main(int argc, char* argv[]) {
 	}
 	else if (estimate == 0) {
 		finalTableSize = (long int) pow(mutClass, brClass);
-//		printf("\n\nfinalTableSize : %d", finalTableSize);
+		if (finalTableSize > 1000000000) { //	1 billion
+			printf("\nThis is going to be too long a table to compute!\n"
+					"Please contact Champak B. Reddy (champak.br@gmail.com) if you really want to go ahead with this\n"
+					"Prematurely exiting BlockLik...");
+			exit(-1);
+		}
+//		printf("\n\nfinalTableSize : %.0f", finalTableSize);
 
 		time(&likStartTime);
 
