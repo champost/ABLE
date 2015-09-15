@@ -54,6 +54,8 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_vector.h>
 
+#include <nlopt.hpp>
+
 #include "MersenneTwister.h"
 #include "main.h"
 
@@ -75,7 +77,7 @@ vector<int> tbsIdx;
 int ms_argc;
 char **ms_argv;
 int ntrees, treesSampled;
-int estimate;
+int estimate, evalCount;
 unsigned long int finalTableSize;
 
 
@@ -164,7 +166,7 @@ double computeLik() {
 		ofs.close();
 		selectConfigsMap.clear();
 	}
-	else if (estimate == 1) {
+	else if ((estimate == 1) || (estimate == 3)) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		selectConfigsMap.clear();
@@ -225,7 +227,32 @@ void calcFinalTable(double **onetreeTable) {
 }
 
 
-double optimize_wrapper(const gsl_vector *vars, void *obj) {
+double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
+
+	++evalCount;
+	if (!grad.empty()) {
+		cerr << "Cannot proceed with BlockLik" << endl;
+		cerr << "Gradient based optimization not yet implemented..." << endl;
+		exit(-1);
+	}
+	for (size_t i = 0; i < tbsIdx.size(); i++) {
+		stringstream stst;
+		stst << vars[i];
+		stst >> ms_argv[tbsIdx[i]];
+	}
+
+	double loglik = computeLik();
+	printf ("%5d ", evalCount);
+	for (size_t i = 0; i < vars.size(); i++)
+		printf ("%.6f ", vars[i]);
+	printf ("LnL = %.6f\n", loglik);
+	return loglik;
+
+//	return computeLik();
+}
+
+
+double optimize_wrapper_gsl(const gsl_vector *vars, void *obj) {
 	for (size_t i = 0; i < tbsIdx.size(); i++) {
 		double par = gsl_vector_get(vars, i);
 		if ((par <= 0) || (par > 5))
@@ -465,6 +492,43 @@ int main(int argc, char* argv[]) {
 //			}	//	rho
 //		}	//	theta
 	}
+	else if (estimate == 3) {
+
+		readDataConfigs();
+
+		nlopt::opt opt(nlopt::LN_SBPLX, tbsIdx.size());
+//		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbsIdx.size());
+//		nlopt::opt opt(nlopt::LN_COBYLA, tbsIdx.size());
+		opt.set_lower_bounds(1e-7);
+		opt.set_upper_bounds(5);
+		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+		opt.set_xtol_rel(1e-7);
+		opt.set_initial_step(1);
+
+		double maxLnL;
+		vector<double> paramVec;
+
+
+		for (size_t i = 0; i < tbsIdx.size(); i++)
+			paramVec.push_back(ranMT()+2);
+
+
+
+
+		printf ("Start coordinates : \n");
+		for (size_t i = 0; i < paramVec.size(); i++)
+			printf ("%.6f ", paramVec[i]);
+		printf ("\n");
+
+		evalCount = 0;
+		opt.optimize(paramVec, maxLnL);
+
+		printf ("Found a maximum after %d evaluations\n", evalCount);
+		printf ("Found a maximum at ");
+		for (size_t i = 0; i < paramVec.size(); i++)
+			printf ("%.6f ", paramVec[i]);
+		printf ("LnL = %.6f\n", maxLnL);
+	}
 	else if (estimate == 1) {
 
 		readDataConfigs();
@@ -503,7 +567,7 @@ int main(int argc, char* argv[]) {
 		printf ("\n");
 
 		gsl_multimin_function minex_func;
-		minex_func.f = optimize_wrapper;
+		minex_func.f = optimize_wrapper_gsl;
 //		minex_func.params = pt;
 		minex_func.n = npar;
 		s = gsl_multimin_fminimizer_alloc (T, npar);
