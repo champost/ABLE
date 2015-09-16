@@ -1,1 +1,1 @@
-# BlockLik
+# ABLE - Approximate "Blockwise" Likelihood Estimation
