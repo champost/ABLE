@@ -160,7 +160,7 @@ double computeLik() {
 	if (estimate == 2) {
 		ofstream ofs("tmp.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
-			ofs << getMutConfigStr(it->first) << " : " << it->second / treesSampled << endl;
+			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		}
 		ofs.close();
@@ -478,7 +478,12 @@ int main(int argc, char* argv[]) {
 			}
 			printf ("%.6f ", atof(ms_argv[tbsIdx[i]]));
 		}
+		time(&likStartTime);
+
 		printf("LnL : %.6f\n", computeLik());
+
+		time(&likEndTime);
+		printf("Time taken for computation only : %.5f s\n\n", float(likEndTime - likStartTime));
 
 //		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
 //			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
@@ -496,8 +501,8 @@ int main(int argc, char* argv[]) {
 
 		readDataConfigs();
 
-		nlopt::opt opt(nlopt::LN_SBPLX, tbsIdx.size());
-//		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbsIdx.size());
+//		nlopt::opt opt(nlopt::LN_SBPLX, tbsIdx.size());
+		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbsIdx.size());
 //		nlopt::opt opt(nlopt::LN_COBYLA, tbsIdx.size());
 		opt.set_lower_bounds(1e-7);
 		opt.set_upper_bounds(5);
@@ -510,7 +515,8 @@ int main(int argc, char* argv[]) {
 
 
 		for (size_t i = 0; i < tbsIdx.size(); i++)
-			paramVec.push_back(ranMT()+2);
+//			paramVec.push_back(ranMT()+2);
+			paramVec.push_back(ranMT());
 
 
 
