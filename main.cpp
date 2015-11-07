@@ -62,7 +62,7 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass, foldBrClass, allBrClasses;
+int brClass, mutClass, foldBrClass = 0, allBrClasses;
 //**********************************
 
 MTRand rMT;
@@ -73,11 +73,14 @@ map<vector<int>, double> selectConfigsMap;
 map<unsigned long int, double> allConfigsMap;
 //vector<double> allConfigsLnL;
 vector<int> tbsIdx;
+vector<string> tbsVal;
+string dataConfigFile;
+int npops = 0, kmax = 0;
 
-int ms_argc;
+int ms_argc = 0;
 char **ms_argv;
-int ntrees, treesSampled;
-int estimate, evalCount;
+int ntrees = 0, treesSampled = 0;
+int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
 
@@ -231,7 +234,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	++evalCount;
 	if (!grad.empty()) {
-		cerr << "Cannot proceed with BlockLik" << endl;
+		cerr << "Cannot proceed with ABLE" << endl;
 		cerr << "Gradient based optimization not yet implemented..." << endl;
 		exit(-1);
 	}
@@ -301,44 +304,52 @@ void TrimSpaces(string& str)  {
 }
 
 
-void readParams(int argc, char* argv[]) {
-	string line;
-	ifstream ifs("params.txt",ios::in);
-	getline(ifs,line);
-	stringstream stst(line);
-	ifs.close();
+void readConfigFile(int argc, char* argv[]) {
+	string line, del, keyWord;
+	vector<string> tokens;
+	ifstream ifs("config.txt",ios::in);
+	while (getline(ifs,line)) {
+		del = " ";
+		tokens.clear();
+		Tokenize(line, tokens, del);
+		for(unsigned int j=0;j<tokens.size();j++)
+			TrimSpaces(tokens[j]);
 
-	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
-	for(int i =0; i < argc; i++)
-		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
+		if (tokens[0][0] != '#') {
+			if (tokens[0] == "pops") {
+				stringstream stst1(tokens[1]);
+				stst1 >> npops;
+				for (int i = 0; i < npops; i++) {
+					stringstream stst2(tokens[i+2]);
+					int tmp;
+					stst2 >> tmp;
+					npopVec.push_back(tmp);
+				}
 
-	for (int i = 0; i < argc; i++) {
-		if (string(argv[i]) == "tbs") {
-			if (estimate) {
-				stst >> ms_argv[i];
-				tbsIdx.push_back(i);
 			}
+			else if (tokens[0] == "params") {
+				for(size_t j = 1; j < tokens.size(); j++)
+					tbsVal.push_back(tokens[j]);
+			}
+			else if (tokens[0] == "datafile") {
+				dataConfigFile = tokens[1];
+			}
+			else if (tokens[0] == "estimate") {
+				stringstream stst(tokens[1]);
+				stst >> estimate;
+			}
+			else if (tokens[0] == "kmax") {
+				stringstream stst(tokens[1]);
+				stst >> kmax;
+			}
+			else if (tokens[0] == "folded")
+				foldBrClass = 1;
 			else {
-				cerr << "Cannot proceed with BlockLik" << endl;
-				cerr << "\"tbs\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
+				cerr << "Unrecognised keyword found in the config file!" << endl;
+				cerr << "Aborting ABLE..." << endl;
 				exit(-1);
 			}
 		}
-		else
-			ms_argv[i] = argv[i];
-	}
-}
-
-
-void readPopSizes(int npops) {
-	string line;
-	ifstream ifs("popconfig.txt",ios::in);
-	getline(ifs,line);
-	stringstream stst(line);
-	for (int i = 0; i < npops; i++) {
-		int tmp;
-		stst >> tmp;
-		npopVec.push_back(tmp);
 	}
 	ifs.close();
 }
@@ -350,7 +361,7 @@ void readDataConfigs() {
 	vector<int> config;
 	double val;
 
-	ifstream ifs("dataconfig.txt",ios::in);
+	ifstream ifs(dataConfigFile.c_str(),ios::in);
 	while (getline(ifs,line)) {
 		del = ":";
 		tokens.clear();
@@ -439,14 +450,33 @@ int main(int argc, char* argv[]) {
 
 	time_t likStartTime, likEndTime;
 //	int nsam = atoi(argv[1]);
-	int kmax = atoi(argv[argc-3]), npopSize = atoi(argv[argc-2]);
-	char brFold = argv[argc-1][0];
-	ms_argc = argc - 4;
 	ntrees = atoi(argv[2]);
-	estimate = atoi(argv[argc-4]);
+	ms_argc = argc;
 
-	readParams(argc, argv);
-	readPopSizes(npopSize);
+	readConfigFile(argc, argv);
+
+	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
+	for(int i =0; i < argc; i++)
+		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
+
+	int tokenCount = 1;
+	for (int i = 0; i < argc; i++) {
+		if (string(argv[i]) == "tbs") {
+			if (estimate) {
+				stringstream stst(tbsVal[tokenCount]);
+				stst >> ms_argv[i];
+				tbsIdx.push_back(i);
+				++tokenCount;
+			}
+			else {
+				cerr << "\"tbs\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
+				cerr << "Aborting ABLE..." << endl;
+				exit(-1);
+			}
+		}
+		else
+			ms_argv[i] = argv[i];
+	}
 
 	mutClass = kmax+2;
 	brClass = npopVec[0]+1;
@@ -454,15 +484,13 @@ int main(int argc, char* argv[]) {
 		brClass *= (npopVec[i]+1);
 	brClass -= 2;
 	allBrClasses = brClass;
-	foldBrClass = 0;
 
 	//	fold the branch classes
-	if (brFold == 'f') {
+	if (foldBrClass) {
 		if (brClass % 2)
 			brClass = (brClass+1) / 2;
 		else
 			brClass = brClass / 2;
-		foldBrClass = 1;
 	}
 
 	evalBranchConfigs();
@@ -619,8 +647,8 @@ int main(int argc, char* argv[]) {
 		finalTableSize = (long int) pow(mutClass, brClass);
 		if (finalTableSize > 1000000000) { //	1 billion
 			printf("\nThis is going to be too long a table to compute!\n"
-					"Please contact Champak B. Reddy (champak.br@gmail.com) if you really want to go ahead with this\n"
-					"Prematurely exiting BlockLik...");
+					"Please contact the author Champak B. Reddy (champak.br@gmail.com) if you really keen on going ahead with this\n"
+					"Prematurely exiting ABLE...");
 			exit(-1);
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
