@@ -72,8 +72,8 @@ map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
 map<unsigned long int, double> allConfigsMap;
 //vector<double> allConfigsLnL;
-vector<int> tbsIdx;
-vector<string> tbsVal;
+vector<int> tbiIdx;
+vector<string> tbiVal;
 string dataConfigFile;
 int npops = 0, kmax = 0;
 
@@ -238,10 +238,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		cerr << "Gradient based optimization not yet implemented..." << endl;
 		exit(-1);
 	}
-	for (size_t i = 0; i < tbsIdx.size(); i++) {
+	for (size_t i = 0; i < tbiIdx.size(); i++) {
 		stringstream stst;
 		stst << vars[i];
-		stst >> ms_argv[tbsIdx[i]];
+		stst >> ms_argv[tbiIdx[i]];
 	}
 
 	double loglik = computeLik();
@@ -256,14 +256,14 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 
 double optimize_wrapper_gsl(const gsl_vector *vars, void *obj) {
-	for (size_t i = 0; i < tbsIdx.size(); i++) {
+	for (size_t i = 0; i < tbiIdx.size(); i++) {
 		double par = gsl_vector_get(vars, i);
 		if ((par <= 0) || (par > 5))
 			return 999999;
 		else {
 			stringstream stst;
 			stst << par;
-			stst >> ms_argv[tbsIdx[i]];
+			stst >> ms_argv[tbiIdx[i]];
 		}
 	}
 
@@ -329,7 +329,7 @@ void readConfigFile(int argc, char* argv[]) {
 			}
 			else if (tokens[0] == "params") {
 				for(size_t j = 1; j < tokens.size(); j++)
-					tbsVal.push_back(tokens[j]);
+					tbiVal.push_back(tokens[j]);
 			}
 			else if (tokens[0] == "datafile") {
 				dataConfigFile = tokens[1];
@@ -461,16 +461,16 @@ int main(int argc, char* argv[]) {
 
 //	int tokenCount = 1;
 	for (int i = 0; i < argc; i++) {
-		if (string(argv[i]) == "tbs") {
+		if (string(argv[i]) == "tbi") {
 			if (estimate) {
-//				stringstream stst(tbsVal[tokenCount]);
-				stringstream stst("tbs");
+//				stringstream stst(tbiVal[tokenCount]);
+				stringstream stst("tbi");
 				stst >> ms_argv[i];
-				tbsIdx.push_back(i);
+				tbiIdx.push_back(i);
 //				++tokenCount;
 			}
 			else {
-				cerr << "\"tbs\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
+				cerr << "\"tbi\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
 				cerr << "Aborting ABLE..." << endl;
 				exit(-1);
 			}
@@ -499,13 +499,13 @@ int main(int argc, char* argv[]) {
 	if (estimate == 2) {
 		readDataConfigs();
 
-		for (size_t i = 0; i < tbsIdx.size(); i++) {
-			if (string(ms_argv[tbsIdx[i]]) == "tbs") {
+		for (size_t i = 0; i < tbiIdx.size(); i++) {
+			if (string(ms_argv[tbiIdx[i]]) == "tbi") {
 				stringstream stst;
 				stst << ranMT();
-				stst >> ms_argv[tbsIdx[i]];
+				stst >> ms_argv[tbiIdx[i]];
 			}
-			printf ("%.6f ", atof(ms_argv[tbsIdx[i]]));
+			printf ("%.6f ", atof(ms_argv[tbiIdx[i]]));
 		}
 		time(&likStartTime);
 
@@ -530,9 +530,9 @@ int main(int argc, char* argv[]) {
 
 		readDataConfigs();
 
-//		nlopt::opt opt(nlopt::LN_SBPLX, tbsIdx.size());
-		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbsIdx.size());
-//		nlopt::opt opt(nlopt::LN_COBYLA, tbsIdx.size());
+//		nlopt::opt opt(nlopt::LN_SBPLX, tbiIdx.size());
+		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbiIdx.size());
+//		nlopt::opt opt(nlopt::LN_COBYLA, tbiIdx.size());
 		opt.set_lower_bounds(1e-7);
 		opt.set_upper_bounds(5);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
@@ -543,7 +543,7 @@ int main(int argc, char* argv[]) {
 		vector<double> paramVec;
 
 
-		for (size_t i = 0; i < tbsIdx.size(); i++)
+		for (size_t i = 0; i < tbiIdx.size(); i++)
 //			paramVec.push_back(ranMT()+2);
 			paramVec.push_back(ranMT());
 
@@ -571,10 +571,10 @@ int main(int argc, char* argv[]) {
 		const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
 		gsl_multimin_fminimizer *s = NULL;
 		gsl_vector *ss, *x;
-		size_t npar = tbsIdx.size();
+		size_t npar = tbiIdx.size();
 		if (npar == 0) {
 			cerr << "Cannot proceed with inference" << endl;
-			cerr << "Parameters to be inferred haven't been specified. Please use \"tbs\" arguments to specify them on the command line" << endl;
+			cerr << "Parameters to be inferred haven't been specified. Please use \"tbi\" arguments to specify them on the command line" << endl;
 			exit(-1);
 		}
 		int iter = 0;
@@ -592,10 +592,10 @@ int main(int argc, char* argv[]) {
 
 		printf ("Start coordinates : \n");
 		for (size_t i = 0; i < npar; i++) {
-			if (string(ms_argv[tbsIdx[i]]) == "tbs")
+			if (string(ms_argv[tbiIdx[i]]) == "tbi")
 				gsl_vector_set (x,i,ranMT());
 			else
-				gsl_vector_set (x,i,atof(ms_argv[tbsIdx[i]]));
+				gsl_vector_set (x,i,atof(ms_argv[tbiIdx[i]]));
 
 			printf ("%.6f ", gsl_vector_get (x, i));
 		}
