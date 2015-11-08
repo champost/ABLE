@@ -459,14 +459,15 @@ int main(int argc, char* argv[]) {
 	for(int i =0; i < argc; i++)
 		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
 
-	int tokenCount = 1;
+//	int tokenCount = 1;
 	for (int i = 0; i < argc; i++) {
 		if (string(argv[i]) == "tbs") {
 			if (estimate) {
-				stringstream stst(tbsVal[tokenCount]);
+//				stringstream stst(tbsVal[tokenCount]);
+				stringstream stst("tbs");
 				stst >> ms_argv[i];
 				tbsIdx.push_back(i);
-				++tokenCount;
+//				++tokenCount;
 			}
 			else {
 				cerr << "\"tbs\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
