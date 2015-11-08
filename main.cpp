@@ -496,37 +496,7 @@ int main(int argc, char* argv[]) {
 
 	evalBranchConfigs();
 
-	if (estimate == 2) {
-		readDataConfigs();
-
-		for (size_t i = 0; i < tbiIdx.size(); i++) {
-			if (string(ms_argv[tbiIdx[i]]) == "tbi") {
-				stringstream stst;
-				stst << ranMT();
-				stst >> ms_argv[tbiIdx[i]];
-			}
-			printf ("%.6f ", atof(ms_argv[tbiIdx[i]]));
-		}
-		time(&likStartTime);
-
-		printf("LnL : %.6f\n", computeLik());
-
-		time(&likEndTime);
-		printf("Time taken for computation only : %.5f s\n\n", float(likEndTime - likStartTime));
-
-//		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
-//			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
-//
-//				main_theta = theta;
-//				main_rho = rho;
-//
-////				printf("%.2f\t%.5e\n",theta, computeLik());
-//				printf("%.2f\t%.2f\t%.5e\n",theta, rho, computeLik());
-//
-//			}	//	rho
-//		}	//	theta
-	}
-	else if (estimate == 3) {
+	if (estimate == 3) {
 
 		readDataConfigs();
 
@@ -565,84 +535,34 @@ int main(int argc, char* argv[]) {
 		printf ("LnL = %.6f\n", maxLnL);
 	}
 	else if (estimate == 1) {
-
 		readDataConfigs();
 
-		const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
-		gsl_multimin_fminimizer *s = NULL;
-		gsl_vector *ss, *x;
-		size_t npar = tbiIdx.size();
-		if (npar == 0) {
-			cerr << "Cannot proceed with inference" << endl;
-			cerr << "Parameters to be inferred haven't been specified. Please use \"tbi\" arguments to specify them on the command line" << endl;
-			exit(-1);
+		for (size_t i = 0; i < tbiIdx.size(); i++) {
+			if (string(ms_argv[tbiIdx[i]]) == "tbi") {
+				stringstream stst;
+				stst << ranMT();
+				stst >> ms_argv[tbiIdx[i]];
+			}
+			printf ("%.6f ", atof(ms_argv[tbiIdx[i]]));
 		}
-		int iter = 0;
-		int status;
-		double size;
+		time(&likStartTime);
 
-		/* Initial vertex size vector */
-		ss = gsl_vector_alloc (npar);
+		printf("LnL : %.6f\n", computeLik());
 
-		/* Set all step sizes to .01 */ //Note that it was originally 1
-		gsl_vector_set_all (ss, 1);
+		time(&likEndTime);
+		printf("Time taken for computation only : %.5f s\n\n", float(likEndTime - likStartTime));
 
-		/* Starting point */
-		x = gsl_vector_alloc (npar);
-
-		printf ("Start coordinates : \n");
-		for (size_t i = 0; i < npar; i++) {
-			if (string(ms_argv[tbiIdx[i]]) == "tbi")
-				gsl_vector_set (x,i,ranMT());
-			else
-				gsl_vector_set (x,i,atof(ms_argv[tbiIdx[i]]));
-
-			printf ("%.6f ", gsl_vector_get (x, i));
-		}
-		printf ("\n");
-
-		gsl_multimin_function minex_func;
-		minex_func.f = optimize_wrapper_gsl;
-//		minex_func.params = pt;
-		minex_func.n = npar;
-		s = gsl_multimin_fminimizer_alloc (T, npar);
-		gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
-		do {
-			//cout<<"Now on iteration "<<iter<<endl;
-			iter++;
-			status = gsl_multimin_fminimizer_iterate(s);
-			if (status!=0) { //0 Means it's a success
-				printf ("error: %s\n", gsl_strerror (status));
-				break;
-			}
-
-			size = gsl_multimin_fminimizer_size (s);
-			//status = gsl_multimin_test_size (size, 1e-2);
-			status = gsl_multimin_test_size (size, 0.001); //since we want more precision
-
-			if (status == GSL_SUCCESS) {
-				printf ("Converged to a maximum at\n");
-
-//				printf ("%5d ", iter);
-
-				for (size_t i = 0; i < npar; i++)
-					printf ("%.6f ", gsl_vector_get (s->x, i));
-//				printf ("LnL = %.6f size = %.5e\n", -s->fval, size);
-				printf ("LnL = %.6f\n\n", -s->fval);
-			}
-			else {
-				printf ("%5d ", iter);
-				for (size_t i = 0; i < npar; i++)
-					printf ("%.6f ", gsl_vector_get (s->x, i));
-//				printf ("LnL = %.6f size = %.6f\n", -s->fval, size);
-				printf ("LnL = %.6f\n", -s->fval);
-			}
-
-		} while (status == GSL_CONTINUE && iter < 1000);
-
-		gsl_vector_free(x);
-		gsl_vector_free(ss);
-		gsl_multimin_fminimizer_free (s);
+//		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
+//			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
+//
+//				main_theta = theta;
+//				main_rho = rho;
+//
+////				printf("%.2f\t%.5e\n",theta, computeLik());
+//				printf("%.2f\t%.2f\t%.5e\n",theta, rho, computeLik());
+//
+//			}	//	rho
+//		}	//	theta
 	}
 	else if (estimate == 0) {
 		finalTableSize = (long int) pow(mutClass, brClass);
