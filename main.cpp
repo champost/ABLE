@@ -51,9 +51,6 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <vector>
 #include <algorithm>
 
-#include <gsl/gsl_multimin.h>
-#include <gsl/gsl_vector.h>
-
 #include <nlopt.hpp>
 
 #include "MersenneTwister.h"
@@ -252,22 +249,6 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	return loglik;
 
 //	return computeLik();
-}
-
-
-double optimize_wrapper_gsl(const gsl_vector *vars, void *obj) {
-	for (size_t i = 0; i < tbiIdx.size(); i++) {
-		double par = gsl_vector_get(vars, i);
-		if ((par <= 0) || (par > 5))
-			return 999999;
-		else {
-			stringstream stst;
-			stst << par;
-			stst >> ms_argv[tbiIdx[i]];
-		}
-	}
-
-	return -computeLik();
 }
 
 
