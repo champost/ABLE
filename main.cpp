@@ -69,8 +69,9 @@ map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
 map<unsigned long int, double> allConfigsMap;
 //vector<double> allConfigsLnL;
-vector<int> tbiIdx;
-vector<string> tbiVal;
+map<string, vector<int> > tbiIdx;
+map<string, double> tbiStartVal;
+map<string, int> parOrder;
 string dataConfigFile;
 int npops = 0, kmax = 0;
 
@@ -80,11 +81,11 @@ int ntrees = 0, treesSampled = 0;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
-
 double ranMT() { return(rMT()); }
 
 //	conversion from decimal to base-mutClass
 vector<int> getMutConfigVec(unsigned long int i) {
+
 	int quo = i;
 	int rem = 0;
 	vector<int> MutConfig;
@@ -105,6 +106,7 @@ vector<int> getMutConfigVec(unsigned long int i) {
 
 //	conversion from decimal to base-mutClass
 string getMutConfigStr(unsigned long int i) {
+
 	int quo = i;
 	int rem = 0;
 	stringstream stst;
@@ -133,6 +135,7 @@ string getMutConfigStr(unsigned long int i) {
 
 
 string getMutConfigStr(vector<int> configVec) {
+
 	int size = configVec.size();
 	stringstream stst;
 	stst << "(";
@@ -145,19 +148,21 @@ string getMutConfigStr(vector<int> configVec) {
 
 
 int getBrConfigNum(int *brConfVec) {
+
 	vector<int> vec(brConfVec, brConfVec+npopVec.size());
 	return intVec2BrConfig[vec];
 }
 
 
 double computeLik() {
+
 	treesSampled = 0;
 
 	// calling ms
 	main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
-	if (estimate == 2) {
+	if (estimate == 1) {
 		ofstream ofs("tmp.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
 			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
@@ -166,7 +171,7 @@ double computeLik() {
 		ofs.close();
 		selectConfigsMap.clear();
 	}
-	else if ((estimate == 1) || (estimate == 3)) {
+	else if (estimate == 2) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		selectConfigsMap.clear();
@@ -235,10 +240,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		cerr << "Gradient based optimization not yet implemented..." << endl;
 		exit(-1);
 	}
-	for (size_t i = 0; i < tbiIdx.size(); i++) {
+
+	for (map<string, vector<int> >::iterator it = tbiIdx.begin(); it != tbiIdx.end(); it++) {
 		stringstream stst;
-		stst << vars[i];
-		stst >> ms_argv[tbiIdx[i]];
+		stst << vars[parOrder[it->first]];
+		for (size_t i = 0; i < it->second.size(); i++)
+			stst >> ms_argv[it->second[i]];
 	}
 
 	double loglik = computeLik();
@@ -286,6 +293,7 @@ void TrimSpaces(string& str)  {
 
 
 void readConfigFile(int argc, char* argv[]) {
+
 	string line, del, keyWord;
 	vector<string> tokens;
 	ifstream ifs("config.txt",ios::in);
@@ -309,8 +317,10 @@ void readConfigFile(int argc, char* argv[]) {
 
 			}
 			else if (tokens[0] == "params") {
-				for(size_t j = 1; j < tokens.size(); j++)
-					tbiVal.push_back(tokens[j]);
+				double val;
+				stringstream stst(tokens[2]);
+				stst >> val;
+				tbiStartVal[tokens[1]] = val;
 			}
 			else if (tokens[0] == "datafile") {
 				dataConfigFile = tokens[1];
@@ -333,6 +343,37 @@ void readConfigFile(int argc, char* argv[]) {
 		}
 	}
 	ifs.close();
+
+	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
+	for(int i =0; i < argc; i++)
+		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
+
+	for (int i = 0; i < argc; i++) {
+		string param(argv[i]);
+		stringstream stst;
+		if (param.substr(0,3) == "tbi") {
+			tbiIdx[param].push_back(i);
+			if (tbiStartVal.find(param) != tbiStartVal.end()) {
+				stst << tbiStartVal[param];
+				stst >> ms_argv[i];
+			}
+			else {
+				double tmpPar = ranMT();
+				tbiStartVal[param] = tmpPar;
+				stst << tmpPar;
+				stst >> ms_argv[i];
+			}
+		}
+		else
+			ms_argv[i] = argv[i];
+	}
+
+	if ((estimate == 2) && !tbiIdx.size()) {
+		cerr << "Cannot proceed with inference" << endl;
+		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
+		cerr << "Exiting ABLE..." << endl;
+		exit(-1);
+	}
 }
 
 
@@ -369,9 +410,25 @@ void readDataConfigs() {
 
 //	conversion from decimal to base-(maxPopSize+1)
 void evalBranchConfigs() {
+
 	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
 	bool skipConfig;
 	maxPopSize = totPopSum = npopVec[0];
+
+	mutClass = kmax+2;
+	brClass = npopVec[0]+1;
+	for (size_t i = 1; i < npopVec.size(); i++)
+		brClass *= (npopVec[i]+1);
+	brClass -= 2;
+	allBrClasses = brClass;
+
+	//	fold the branch classes
+	if (foldBrClass) {
+		if (brClass % 2)
+			brClass = (brClass+1) / 2;
+		else
+			brClass = brClass / 2;
+	}
 
 	for (size_t i = 1; i < npopVec.size(); i++) {
 		totPopSum += npopVec[i];
@@ -436,131 +493,82 @@ int main(int argc, char* argv[]) {
 
 	readConfigFile(argc, argv);
 
-	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
-	for(int i =0; i < argc; i++)
-		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
-
-//	int tokenCount = 1;
-	for (int i = 0; i < argc; i++) {
-		if (string(argv[i]) == "tbi") {
-			if (estimate) {
-//				stringstream stst(tbiVal[tokenCount]);
-				stringstream stst("tbi");
-				stst >> ms_argv[i];
-				tbiIdx.push_back(i);
-//				++tokenCount;
-			}
-			else {
-				cerr << "\"tbi\" arguments cannot be specified in the command line when calculating the likelihood at a single point" << endl;
-				cerr << "Aborting ABLE..." << endl;
-				exit(-1);
-			}
-		}
-		else
-			ms_argv[i] = argv[i];
-	}
-
-	mutClass = kmax+2;
-	brClass = npopVec[0]+1;
-	for (size_t i = 1; i < npopVec.size(); i++)
-		brClass *= (npopVec[i]+1);
-	brClass -= 2;
-	allBrClasses = brClass;
-
-	//	fold the branch classes
-	if (foldBrClass) {
-		if (brClass % 2)
-			brClass = (brClass+1) / 2;
-		else
-			brClass = brClass / 2;
-	}
-
 	evalBranchConfigs();
 
-	if (estimate == 3) {
+	if (estimate == 2) {
 
 		readDataConfigs();
+
+		double maxLnL;
+		vector<double> parVec;
 
 //		nlopt::opt opt(nlopt::LN_SBPLX, tbiIdx.size());
 		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbiIdx.size());
 //		nlopt::opt opt(nlopt::LN_COBYLA, tbiIdx.size());
+
 		opt.set_lower_bounds(1e-7);
 		opt.set_upper_bounds(5);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		opt.set_xtol_rel(1e-7);
 		opt.set_initial_step(1);
 
-		double maxLnL;
-		vector<double> paramVec;
-
-
-		for (size_t i = 0; i < tbiIdx.size(); i++)
-//			paramVec.push_back(ranMT()+2);
-			paramVec.push_back(ranMT());
-
-
-
+		int parCount = 0;
+		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
+			parVec.push_back(it->second);
+			parOrder[it->first] = parCount;
+			++parCount;
+		}
 
 		printf ("Start coordinates : \n");
-		for (size_t i = 0; i < paramVec.size(); i++)
-			printf ("%.6f ", paramVec[i]);
+		for (size_t i = 0; i < parVec.size(); i++)
+			printf ("%.6f ", parVec[i]);
 		printf ("\n");
 
 		evalCount = 0;
-		opt.optimize(paramVec, maxLnL);
+		time(&likStartTime);
+		opt.optimize(parVec, maxLnL);
+		time(&likEndTime);
 
 		printf ("Found a maximum after %d evaluations\n", evalCount);
 		printf ("Found a maximum at ");
-		for (size_t i = 0; i < paramVec.size(); i++)
-			printf ("%.6f ", paramVec[i]);
+		for (size_t i = 0; i < parVec.size(); i++)
+			printf ("%.6f ", parVec[i]);
 		printf ("LnL = %.6f\n", maxLnL);
+		printf("Time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
 	else if (estimate == 1) {
+
 		readDataConfigs();
 
-		for (size_t i = 0; i < tbiIdx.size(); i++) {
-			if (string(ms_argv[tbiIdx[i]]) == "tbi") {
-				stringstream stst;
-				stst << ranMT();
-				stst >> ms_argv[tbiIdx[i]];
-			}
-			printf ("%.6f ", atof(ms_argv[tbiIdx[i]]));
+		if (!tbiStartVal.empty()) {
+			printf ("Evaluating point likelihood at : \n");
+			for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++)
+				printf ("%.6f ", it->second);
+			printf ("\n");
 		}
+
 		time(&likStartTime);
-
 		printf("LnL : %.6f\n", computeLik());
-
 		time(&likEndTime);
-		printf("Time taken for computation only : %.5f s\n\n", float(likEndTime - likStartTime));
 
-//		for (double theta = 2.01; theta < 4.0; theta +=0.25) {
-//			for (double rho = 4.01; rho < 6.0; rho +=0.25) {
-//
-//				main_theta = theta;
-//				main_rho = rho;
-//
-////				printf("%.2f\t%.5e\n",theta, computeLik());
-//				printf("%.2f\t%.2f\t%.5e\n",theta, rho, computeLik());
-//
-//			}	//	rho
-//		}	//	theta
+		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
 	else if (estimate == 0) {
+
 		finalTableSize = (long int) pow(mutClass, brClass);
 		if (finalTableSize > 1000000000) { //	1 billion
-			printf("\nThis is going to be too long a table to compute!\n"
-					"Please contact the author Champak B. Reddy (champak.br@gmail.com) if you really keen on going ahead with this\n"
-					"Prematurely exiting ABLE...");
+			cerr << "\nThis is going to be too long a table to compute!" << endl;
+			cerr << "Please contact the author Champak B. Reddy (champak.br@gmail.com) if you really keen on going ahead with this" << endl;
+			cerr << "Exiting ABLE...\n" << endl;
 			exit(-1);
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
 
 		time(&likStartTime);
-
 		computeLik();
-
 		time(&likEndTime);
-		printf("\n\nTime taken for computation only : %.5f s", float(likEndTime - likStartTime));
+
+		printf("\n\nTime taken for computation : %.5f s", float(likEndTime - likStartTime));
 	}
 
 	return 0;
