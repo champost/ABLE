@@ -127,9 +127,13 @@ struct params pars ;
 
 int main_ms(int ms_argc, char *ms_argv[])
 {
-	int i, k, howmany, segsites, listX, listY;
-	char **list, **cmatrix(), **tbsparamstrs ;
-	FILE *pf, *fopen() ;
+//	int i, k, howmany, segsites, listX, listY;
+//	char **list, **cmatrix(), **tbsparamstrs ;
+//	FILE *pf, *fopen() ;
+//	char **list, **cmatrix(), **tbsparamstrs ;
+	int i, howmany, listX;
+	char **list, **cmatrix();
+	FILE *fopen() ;
 	double probss, tmrca, ttot ;
 	void seedit( const char * ) ;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
@@ -153,13 +157,13 @@ int main_ms(int ms_argc, char *ms_argv[])
 //	if( ntbs > 0 )  for( k=0; k<ntbs; k++)  scanf(" %s", tbsparamstrs[k] );
 	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
 //	if( !pars.commandlineseedflag ) seedit( "s");
-	pf = stdout ;
+//	pf = stdout ;
 
 	if( pars.mp.segsitesin ==  0 ) {
 	     list = cmatrix(pars.cp.nsam,maxsites+1);
 //	     posit = (double *)malloc( (unsigned)( maxsites*sizeof( double)) ) ;
 	     listX = pars.cp.nsam;
-	     listY = maxsites+1;
+//	     listY = maxsites+1;
 	}
 	else {
 	     list = cmatrix(pars.cp.nsam, pars.mp.segsitesin+1 ) ;
@@ -169,7 +173,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 		    for(  i= pars.mp.segsitesin; i > 1; i--) segfac *= i ;
 		 }
 	     listX = pars.cp.nsam;
-	     listY = pars.mp.segsitesin+1;
+//	     listY = pars.mp.segsitesin+1;
 	}
 
     while( howmany-count++ ) {
@@ -189,7 +193,8 @@ int main_ms(int ms_argc, char *ms_argv[])
 //		}
 //		printf("\n");
 
-        segsites = gensam( list, &probss, &tmrca, &ttot) ;
+//        segsites = gensam( list, &probss, &tmrca, &ttot) ;
+        gensam( list, &probss, &tmrca, &ttot);
 
 //  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
 //        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
@@ -223,14 +228,20 @@ int main_ms(int ms_argc, char *ms_argv[])
 	int 
 gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 {
-	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
+//	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
+//	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
+//	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
+//	double *pk;
+//	int *ss;
+//	int segsitesin,nsites;
+//	double theta, es ;
+//	int nsam, mfreq ;
+	int nsegs, i, j, k, seg, ns, start, end, len;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
-	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
-	double *pk;
-	int *ss;
+	double ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
 	int segsitesin,nsites;
-	double theta, es ;
-	int nsam, mfreq ;
+	double theta;
+	int nsam;
 	void prtree( struct node *ptree, int nsam);
 	void make_gametes(int nsam, int mfreq,  struct node *ptree, double tt, int newsites, int ns, char **list );
  	void ndes_setup( struct node *, int nsam );
@@ -241,13 +252,13 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
 
 	nsites = pars.cp.nsites ;
-	nsinv = 1./nsites;
+//	nsinv = 1./nsites;
 	seglst = segtre_mig(&(pars.cp),  &nsegs ) ;
 	
 	nsam = pars.cp.nsam;
 	segsitesin = pars.mp.segsitesin ;
 	theta = pars.mp.theta ;
-	mfreq = pars.mp.mfreq ;
+//	mfreq = pars.mp.mfreq ;
 
 	if( pars.mp.treeflag ) {
 	  	ns = 0 ;
@@ -1015,7 +1026,8 @@ exit(1);
 	void
 addtoelist( struct devent *pt, struct devent *elist ) 
 {
-	struct devent *plast, *pevent, *ptemp  ;
+//	struct devent *plast, *pevent, *ptemp  ;
+	struct devent *plast = NULL, *pevent, *ptemp  ;
 
 	pevent = elist ;
 	while(  (pevent != NULL ) && ( pevent->time <= pt->time ) )  {
@@ -1109,7 +1121,7 @@ prtree( ptree, nsam)
 	struct node *ptree;
 	int nsam;
 {
-	double t;
+//	double t;
 	int i, *descl, *descr ;
 	void parens( struct node *ptree, int *descl, int *descr, int noden );
 

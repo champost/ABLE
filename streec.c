@@ -78,10 +78,13 @@ segtre_mig(struct c_params *cp, int *pnsegs )
 {
 	int i, j, k, dec, pop, pop2, c1, c2, ind, rchrom;
 	int migrant, source_pop, *config;
-	double  ran1(), sum, x, ttemp, rft, clefta,  tmin, p  ;
+//	double  ran1(), sum, x, ttemp, rft, clefta,  tmin, p  ;
+	double  ran1(), sum, x, ttemp, rft, clefta,  tmin = 0, p  ;
 	double prec, cin,  prect, mig, ran, coal_prob, rdum , arg ;
-	char event ;
-	int re(), cinr(), cleftr(), eflag, cpop, ic  ;
+//	char event ;
+	char event = ' ';
+//	int re(), cinr(), cleftr(), eflag, cpop, ic  ;
+	int re(), cinr(), cleftr(), eflag, cpop = 0, ic  ;
 	int nsam, npop, nsites, *inconfig ;
 	double r,  f, rf,  track_len, **migm ;
 	double *size, *alphag, *tlast ;
@@ -398,7 +401,8 @@ segtre_mig(struct c_params *cp, int *pnsegs )
 re(nsam)
 	int nsam;
 {
-	struct seg *pseg ;
+//	struct seg *pseg ;
+	struct seg *pseg = NULL;
 	int  el, lsg, lsgm1,  ic,  is;
     long spot;
 	double ran1();
@@ -447,8 +451,10 @@ cleftr( int nsam)
 	int
 cinr( int nsam, int nsites)
 {
-	struct seg *pseg ;
-	int len,  el, lsg, lsgm1,  ic,  is, spot, endic ;
+//	struct seg *pseg ;
+//	int len,  el, lsg, lsgm1,  ic,  is, spot, endic ;
+	struct seg *pseg = NULL;
+	int len,  el, lsg, lsgm1 = 0,  ic,  is, spot, endic ;
 	double ran1();
 	int  ca() ;
 
