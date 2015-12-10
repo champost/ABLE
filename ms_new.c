@@ -260,7 +260,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	theta = pars.mp.theta ;
 //	mfreq = pars.mp.mfreq ;
 
-	if( pars.mp.treeflag ) {
+//	if( pars.mp.treeflag ) {
 	  	ns = 0 ;
 
 
@@ -335,7 +335,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	    for(seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++)
 	    	free(seglst[seg].ptree);
 
-	}
+//	}
 
 //	if( pars.mp.timeflag ) {
 //      tt = 0.0 ;
@@ -421,7 +421,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //	  free(ss);
 //
 //    }
-	for(i=0;i<nsam;i++) list[i][ns] = '\0' ;
+//	for(i=0;i<nsam;i++) list[i][ns] = '\0' ;
 	return( ns ) ;
 }
 
