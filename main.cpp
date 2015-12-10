@@ -74,6 +74,7 @@ map<string, double> tbiStartVal;
 map<string, int> parOrder;
 string dataConfigFile;
 int npops = 0, kmax = 0;
+ofstream testLik, testConfig;
 
 int ms_argc = 0;
 char **ms_argv;
@@ -159,7 +160,8 @@ double computeLik() {
 	treesSampled = 0;
 
 	// calling ms
-	main_ms(ms_argc, ms_argv);
+//	while ((double(selectConfigsMap.size()) < (0.8 * dataConfigs.size())) && (treesSampled < 10000))
+		main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
 	if (estimate == 1) {
@@ -174,6 +176,11 @@ double computeLik() {
 	else if (estimate == 2) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
+
+
+		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
+
+
 		selectConfigsMap.clear();
 	}
 	else if (estimate == 0) {
@@ -201,7 +208,9 @@ void calcFinalTable(double **onetreeTable) {
 
 	++treesSampled;
 
-	if (estimate) {
+	double loglik = 0.0;
+
+	if (estimate == 2) {
 		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
 		    double jointPoisson = 1.0;
 
@@ -213,8 +222,24 @@ void calcFinalTable(double **onetreeTable) {
 				selectConfigsMap[vec] += jointPoisson;
 		}
 	}
+	else if (estimate == 1) {
+		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		    double jointPoisson = 1.0;
+
+		    vector<int> vec = it->first;
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
+
+			if (jointPoisson > 0.0)
+				selectConfigsMap[vec] += jointPoisson;
+
+			if (selectConfigsMap.count(vec))
+				loglik += log(selectConfigsMap[vec] / treesSampled) * it->second;
+		}
+		testLik << scientific << loglik << endl;
+		testConfig << scientific << (double) selectConfigsMap.size()/dataConfigs.size() << endl;
+	}
 	else {
-//		double loglik = 0.0;
 		for (unsigned long int i = 0; i < finalTableSize; i++) {
 		    double jointPoisson = 1.0;
 
@@ -222,12 +247,9 @@ void calcFinalTable(double **onetreeTable) {
 			for (int j = 0; j < brClass; j++)
 				jointPoisson *= onetreeTable[j][vec[j]];
 
-			if (jointPoisson > 0.0) {
+			if (jointPoisson > 0.0)
 				allConfigsMap[i] += jointPoisson;
-//				loglik += jointPoisson * log(jointPoisson);
-			}
 		}
-//		allConfigsLnL.push_back(loglik);
 	}
 }
 
@@ -251,7 +273,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	double loglik = computeLik();
 	printf ("%5d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf ("%.6f ", vars[i]);
+		printf ("%.5e ", vars[i]);
+
+
+	printf ("Trees = %d ", treesSampled);
+
+
 	printf ("LnL = %.6f\n", loglik);
 	return loglik;
 
@@ -336,7 +363,7 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "folded")
 				foldBrClass = 1;
 			else {
-				cerr << "Unrecognised keyword found in the config file!" << endl;
+				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
 				exit(-1);
 			}
@@ -367,6 +394,11 @@ void readConfigFile(int argc, char* argv[]) {
 		else
 			ms_argv[i] = argv[i];
 	}
+
+//		for(int i = 1; i < ms_argc; i++)
+//			printf("%s ",ms_argv[i]);
+//		printf("\n");
+//		exit(-1);
 
 	if ((estimate == 2) && !tbiIdx.size()) {
 		cerr << "Cannot proceed with inference" << endl;
@@ -509,8 +541,21 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(1e-7);
 		opt.set_upper_bounds(5);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		opt.set_xtol_rel(1e-7);
+		opt.set_xtol_rel(1e-4);
 		opt.set_initial_step(1);
+
+//		nlopt::opt opt(nlopt::AUGLAG, tbiIdx.size());
+//		nlopt::opt opt(nlopt::G_MLSL, tbiIdx.size());
+//		opt.set_population(tbiIdx.size()+1);
+//		opt.set_lower_bounds(1e-7);
+//		opt.set_upper_bounds(5);
+//		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+//
+//		nlopt::opt local_opt(nlopt::LN_NELDERMEAD, tbiIdx.size());
+//		local_opt.set_xtol_rel(1e-4);
+//		local_opt.set_initial_step(1);
+
+//		opt.set_local_optimizer(local_opt);
 
 		int parCount = 0;
 		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
@@ -546,10 +591,19 @@ int main(int argc, char* argv[]) {
 				printf ("%.6f ", it->second);
 			printf ("\n");
 		}
+		else {
+			for (int i = 0; i < argc; i++)
+				cout << argv[i] << " ";
+			cout << endl;
+		}
 
+		testLik.open("logliks.txt",ios::out);
+		testConfig.open("propConfigs.txt",ios::out);
 		time(&likStartTime);
 		printf("LnL : %.6f\n", computeLik());
 		time(&likEndTime);
+		testLik.close();
+		testConfig.close();
 
 		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
