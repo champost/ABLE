@@ -79,6 +79,7 @@ ofstream testLik, testConfig;
 int ms_argc = 0;
 char **ms_argv;
 int ntrees = 0, treesSampled = 0;
+int globalTrees = 400, localTrees = 1000, globalReps = 300;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
@@ -276,10 +277,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		printf ("%.5e ", vars[i]);
 
 
-	printf ("Trees = %d ", treesSampled);
+	printf (" Trees: %d ", treesSampled);
 
 
-	printf ("LnL = %.6f\n", loglik);
+	printf (" LnL: %.6f\n", loglik);
 	return loglik;
 
 //	return computeLik();
@@ -362,6 +363,18 @@ void readConfigFile(int argc, char* argv[]) {
 			}
 			else if (tokens[0] == "folded")
 				foldBrClass = 1;
+			else if (tokens[0] == "globaltrees") {
+				stringstream stst(tokens[1]);
+				stst >> globalTrees;
+			}
+			else if (tokens[0] == "localtrees") {
+				stringstream stst(tokens[1]);
+				stst >> localTrees;
+			}
+			else if (tokens[0] == "globalreps") {
+				stringstream stst(tokens[1]);
+				stst >> globalReps;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -391,8 +404,14 @@ void readConfigFile(int argc, char* argv[]) {
 				stst >> ms_argv[i];
 			}
 		}
-		else
-			ms_argv[i] = argv[i];
+		else if (i == 2) {
+			stst << localTrees;
+			stst >> ms_argv[2];
+		}
+		else {
+			stst << argv[i];
+			stst >> ms_argv[i];
+		}
 	}
 
 //		for(int i = 1; i < ms_argc; i++)
@@ -534,28 +553,18 @@ int main(int argc, char* argv[]) {
 		double maxLnL;
 		vector<double> parVec;
 
-//		nlopt::opt opt(nlopt::LN_SBPLX, tbiIdx.size());
-		nlopt::opt opt(nlopt::LN_NELDERMEAD, tbiIdx.size());
-//		nlopt::opt opt(nlopt::LN_COBYLA, tbiIdx.size());
-
-		opt.set_lower_bounds(1e-7);
+		nlopt::opt opt(nlopt::GN_DIRECT_L_NOSCAL, tbiIdx.size());
+		opt.set_lower_bounds(1e-3);
 		opt.set_upper_bounds(5);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		opt.set_xtol_rel(1e-4);
-		opt.set_initial_step(1);
+		opt.set_maxeval(globalReps);
 
-//		nlopt::opt opt(nlopt::AUGLAG, tbiIdx.size());
-//		nlopt::opt opt(nlopt::G_MLSL, tbiIdx.size());
-//		opt.set_population(tbiIdx.size()+1);
-//		opt.set_lower_bounds(1e-7);
-//		opt.set_upper_bounds(5);
-//		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-//
-//		nlopt::opt local_opt(nlopt::LN_NELDERMEAD, tbiIdx.size());
-//		local_opt.set_xtol_rel(1e-4);
-//		local_opt.set_initial_step(1);
-
-//		opt.set_local_optimizer(local_opt);
+		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
+		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+		local_opt.set_lower_bounds(1e-3);
+		local_opt.set_upper_bounds(5);
+		local_opt.set_xtol_rel(1e-4);
+		local_opt.set_initial_step(1);
 
 		int parCount = 0;
 		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
@@ -564,14 +573,27 @@ int main(int argc, char* argv[]) {
 			++parCount;
 		}
 
-		printf ("Start coordinates : \n");
-		for (size_t i = 0; i < parVec.size(); i++)
-			printf ("%.6f ", parVec[i]);
-		printf ("\n");
+		printf ("Starting global search: \n");
 
 		evalCount = 0;
 		time(&likStartTime);
 		opt.optimize(parVec, maxLnL);
+//		time(&likEndTime);
+
+		printf ("\nFound a global optimum after %d evaluations\n", evalCount);
+		printf ("Now using the global optimum as a starting point for a refined local search...\n");
+
+		stringstream stst;
+		stst << localTrees;
+		stst >> ms_argv[2];
+
+		for (size_t i = 0; i < parVec.size(); i++)
+			printf ("%.6f ", parVec[i]);
+		printf("\n\n");
+
+		evalCount = 0;
+//		time(&likStartTime);
+		local_opt.optimize(parVec, maxLnL);
 		time(&likEndTime);
 
 		printf ("Found a maximum after %d evaluations\n", evalCount);
@@ -579,7 +601,7 @@ int main(int argc, char* argv[]) {
 		for (size_t i = 0; i < parVec.size(); i++)
 			printf ("%.6f ", parVec[i]);
 		printf ("LnL = %.6f\n", maxLnL);
-		printf("Time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
+		printf("Overall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
 	else if (estimate == 1) {
 
