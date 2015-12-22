@@ -79,7 +79,9 @@ ofstream testLik, testConfig;
 int ms_argc = 0;
 char **ms_argv;
 int ntrees = 0, treesSampled = 0;
-int globalTrees = 400, localTrees = 1000, globalReps = 300;
+int globalTrees = 500, localTrees = 1500, globalReps = 400;
+double globalUpper = 5, globalLower = 1e-3;
+bool skipGlobal = false, expected_bSFS;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
@@ -166,12 +168,17 @@ double computeLik() {
 
 	double loglik = 0.0;
 	if (estimate == 1) {
-		ofstream ofs("tmp.txt",ios::out);
+		ofstream ofs("expected_bSFS.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
 			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 		}
 		ofs.close();
+
+
+		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
+
+
 		selectConfigsMap.clear();
 	}
 	else if (estimate == 2) {
@@ -211,7 +218,7 @@ void calcFinalTable(double **onetreeTable) {
 
 	double loglik = 0.0;
 
-	if (estimate == 2) {
+	if (expected_bSFS || (estimate == 2)) {
 		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
 		    double jointPoisson = 1.0;
 
@@ -363,17 +370,31 @@ void readConfigFile(int argc, char* argv[]) {
 			}
 			else if (tokens[0] == "folded")
 				foldBrClass = 1;
-			else if (tokens[0] == "globaltrees") {
+			else if (tokens[0] == "global_trees") {
 				stringstream stst(tokens[1]);
 				stst >> globalTrees;
 			}
-			else if (tokens[0] == "localtrees") {
+			else if (tokens[0] == "local_trees") {
 				stringstream stst(tokens[1]);
 				stst >> localTrees;
 			}
-			else if (tokens[0] == "globalreps") {
+			else if (tokens[0] == "global_reps") {
 				stringstream stst(tokens[1]);
 				stst >> globalReps;
+			}
+			else if (tokens[0] == "global_upper") {
+				stringstream stst(tokens[1]);
+				stst >> globalUpper;
+			}
+			else if (tokens[0] == "global_lower") {
+				stringstream stst(tokens[1]);
+				stst >> globalLower;
+			}
+			else if (tokens[0] == "skip_global") {
+				skipGlobal = true;
+			}
+			else if (tokens[0] == "expected_bSFS") {
+				expected_bSFS = true;
 			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
@@ -404,8 +425,8 @@ void readConfigFile(int argc, char* argv[]) {
 				stst >> ms_argv[i];
 			}
 		}
-		else if (i == 2) {
-			stst << localTrees;
+		else if ((i == 2) && (estimate > 0) && (globalTrees != 400)) {
+			stst << globalTrees;
 			stst >> ms_argv[2];
 		}
 		else {
@@ -553,19 +574,6 @@ int main(int argc, char* argv[]) {
 		double maxLnL;
 		vector<double> parVec;
 
-		nlopt::opt opt(nlopt::GN_DIRECT_L_NOSCAL, tbiIdx.size());
-		opt.set_lower_bounds(1e-3);
-		opt.set_upper_bounds(5);
-		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		opt.set_maxeval(globalReps);
-
-		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
-		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		local_opt.set_lower_bounds(1e-3);
-		local_opt.set_upper_bounds(5);
-		local_opt.set_xtol_rel(1e-4);
-		local_opt.set_initial_step(1);
-
 		int parCount = 0;
 		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
 			parVec.push_back(it->second);
@@ -573,15 +581,30 @@ int main(int argc, char* argv[]) {
 			++parCount;
 		}
 
-		printf ("Starting global search: \n");
+		if (!skipGlobal) {
+			nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiIdx.size());
+			opt.set_lower_bounds(globalLower);
+			opt.set_upper_bounds(globalUpper);
+			opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+			opt.set_maxeval(globalReps);
 
-		evalCount = 0;
-		time(&likStartTime);
-		opt.optimize(parVec, maxLnL);
-//		time(&likEndTime);
 
-		printf ("\nFound a global optimum after %d evaluations\n", evalCount);
-		printf ("Now using the global optimum as a starting point for a refined local search...\n");
+			if (pow(4,parVec.size()) > globalReps)
+				opt.set_maxeval(pow(4,parVec.size()));
+
+
+			printf ("Starting global search: \n");
+
+			evalCount = 0;
+			time(&likStartTime);
+			opt.optimize(parVec, maxLnL);
+
+			printf ("\nUsing the global optimum after %d evaluations as a starting point for a refined local search...\n", evalCount);
+		} else {
+			printf ("Skipping global search!\n");
+			printf ("\nUsing the user-specified/default values as a starting point for a refined local search...\n");
+			time(&likStartTime);
+		}
 
 		stringstream stst;
 		stst << localTrees;
@@ -591,8 +614,16 @@ int main(int argc, char* argv[]) {
 			printf ("%.6f ", parVec[i]);
 		printf("\n\n");
 
+
+
+		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
+		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+		local_opt.set_lower_bounds(globalLower);
+		local_opt.set_upper_bounds(globalUpper);
+		local_opt.set_xtol_rel(1e-4);
+		local_opt.set_initial_step(1);
+
 		evalCount = 0;
-//		time(&likStartTime);
 		local_opt.optimize(parVec, maxLnL);
 		time(&likEndTime);
 
@@ -619,13 +650,20 @@ int main(int argc, char* argv[]) {
 			cout << endl;
 		}
 
-		testLik.open("logliks.txt",ios::out);
-		testConfig.open("propConfigs.txt",ios::out);
-		time(&likStartTime);
-		printf("LnL : %.6f\n", computeLik());
-		time(&likEndTime);
-		testLik.close();
-		testConfig.close();
+		if (!expected_bSFS) {
+			testLik.open("logliks.txt",ios::out);
+			testConfig.open("propConfigs.txt",ios::out);
+			time(&likStartTime);
+			printf("LnL : %.6f\n", computeLik());
+			time(&likEndTime);
+			testLik.close();
+			testConfig.close();
+		}
+		else {
+			time(&likStartTime);
+			printf("LnL : %.6f\n", computeLik());
+			time(&likEndTime);
+		}
 
 		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
