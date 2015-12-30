@@ -81,7 +81,7 @@ char **ms_argv;
 int ntrees = 0, treesSampled = 0;
 int globalTrees = 500, localTrees = 1500, globalReps = 400;
 double globalUpper = 5, globalLower = 1e-3;
-bool skipGlobal = false, expected_bSFS;
+bool skipGlobal = false, bSFS;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
@@ -119,9 +119,9 @@ string getMutConfigStr(unsigned long int i) {
 		if (quo) {
 			rem = quo % mutClass;
 			quo /= mutClass;
-			if (rem == mutClass-1)
-				stst << rem-1 << ">";
-			else
+//			if (rem == mutClass-1)
+//				stst << rem-1 << ">";
+//			else
 				stst << rem;
 		}
 		else
@@ -167,8 +167,8 @@ double computeLik() {
 		main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
-	if (estimate == 1) {
-		ofstream ofs("expected_bSFS.txt",ios::out);
+	if (bSFS) {
+		ofstream ofs("bSFS.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
 			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
@@ -181,7 +181,7 @@ double computeLik() {
 
 		selectConfigsMap.clear();
 	}
-	else if (estimate == 2) {
+	else if (estimate > 0) {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 
@@ -192,8 +192,11 @@ double computeLik() {
 		selectConfigsMap.clear();
 	}
 	else if (estimate == 0) {
+		ofstream ofs("expected_bSFS.txt",ios::out);
 		for (map<unsigned long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
-			printf("%s : %.5e\n",getMutConfigStr(it->first).c_str(), it->second/treesSampled);
+			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
+		ofs.close();
+
 		allConfigsMap.clear();
 	}
 
@@ -218,7 +221,7 @@ void calcFinalTable(double **onetreeTable) {
 
 	double loglik = 0.0;
 
-	if (expected_bSFS || (estimate == 2)) {
+	if (bSFS || (estimate == 2)) {
 		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
 		    double jointPoisson = 1.0;
 
@@ -339,7 +342,7 @@ void readConfigFile(int argc, char* argv[]) {
 		for(unsigned int j=0;j<tokens.size();j++)
 			TrimSpaces(tokens[j]);
 
-		if (tokens[0][0] != '#') {
+		if ((tokens[0][0] != '#') && (line.size() > 0)) {
 			if (tokens[0] == "pops") {
 				stringstream stst1(tokens[1]);
 				stst1 >> npops;
@@ -393,8 +396,8 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "skip_global") {
 				skipGlobal = true;
 			}
-			else if (tokens[0] == "expected_bSFS") {
-				expected_bSFS = true;
+			else if (tokens[0] == "bSFS") {
+				bSFS = true;
 			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
@@ -634,7 +637,7 @@ int main(int argc, char* argv[]) {
 		printf ("LnL = %.6f\n", maxLnL);
 		printf("Overall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
-	else if (estimate == 1) {
+	else if ((estimate == 1) || bSFS) {
 
 		readDataConfigs();
 
@@ -650,7 +653,7 @@ int main(int argc, char* argv[]) {
 			cout << endl;
 		}
 
-		if (!expected_bSFS) {
+		if (!bSFS) {
 			testLik.open("logliks.txt",ios::out);
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
@@ -672,7 +675,7 @@ int main(int argc, char* argv[]) {
 		finalTableSize = (long int) pow(mutClass, brClass);
 		if (finalTableSize > 1000000000) { //	1 billion
 			cerr << "\nThis is going to be too long a table to compute!" << endl;
-			cerr << "Please contact the author Champak B. Reddy (champak.br@gmail.com) if you really keen on going ahead with this" << endl;
+			cerr << "Please contact the author Champak B. Reddy (champak.br@gmail.com) if you are really keen on going ahead with this" << endl;
 			cerr << "Exiting ABLE...\n" << endl;
 			exit(-1);
 		}
@@ -682,7 +685,7 @@ int main(int argc, char* argv[]) {
 		computeLik();
 		time(&likEndTime);
 
-		printf("\n\nTime taken for computation : %.5f s", float(likEndTime - likStartTime));
+		printf("\n\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
 	}
 
 	return 0;
