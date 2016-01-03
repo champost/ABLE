@@ -72,6 +72,7 @@ map<unsigned long int, double> allConfigsMap;
 map<string, vector<int> > tbiIdx;
 map<string, double> tbiStartVal;
 map<string, int> parOrder;
+map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
 string dataConfigFile;
 int npops = 0, kmax = 0;
 ofstream testLik, testConfig;
@@ -79,9 +80,9 @@ ofstream testLik, testConfig;
 int ms_argc = 0;
 char **ms_argv;
 int ntrees = 0, treesSampled = 0;
-int globalTrees = 500, localTrees = 1500, globalReps = 400;
+int globalTrees = 500, localTrees = 1500, globalReps = 400, bestGlobalSearchPoints = 1;
 double globalUpper = 5, globalLower = 1e-3;
-bool skipGlobal = false, bSFS;
+bool skipGlobal = false, globalSearch = true, bSFS;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
@@ -282,15 +283,16 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	}
 
 	double loglik = computeLik();
-	printf ("%5d ", evalCount);
+	
+	if (globalSearch)
+		bestGlobalSearchPointsMap[-loglik] = vars;
+
+	printf("%5d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf ("%.5e ", vars[i]);
+		printf("%.5e ", vars[i]);
+	printf(" Trees: %d ", treesSampled);
+	printf(" LnL: %.6f\n", loglik);
 
-
-	printf (" Trees: %d ", treesSampled);
-
-
-	printf (" LnL: %.6f\n", loglik);
 	return loglik;
 
 //	return computeLik();
@@ -393,11 +395,15 @@ void readConfigFile(int argc, char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> globalLower;
 			}
-			else if (tokens[0] == "skip_global") {
+			else if (tokens[0] == "skip_global_search") {
 				skipGlobal = true;
 			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
+			}
+			else if (tokens[0] == "best_global_points") {
+				stringstream stst(tokens[1]);
+				stst >> bestGlobalSearchPoints;
 			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
@@ -576,7 +582,6 @@ int main(int argc, char* argv[]) {
 
 		double maxLnL;
 		vector<double> parVec;
-
 		int parCount = 0;
 		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
 			parVec.push_back(it->second);
@@ -584,68 +589,100 @@ int main(int argc, char* argv[]) {
 			++parCount;
 		}
 
-		if (!skipGlobal) {
-			nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiIdx.size());
-			opt.set_lower_bounds(globalLower);
-			opt.set_upper_bounds(globalUpper);
-			opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-			opt.set_maxeval(globalReps);
-
-
-			if (pow(4,parVec.size()) > globalReps)
-				opt.set_maxeval(pow(4,parVec.size()));
-
-
-			printf ("Starting global search: \n");
-
-			evalCount = 0;
-			time(&likStartTime);
-			opt.optimize(parVec, maxLnL);
-
-			printf ("\nUsing the global optimum after %d evaluations as a starting point for a refined local search...\n", evalCount);
-		} else {
-			printf ("Skipping global search!\n");
-			printf ("\nUsing the user-specified/default values as a starting point for a refined local search...\n");
-			time(&likStartTime);
-		}
-
-		stringstream stst;
-		stst << localTrees;
-		stst >> ms_argv[2];
-
-		for (size_t i = 0; i < parVec.size(); i++)
-			printf ("%.6f ", parVec[i]);
-		printf("\n\n");
-
+		nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiIdx.size());
+		opt.set_lower_bounds(globalLower);
+		opt.set_upper_bounds(globalUpper);
+		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+		opt.set_maxeval(globalReps);
+		if (pow(4,parVec.size()) > globalReps)
+			opt.set_maxeval(pow(4,parVec.size()));
 
 
 		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
-		local_opt.set_xtol_rel(1e-4);
+
+		local_opt.set_maxeval(10);
+
+//		local_opt.set_xtol_rel(1e-4);
 		local_opt.set_initial_step(1);
 
-		evalCount = 0;
-		local_opt.optimize(parVec, maxLnL);
-		time(&likEndTime);
 
-		printf ("Found a maximum after %d evaluations\n", evalCount);
-		printf ("Found a maximum at ");
-		for (size_t i = 0; i < parVec.size(); i++)
-			printf ("%.6f ", parVec[i]);
-		printf ("LnL = %.6f\n", maxLnL);
-		printf("Overall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
+		if (!skipGlobal) {
+			printf("Starting global search: \n");
+
+			evalCount = 0;
+			time(&likStartTime);
+			opt.optimize(parVec, maxLnL);
+
+			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
+			stringstream stst;
+			stst << localTrees;
+			stst >> ms_argv[2];
+
+			int totEvalCount = 0;
+			map<double, vector<double> >::iterator it = bestGlobalSearchPointsMap.begin();
+			for (int localStart = 1; localStart <= bestGlobalSearchPoints; localStart++) {
+				parVec = it->second;
+				globalSearch = false;
+				if (bestGlobalSearchPoints > 1)
+					printf("Starting local search %d\n", localStart);
+
+				evalCount = 0;
+				local_opt.optimize(parVec, maxLnL);
+
+				printf("Found the local maximum after %d evaluations\n", evalCount);
+				printf("Found a maximum at ");
+				for (size_t i = 0; i < parVec.size(); i++)
+					printf("%.6f ", parVec[i]);
+				printf("LnL = %.6f\n\n", maxLnL);
+
+				bestLocalSearchResultsMap[-maxLnL] = parVec;
+				totEvalCount += evalCount;
+				++it;
+			}
+			if (bestGlobalSearchPoints > 1) {
+				printf("\nFound the BEST local maximum after a total of %d evaluations\n", totEvalCount);
+				printf("Found a maximum at ");
+				it = bestLocalSearchResultsMap.begin();
+				for (size_t i = 0; i < it->second.size(); i++)
+					printf("%.6f ", it->second[i]);
+				printf("LnL: %.6f \n\n", -it->first);
+			}
+		}
+		else {
+			printf("Skipping global search!\n");
+			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
+			time(&likStartTime);
+
+			stringstream stst;
+			stst << localTrees;
+			stst >> ms_argv[2];
+
+			globalSearch = false;
+			evalCount = 0;
+			local_opt.optimize(parVec, maxLnL);
+
+			printf("Found the local maximum after %d evaluations\n", evalCount);
+			printf("Found a maximum at ");
+			for (size_t i = 0; i < parVec.size(); i++)
+				printf("%.6f ", parVec[i]);
+			printf("LnL = %.6f\n\n", maxLnL);
+		}
+
+		time(&likEndTime);
+		printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
 	else if ((estimate == 1) || bSFS) {
 
 		readDataConfigs();
 
 		if (!tbiStartVal.empty()) {
-			printf ("Evaluating point likelihood at : \n");
+			printf("Evaluating point likelihood at : \n");
 			for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++)
-				printf ("%.6f ", it->second);
-			printf ("\n");
+				printf("%.6f ", it->second);
+			printf("\n");
 		}
 		else {
 			for (int i = 0; i < argc; i++)
