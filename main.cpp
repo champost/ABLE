@@ -38,7 +38,6 @@ knowledge of the CeCILL license and that you accept its terms.
  *      Author: champost
  */
 
-
 #include <ctime>
 #include <string>
 #include <fstream>
@@ -55,6 +54,7 @@ knowledge of the CeCILL license and that you accept its terms.
 
 #include "MersenneTwister.h"
 #include "main.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -159,6 +159,56 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 
+void calcFinalTable(double **onetreeTable) {
+
+	++treesSampled;
+
+	double loglik = 0.0;
+
+	if (bSFS || (estimate == 2)) {
+		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		    double jointPoisson = 1.0;
+
+		    vector<int> vec = it->first;
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
+
+			if (jointPoisson > 0.0)
+				selectConfigsMap[vec] += jointPoisson;
+		}
+	}
+	else if (estimate == 1) {
+		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		    double jointPoisson = 1.0;
+
+		    vector<int> vec = it->first;
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
+
+			if (jointPoisson > 0.0)
+				selectConfigsMap[vec] += jointPoisson;
+
+			if (selectConfigsMap.count(vec))
+				loglik += log(selectConfigsMap[vec] / treesSampled) * it->second;
+		}
+		testLik << scientific << loglik << endl;
+		testConfig << scientific << (double) selectConfigsMap.size()/dataConfigs.size() << endl;
+	}
+	else {
+		for (unsigned long int i = 0; i < finalTableSize; i++) {
+		    double jointPoisson = 1.0;
+
+		    vector<int> vec = getMutConfigVec(i);
+			for (int j = 0; j < brClass; j++)
+				jointPoisson *= onetreeTable[j][vec[j]];
+
+			if (jointPoisson > 0.0)
+				allConfigsMap[i] += jointPoisson;
+		}
+	}
+}
+
+
 double computeLik() {
 
 	treesSampled = 0;
@@ -216,56 +266,6 @@ double computeLik() {
 }
 
 
-void calcFinalTable(double **onetreeTable) {
-
-	++treesSampled;
-
-	double loglik = 0.0;
-
-	if (bSFS || (estimate == 2)) {
-		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
-		    double jointPoisson = 1.0;
-
-		    vector<int> vec = it->first;
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
-
-			if (jointPoisson > 0.0)
-				selectConfigsMap[vec] += jointPoisson;
-		}
-	}
-	else if (estimate == 1) {
-		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
-		    double jointPoisson = 1.0;
-
-		    vector<int> vec = it->first;
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
-
-			if (jointPoisson > 0.0)
-				selectConfigsMap[vec] += jointPoisson;
-
-			if (selectConfigsMap.count(vec))
-				loglik += log(selectConfigsMap[vec] / treesSampled) * it->second;
-		}
-		testLik << scientific << loglik << endl;
-		testConfig << scientific << (double) selectConfigsMap.size()/dataConfigs.size() << endl;
-	}
-	else {
-		for (unsigned long int i = 0; i < finalTableSize; i++) {
-		    double jointPoisson = 1.0;
-
-		    vector<int> vec = getMutConfigVec(i);
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
-
-			if (jointPoisson > 0.0)
-				allConfigsMap[i] += jointPoisson;
-		}
-	}
-}
-
-
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
 
 	++evalCount;
@@ -299,36 +299,110 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 }
 
 
-void Tokenize(const string& str, vector<string>& tokens, const string& delimiters){
-    // Skip delimiters at beginning.
-    string::size_type lastPos = str.find_first_not_of(delimiters, 0);
-    // Find first "non-delimiter".
-    string::size_type pos     = str.find_first_of(delimiters, lastPos);
+void readDataConfigs() {
+	string line, del, keyVec;
+	vector<string> tokens;
+	vector<int> config;
+	double val;
 
-    while (string::npos != pos || string::npos != lastPos)
-    {
-        // Found a token, add it to the vector.
-        tokens.push_back(str.substr(lastPos, pos - lastPos));
-        // Skip delimiters.  Note the "not_of"
-        lastPos = str.find_first_not_of(delimiters, pos);
-        // Find next "non-delimiter"
-        pos = str.find_first_of(delimiters, lastPos);
-    }
+	ifstream ifs(dataConfigFile.c_str(),ios::in);
+	while (getline(ifs,line)) {
+		del = ":";
+		tokens.clear();
+		Tokenize(line, tokens, del);
+		for(unsigned int j=0;j<tokens.size();j++){
+			TrimSpaces(tokens[j]);
+		}
+		keyVec = tokens[0];
+		val = atof(tokens[1].c_str());
+
+		del = "(,)";
+		tokens.clear();
+		Tokenize(keyVec, tokens, del);
+		for(unsigned int j=0;j<tokens.size();j++){
+			TrimSpaces(tokens[j]);
+			config.push_back(atoi(tokens[j].c_str()));
+		}
+		dataConfigs[config] = val;
+		config.clear();
+	}
+	ifs.close();
 }
 
 
-void TrimSpaces(string& str)  {
-	// Trim Both leading and trailing spaces
-	size_t startpos = str.find_first_not_of(" \t\r\n"); // Find the first character position after excluding leading blank spaces
-	size_t endpos = str.find_last_not_of(" \t\r\n"); // Find the first character position from reverse af
+//	conversion from decimal to base-(maxPopSize+1)
+void evalBranchConfigs() {
 
-	// if all spaces or empty return an empty string
-	if(( string::npos == startpos ) || ( string::npos == endpos))
-	{
-		str = "";
+	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
+	bool skipConfig;
+	maxPopSize = totPopSum = npopVec[0];
+
+	mutClass = kmax+2;
+	brClass = npopVec[0]+1;
+	for (size_t i = 1; i < npopVec.size(); i++)
+		brClass *= (npopVec[i]+1);
+	brClass -= 2;
+	allBrClasses = brClass;
+
+	//	fold the branch classes
+	if (foldBrClass) {
+		if (brClass % 2)
+			brClass = (brClass+1) / 2;
+		else
+			brClass = brClass / 2;
 	}
-	else
-		str = str.substr( startpos, endpos-startpos+1 );
+
+	for (size_t i = 1; i < npopVec.size(); i++) {
+		totPopSum += npopVec[i];
+		if (npopVec[i] > maxPopSize)
+			maxPopSize = npopVec[i];
+	}
+	++maxPopSize;
+
+	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,npopVec.size()); i++) {
+		quo = i;
+		rem = 0;
+//		stringstream stst;
+//		stst << ")";
+		sumConfig = 0;
+		skipConfig = false;
+		vector<int> vec;
+
+		for (size_t j = 0; j < npopVec.size(); j++) {
+			if (quo) {
+				rem = quo % (maxPopSize);
+				quo /= (maxPopSize);
+				if (rem > npopVec[npopVec.size()-1-j]) {
+					skipConfig = true;
+					break;
+				}
+//				stst << rem;
+				sumConfig += rem;
+				vec.push_back(rem);
+			}
+			else {
+//				stst << "0";
+				vec.push_back(0);
+			}
+
+//			if (j < npopVec.size() - 1)
+//				stst << ",";
+		}
+
+		if (sumConfig == totPopSum)
+			break;
+
+		if (!skipConfig) {
+//			stst << "(";
+//			string config = stst.str();
+//			reverse(config.begin(),config.end());
+			reverse(vec.begin(),vec.end());
+			intVec2BrConfig[vec] = count;
+			++count;
+//			printf("%d\t%d\t%s\n", i, count, config.c_str());
+//			printf("%d\t%s\n", count, config.c_str());
+		}
+	}
 }
 
 
@@ -454,113 +528,6 @@ void readConfigFile(int argc, char* argv[]) {
 		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
 		cerr << "Exiting ABLE..." << endl;
 		exit(-1);
-	}
-}
-
-
-void readDataConfigs() {
-	string line, del, keyVec;
-	vector<string> tokens;
-	vector<int> config;
-	double val;
-
-	ifstream ifs(dataConfigFile.c_str(),ios::in);
-	while (getline(ifs,line)) {
-		del = ":";
-		tokens.clear();
-		Tokenize(line, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
-		}
-		keyVec = tokens[0];
-		val = atof(tokens[1].c_str());
-
-		del = "(,)";
-		tokens.clear();
-		Tokenize(keyVec, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
-			config.push_back(atoi(tokens[j].c_str()));
-		}
-		dataConfigs[config] = val;
-		config.clear();
-	}
-	ifs.close();
-}
-
-
-//	conversion from decimal to base-(maxPopSize+1)
-void evalBranchConfigs() {
-
-	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
-	bool skipConfig;
-	maxPopSize = totPopSum = npopVec[0];
-
-	mutClass = kmax+2;
-	brClass = npopVec[0]+1;
-	for (size_t i = 1; i < npopVec.size(); i++)
-		brClass *= (npopVec[i]+1);
-	brClass -= 2;
-	allBrClasses = brClass;
-
-	//	fold the branch classes
-	if (foldBrClass) {
-		if (brClass % 2)
-			brClass = (brClass+1) / 2;
-		else
-			brClass = brClass / 2;
-	}
-
-	for (size_t i = 1; i < npopVec.size(); i++) {
-		totPopSum += npopVec[i];
-		if (npopVec[i] > maxPopSize)
-			maxPopSize = npopVec[i];
-	}
-	++maxPopSize;
-
-	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,npopVec.size()); i++) {
-		quo = i;
-		rem = 0;
-//		stringstream stst;
-//		stst << ")";
-		sumConfig = 0;
-		skipConfig = false;
-		vector<int> vec;
-
-		for (size_t j = 0; j < npopVec.size(); j++) {
-			if (quo) {
-				rem = quo % (maxPopSize);
-				quo /= (maxPopSize);
-				if (rem > npopVec[npopVec.size()-1-j]) {
-					skipConfig = true;
-					break;
-				}
-//				stst << rem;
-				sumConfig += rem;
-				vec.push_back(rem);
-			}
-			else {
-//				stst << "0";
-				vec.push_back(0);
-			}
-
-//			if (j < npopVec.size() - 1)
-//				stst << ",";
-		}
-
-		if (sumConfig == totPopSum)
-			break;
-
-		if (!skipConfig) {
-//			stst << "(";
-//			string config = stst.str();
-//			reverse(config.begin(),config.end());
-			reverse(vec.begin(),vec.end());
-			intVec2BrConfig[vec] = count;
-			++count;
-//			printf("%d\t%d\t%s\n", i, count, config.c_str());
-//			printf("%d\t%s\n", count, config.c_str());
-		}
 	}
 }
 

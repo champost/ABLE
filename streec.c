@@ -1,3 +1,6 @@
+/* As downloaded from https://webshare.uchicago.edu/users/rhudson1/Public/ms.folder/ms.tar.gz on Jan 14 2015 */
+/* And modified by Champak Beeravolu Reddy (champak.br@gmail.com) */
+
 /**********  segtre_mig.c **********************************
 *
 *	This subroutine uses a Monte Carlo algorithm described in
