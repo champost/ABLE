@@ -356,7 +356,7 @@ void readConfigFile(int argc, char* argv[]) {
 				}
 
 			}
-			else if (tokens[0] == "params") {
+			else if (tokens[0] == "start") {
 				double val;
 				stringstream stst(tokens[2]);
 				stst >> val;
@@ -678,8 +678,8 @@ int main(int argc, char* argv[]) {
 
 		readDataConfigs();
 
+		printf("Evaluating point likelihood at : \n");
 		if (!tbiStartVal.empty()) {
-			printf("Evaluating point likelihood at : \n");
 			for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++)
 				printf("%.6f ", it->second);
 			printf("\n");
