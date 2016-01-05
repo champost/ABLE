@@ -68,7 +68,6 @@ vector<int> npopVec;
 map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
 map<unsigned long int, double> allConfigsMap;
-//vector<double> allConfigsLnL;
 map<string, vector<int> > tbiIdx;
 map<string, double> tbiStartVal;
 map<string, int> parOrder;
@@ -79,14 +78,51 @@ ofstream testLik, testConfig;
 
 int ms_argc = 0;
 char **ms_argv;
-int ntrees = 0, treesSampled = 0;
-int globalTrees = 500, localTrees = 1500, globalReps = 400, bestGlobalSearchPoints = 1;
+int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalReps = 400, localReps = 0, bestGlobalSearchPoints = 1;
 double globalUpper = 5, globalLower = 1e-3;
-bool skipGlobal = false, globalSearch = true, bSFS;
+bool skipGlobal = false, globalSearch = true, bSFS, profileLikBool = true;
 int estimate = 0, evalCount = 0;
 unsigned long int finalTableSize;
 
+
 double ranMT() { return(rMT()); }
+
+
+void profileLik(vector<double> MLEparVec) {
+
+	double parLowerBound, parUpperBound, quarterGlobalRange = (globalUpper - globalLower) / 4, MLEparVal;
+
+	stringstream ststTree;
+	ststTree << localTrees;
+	ststTree >> ms_argv[2];
+
+	for (map<string, vector<int> >::iterator it = tbiIdx.begin(); it != tbiIdx.end(); it++) {
+		MLEparVal = MLEparVec[parOrder[it->first]];
+		parUpperBound = MLEparVal + quarterGlobalRange;
+		parLowerBound = MLEparVal - quarterGlobalRange;
+		if (parLowerBound < 0.0)
+			parLowerBound = MLEparVal / 2;
+
+		printf("\nCalculating profiles of the likelihood surface for %s\n", it->first.c_str());
+		ofstream outFile((it->first+".txt").c_str(),ios::out);
+		vector<double> parRange = logspaced(parLowerBound, parUpperBound, 10);
+		for (size_t j = 0; j < parRange.size(); j++) {
+			stringstream ststProfilePar;
+			ststProfilePar << parRange[j];
+			for (size_t i = 0; i < it->second.size(); i++)
+				ststProfilePar >> ms_argv[it->second[i]];
+
+			outFile << scientific << parRange[j] << "\t" << computeLik() << endl;
+		}
+		outFile.close();
+
+		stringstream ststMLEPar;
+		ststMLEPar << MLEparVal;
+		for (size_t i = 0; i < it->second.size(); i++)
+			ststMLEPar >> ms_argv[it->second[i]];
+	}
+}
+
 
 //	conversion from decimal to base-mutClass
 vector<int> getMutConfigVec(unsigned long int i) {
@@ -214,11 +250,10 @@ double computeLik() {
 	treesSampled = 0;
 
 	// calling ms
-//	while ((double(selectConfigsMap.size()) < (0.8 * dataConfigs.size())) && (treesSampled < 10000))
-		main_ms(ms_argc, ms_argv);
+	main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
-	if (bSFS) {
+	if (bSFS && (estimate < 2)) {
 		ofstream ofs("bSFS.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
 			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
@@ -226,9 +261,7 @@ double computeLik() {
 		}
 		ofs.close();
 
-
 		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
-
 
 		selectConfigsMap.clear();
 	}
@@ -236,9 +269,7 @@ double computeLik() {
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
 			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
 
-
 		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
-
 
 		selectConfigsMap.clear();
 	}
@@ -250,17 +281,6 @@ double computeLik() {
 
 		allConfigsMap.clear();
 	}
-
-//	double average = 0.0, variance = 0.0;
-//	for (int j = 0; j < treesSampled; j++)
-//		average += allConfigsLnL[j];
-//	average /= treesSampled;
-//
-//	for (int j = 0; j < treesSampled; j++)
-//		variance += pow((average - allConfigsLnL[j]),2);
-//	variance /= (treesSampled - 1);
-//	printf("avgLnL : %.5f; varLnL : %.5f\n", average, variance);
-//	allConfigsLnL.clear();
 
 	return loglik;
 }
@@ -294,8 +314,6 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	printf(" LnL: %.6f\n", loglik);
 
 	return loglik;
-
-//	return computeLik();
 }
 
 
@@ -461,6 +479,10 @@ void readConfigFile(int argc, char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> globalReps;
 			}
+			else if (tokens[0] == "local_reps") {
+				stringstream stst(tokens[1]);
+				stst >> localReps;
+			}
 			else if (tokens[0] == "global_upper") {
 				stringstream stst(tokens[1]);
 				stst >> globalUpper;
@@ -478,6 +500,9 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "best_global_points") {
 				stringstream stst(tokens[1]);
 				stst >> bestGlobalSearchPoints;
+			}
+			else if (tokens[0] == "no_profiles") {
+				profileLikBool = false;
 			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
@@ -536,7 +561,7 @@ int main(int argc, char* argv[]) {
 
 	time_t likStartTime, likEndTime;
 //	int nsam = atoi(argv[1]);
-	ntrees = atoi(argv[2]);
+//	ntrees = atoi(argv[2]);
 	ms_argc = argc;
 
 	readConfigFile(argc, argv);
@@ -569,11 +594,10 @@ int main(int argc, char* argv[]) {
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
-
-		local_opt.set_maxeval(10);
-
-//		local_opt.set_xtol_rel(1e-4);
-		local_opt.set_initial_step(1);
+		if (localReps)
+			local_opt.set_maxeval(localReps);
+		local_opt.set_xtol_rel(1e-4);
+		local_opt.set_initial_step((globalUpper-globalLower)/5);
 
 
 		if (!skipGlobal) {
@@ -616,6 +640,9 @@ int main(int argc, char* argv[]) {
 				for (size_t i = 0; i < it->second.size(); i++)
 					printf("%.6f ", it->second[i]);
 				printf("LnL: %.6f \n\n", -it->first);
+
+				parVec = it->second;
+				maxLnL = it->first;
 			}
 		}
 		else {
@@ -640,6 +667,9 @@ int main(int argc, char* argv[]) {
 
 		time(&likEndTime);
 		printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
+
+		if (profileLikBool)
+			profileLik(parVec);
 	}
 	else if ((estimate == 1) || bSFS) {
 

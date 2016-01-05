@@ -41,14 +41,27 @@ knowledge of the CeCILL license and that you accept its terms.
 #ifndef MAIN_H_
 #define MAIN_H_
 
+using namespace std;
+
+void profileLik(vector<double> MLEparVec);
+vector<int> getMutConfigVec(unsigned long int i);
+string getMutConfigStr(unsigned long int i);
+string getMutConfigStr(vector<int> configVec);
+double computeLik();
+double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data);
+void readDataConfigs();
+void evalBranchConfigs();
+void readConfigFile(int argc, char* argv[]);
+
+
 extern "C" {
 int main_ms(int ms_argc, char *ms_argv[]);
-double *** d3matrix(int x, int y, int z);
-void freed3matrix(double ***m, int x, int y);
-double ** d2matrix(int x, int y);
-void freed2matrix(double **m, int x);
-int ** d2int_matrix(int x, int y);
-void freed2int_matrix(int **m, int x);
+//double *** d3matrix(int x, int y, int z);
+//void freed3matrix(double ***m, int x, int y);
+//double ** d2matrix(int x, int y);
+//void freed2matrix(double **m, int x);
+//int ** d2int_matrix(int x, int y);
+//void freed2int_matrix(int **m, int x);
 
 double ranMT();
 void calcFinalTable(double **onetreeTable);

@@ -44,8 +44,7 @@ knowledge of the CeCILL license and that you accept its terms.
 
 #include "utils.h"
 
-using namespace std;
-
+//	Linearly spaced points between [a,b]
 vector<double> linspaced(double a, double b, int n) {
     vector<double> array;
     if (n > 0) {
@@ -67,11 +66,11 @@ vector<double> linspaced(double a, double b, int n) {
 //	Log-spaced points between [a,b] ONLY for (a,b > 0)
 vector<double> logspaced(double a, double b, int n) {
     vector<double> array;
-    if (n > 0) {
+    if ((n > 0) && (a > 0) && (b > 0)) {
         if ((a == b) || (n == 1))
         	array.push_back(a);
         else {
-            double step = pow(b/a, 1/(n-1));
+            double step = pow(b/a, 1.0/(n-1));
             int count = 0;
         	while(count < n) {
         		array.push_back(a * pow(step, count));

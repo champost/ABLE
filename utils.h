@@ -41,9 +41,6 @@ knowledge of the CeCILL license and that you accept its terms.
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#include <vector>
-#include <string>
-
 using namespace std;
 
 vector<double> linspaced(double a, double b, int n);
