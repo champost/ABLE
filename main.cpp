@@ -691,14 +691,16 @@ int main(int argc, char* argv[]) {
 			testLik.open("logliks.txt",ios::out);
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
-			printf("LnL : %.6f\n", computeLik());
+			double loglik = computeLik();
+			printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
 			time(&likEndTime);
 			testLik.close();
 			testConfig.close();
 		}
 		else {
 			time(&likStartTime);
-			printf("LnL : %.6f\n", computeLik());
+			double loglik = computeLik();
+			printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
 			time(&likEndTime);
 		}
 
