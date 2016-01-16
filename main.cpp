@@ -586,8 +586,12 @@ int main(int argc, char* argv[]) {
 		opt.set_upper_bounds(globalUpper);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		opt.set_maxeval(globalReps);
-		if (pow(4,parVec.size()) > globalReps)
-			opt.set_maxeval(pow(4,parVec.size()));
+		if ((globalReps == 400) && (pow(4,parVec.size()) > globalReps)) {
+			if (pow(4,parVec.size()) > 20000)
+				opt.set_maxeval(20000);
+			else
+				opt.set_maxeval(pow(4,parVec.size()));
+		}
 
 
 		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
