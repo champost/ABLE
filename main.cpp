@@ -72,7 +72,7 @@ map<string, vector<int> > tbiIdx;
 map<string, double> tbiStartVal;
 map<string, int> parOrder;
 map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
-string dataConfigFile;
+string dataConfigFile, configFile;
 int npops = 0, kmax = 0;
 ofstream testLik, testConfig;
 
@@ -432,7 +432,7 @@ void readConfigFile(int argc, char* argv[]) {
 
 	string line, del, keyWord;
 	vector<string> tokens;
-	ifstream ifs("config.txt",ios::in);
+	ifstream ifs(configFile.c_str(),ios::in);
 	while (getline(ifs,line)) {
 		del = " ";
 		tokens.clear();
@@ -454,9 +454,19 @@ void readConfigFile(int argc, char* argv[]) {
 			}
 			else if (tokens[0] == "start") {
 				double val;
-				stringstream stst(tokens[2]);
-				stst >> val;
-				tbiStartVal[tokens[1]] = val;
+				if (tokens[1] == "all") {
+					for(unsigned int j = 2; j < tokens.size(); j++) {
+						stringstream stst, stst_val(tokens[j]);
+						stst << "tbi" << j+1;
+						stst_val >> val;
+						tbiStartVal[stst.str()] = val;
+					}
+				}
+				else {
+					stringstream stst(tokens[2]);
+					stst >> val;
+					tbiStartVal[tokens[1]] = val;
+				}
 			}
 			else if (tokens[0] == "datafile") {
 				dataConfigFile = tokens[1];
@@ -558,6 +568,13 @@ void readConfigFile(int argc, char* argv[]) {
 		cerr << "Exiting ABLE..." << endl;
 		exit(-1);
 	}
+
+//	if ((estimate > 0) && (globalTrees < 100 * tbiIdx.size())) {
+//		globalTrees = 100 * tbiIdx.size();
+//		stringstream stst;
+//		stst << globalTrees;
+//		stst >> ms_argv[2];
+//	}
 }
 
 
@@ -567,6 +584,11 @@ int main(int argc, char* argv[]) {
 //	int nsam = atoi(argv[1]);
 //	ntrees = atoi(argv[2]);
 	ms_argc = argc;
+	configFile = string(argv[argc - 1]);
+	if (configFile == "-T")
+		configFile = "config.txt";
+	else
+		ms_argc = argc - 1;
 
 	readConfigFile(argc, argv);
 
