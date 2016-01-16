@@ -78,7 +78,7 @@ ofstream testLik, testConfig;
 
 int ms_argc = 0;
 char **ms_argv;
-int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalReps = 400, localReps = 0, bestGlobalSearchPoints = 1;
+int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
 double globalUpper = 5, globalLower = 1e-3;
 bool skipGlobal = false, globalSearch = true, bSFS, profileLikBool = true;
 int estimate = 0, evalCount = 0;
@@ -88,7 +88,7 @@ unsigned long int finalTableSize;
 double ranMT() { return(rMT()); }
 
 
-void profileLik(vector<double> MLEparVec) {
+void profileLik(vector<double> MLEparVec, double maxLnL) {
 
 	double parLowerBound, parUpperBound, quarterGlobalRange = (globalUpper - globalLower) / 4, MLEparVal;
 
@@ -104,7 +104,10 @@ void profileLik(vector<double> MLEparVec) {
 			parLowerBound = MLEparVal / 2;
 
 		printf("\nCalculating profiles of the likelihood surface for %s\n", it->first.c_str());
+
 		ofstream outFile((it->first+".txt").c_str(),ios::out);
+		outFile << scientific << MLEparVal << "\t" << maxLnL << endl;
+
 		vector<double> parRange = logspaced(parLowerBound, parUpperBound, 10);
 		for (size_t j = 0; j < parRange.size(); j++) {
 			stringstream ststProfilePar;
@@ -114,6 +117,7 @@ void profileLik(vector<double> MLEparVec) {
 
 			outFile << scientific << parRange[j] << "\t" << computeLik() << endl;
 		}
+
 		outFile.close();
 
 		stringstream ststMLEPar;
@@ -475,13 +479,13 @@ void readConfigFile(int argc, char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> localTrees;
 			}
-			else if (tokens[0] == "global_reps") {
+			else if (tokens[0] == "global_evals") {
 				stringstream stst(tokens[1]);
-				stst >> globalReps;
+				stst >> globalEvals;
 			}
-			else if (tokens[0] == "local_reps") {
+			else if (tokens[0] == "local_evals") {
 				stringstream stst(tokens[1]);
-				stst >> localReps;
+				stst >> localEvals;
 			}
 			else if (tokens[0] == "global_upper") {
 				stringstream stst(tokens[1]);
@@ -585,8 +589,8 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(globalLower);
 		opt.set_upper_bounds(globalUpper);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		opt.set_maxeval(globalReps);
-		if ((globalReps == 400) && (pow(4,parVec.size()) > globalReps)) {
+		opt.set_maxeval(globalEvals);
+		if ((globalEvals == 400) && (pow(4,parVec.size()) > globalEvals)) {
 			if (pow(4,parVec.size()) > 20000)
 				opt.set_maxeval(20000);
 			else
@@ -598,8 +602,8 @@ int main(int argc, char* argv[]) {
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
-		if (localReps)
-			local_opt.set_maxeval(localReps);
+		if (localEvals)
+			local_opt.set_maxeval(localEvals);
 		local_opt.set_xtol_rel(1e-4);
 		local_opt.set_initial_step((globalUpper-globalLower)/5);
 
@@ -673,7 +677,7 @@ int main(int argc, char* argv[]) {
 		printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 
 		if (profileLikBool)
-			profileLik(parVec);
+			profileLik(parVec, maxLnL);
 	}
 	else if ((estimate == 1) || bSFS) {
 
