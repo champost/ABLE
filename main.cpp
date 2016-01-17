@@ -457,7 +457,7 @@ void readConfigFile(int argc, char* argv[]) {
 				if (tokens[1] == "all") {
 					for(unsigned int j = 2; j < tokens.size(); j++) {
 						stringstream stst, stst_val(tokens[j]);
-						stst << "tbi" << j+1;
+						stst << "tbi" << j-1;
 						stst_val >> val;
 						tbiStartVal[stst.str()] = val;
 					}
