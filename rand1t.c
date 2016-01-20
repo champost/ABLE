@@ -59,6 +59,8 @@ ran1()
 //    	exit(-1);
         	 double ranMT();
         	 return ranMT();
+//             int rand();
+//             return rand()/(RAND_MAX+1.0);
 }
 
 

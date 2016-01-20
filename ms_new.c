@@ -355,6 +355,16 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
 //    			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
     		}
+/*
+	    	double poisson_pmf(const double k, const double lambda);
+	    	if (totBrLen[i-1] > 0.0) {
+				onetreeTable[i-1][0] = poisson_pmf(0,totBrLen[i-1]*pars.mp.theta);
+    			for(j = 1; j < mutClass-1; j++) {
+    				onetreeTable[i-1][j] = onetreeTable[i-1][j-1] + poisson_pmf(j,totBrLen[i-1]*pars.mp.theta);
+    			}
+    			onetreeTable[i-1][j] = 1.0 - onetreeTable[i-1][j-1];
+	    	}
+*/
     		else {
 //    			printf("Total folded branch length = 0\n\n");
     			onetreeTable[i-1][0] = 1.0;
@@ -467,8 +477,13 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	return( ns ) ;
 }
 
-	void 
-ndes_setup(struct node *ptree, int nsam )
+/*
+double poisson_pmf(const double k, const double lambda) {
+	return exp(k * log(lambda) - lgamma(k + 1.0) - lambda);
+}
+*/
+
+void ndes_setup(struct node *ptree, int nsam )
 {
 	int i ;
 

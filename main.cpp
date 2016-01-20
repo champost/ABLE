@@ -63,32 +63,34 @@ int brClass, mutClass, foldBrClass = 0, allBrClasses;
 //**********************************
 
 MTRand rMT;
-map<vector<int>, int> intVec2BrConfig;
 vector<int> npopVec;
 map<vector<int>, double> dataConfigs;
 map<vector<int>, double> selectConfigsMap;
 map<unsigned long int, double> allConfigsMap;
-map<string, vector<int> > tbiIdx;
-map<string, double> tbiStartVal;
-map<string, int> parOrder;
+map<vector<int>, int> intVec2BrConfig;
+map<string, vector<int> > tbiMsCmdIdx;
+map<string, double> tbiUserVal;
+map<string, int> tbiOrder;
 map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
 string dataConfigFile, configFile;
-int npops = 0, kmax = 0;
 ofstream testLik, testConfig;
 
-int ms_argc = 0;
 char **ms_argv;
-int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
-double globalUpper = 5, globalLower = 1e-3;
-bool skipGlobal = false, globalSearch = true, bSFS, profileLikBool = true;
+
+int ms_argc = 0;
+int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
+int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
+
+double globalUpper = 5, globalLower = 1e-3;
+bool skipGlobal = false, globalSearch = true, bSFS, profileLikBool = true, onlyProfiles = false;
 unsigned long int finalTableSize;
 
 
 double ranMT() { return(rMT()); }
 
 
-void profileLik(vector<double> MLEparVec, double maxLnL) {
+void profileLik(vector<double> MLEparVec) {
 
 	double parLowerBound, parUpperBound, quarterGlobalRange = (globalUpper - globalLower) / 4, MLEparVal;
 
@@ -96,8 +98,9 @@ void profileLik(vector<double> MLEparVec, double maxLnL) {
 	ststTree << localTrees;
 	ststTree >> ms_argv[2];
 
-	for (map<string, vector<int> >::iterator it = tbiIdx.begin(); it != tbiIdx.end(); it++) {
-		MLEparVal = MLEparVec[parOrder[it->first]];
+	//	Likelihood profiles for all parameters to be inferred (tbi)
+	for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+		MLEparVal = MLEparVec[tbiOrder[it->first]];
 		parUpperBound = MLEparVal + quarterGlobalRange;
 		parLowerBound = MLEparVal - quarterGlobalRange;
 		if (parLowerBound < 0.0)
@@ -106,24 +109,34 @@ void profileLik(vector<double> MLEparVec, double maxLnL) {
 		printf("\nCalculating profiles of the likelihood surface for %s\n", it->first.c_str());
 
 		ofstream outFile((it->first+".txt").c_str(),ios::out);
-		outFile << scientific << MLEparVal << "\t" << maxLnL << endl;
 
+		//	Calculating the LnL at the MLE
+		for (size_t i = 0; i < it->second.size(); i++) {
+			stringstream ststMLEPar;
+			ststMLEPar << MLEparVal;
+			ststMLEPar >> ms_argv[it->second[i]];
+		}
+		outFile << scientific << MLEparVal << "\t" << computeLik() << endl;
+
+		//	Likelihood profiles for this parameter
 		vector<double> parRange = logspaced(parLowerBound, parUpperBound, 10);
 		for (size_t j = 0; j < parRange.size(); j++) {
-			stringstream ststProfilePar;
-			ststProfilePar << parRange[j];
-			for (size_t i = 0; i < it->second.size(); i++)
+			for (size_t i = 0; i < it->second.size(); i++) {
+				stringstream ststProfilePar;
+				ststProfilePar << parRange[j];
 				ststProfilePar >> ms_argv[it->second[i]];
-
+			}
 			outFile << scientific << parRange[j] << "\t" << computeLik() << endl;
 		}
 
 		outFile.close();
 
-		stringstream ststMLEPar;
-		ststMLEPar << MLEparVal;
-		for (size_t i = 0; i < it->second.size(); i++)
+		//	Resetting the MLE for this parameter
+		for (size_t i = 0; i < it->second.size(); i++) {
+			stringstream ststMLEPar;
+			ststMLEPar << MLEparVal;
 			ststMLEPar >> ms_argv[it->second[i]];
+		}
 	}
 }
 
@@ -299,9 +312,9 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		exit(-1);
 	}
 
-	for (map<string, vector<int> >::iterator it = tbiIdx.begin(); it != tbiIdx.end(); it++) {
+	for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 		stringstream stst;
-		stst << vars[parOrder[it->first]];
+		stst << vars[tbiOrder[it->first]];
 		for (size_t i = 0; i < it->second.size(); i++)
 			stst >> ms_argv[it->second[i]];
 	}
@@ -459,13 +472,13 @@ void readConfigFile(int argc, char* argv[]) {
 						stringstream stst, stst_val(tokens[j]);
 						stst << "tbi" << j-1;
 						stst_val >> val;
-						tbiStartVal[stst.str()] = val;
+						tbiUserVal[stst.str()] = val;
 					}
 				}
 				else {
 					stringstream stst(tokens[2]);
 					stst >> val;
-					tbiStartVal[tokens[1]] = val;
+					tbiUserVal[tokens[1]] = val;
 				}
 			}
 			else if (tokens[0] == "datafile") {
@@ -518,6 +531,9 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "no_profiles") {
 				profileLikBool = false;
 			}
+			else if (tokens[0] == "only_profiles") {
+				onlyProfiles = true;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -535,14 +551,14 @@ void readConfigFile(int argc, char* argv[]) {
 		string param(argv[i]);
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
-			tbiIdx[param].push_back(i);
-			if (tbiStartVal.find(param) != tbiStartVal.end()) {
-				stst << tbiStartVal[param];
+			tbiMsCmdIdx[param].push_back(i);
+			if (tbiUserVal.find(param) != tbiUserVal.end()) {
+				stst << tbiUserVal[param];
 				stst >> ms_argv[i];
 			}
 			else {
 				double tmpPar = ranMT();
-				tbiStartVal[param] = tmpPar;
+				tbiUserVal[param] = tmpPar;
 				stst << tmpPar;
 				stst >> ms_argv[i];
 			}
@@ -562,15 +578,18 @@ void readConfigFile(int argc, char* argv[]) {
 //		printf("\n");
 //		exit(-1);
 
-	if ((estimate == 2) && !tbiIdx.size()) {
+	if ((estimate == 2) && !tbiMsCmdIdx.size()) {
 		cerr << "Cannot proceed with inference" << endl;
 		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
 		cerr << "Exiting ABLE..." << endl;
 		exit(-1);
 	}
 
-//	if ((estimate > 0) && (globalTrees < 100 * tbiIdx.size())) {
-//		globalTrees = 100 * tbiIdx.size();
+	if (onlyProfiles)
+		skipGlobal = true;
+
+//	if ((estimate > 0) && (globalTrees < 100 * tbiMsCmdIdx.size())) {
+//		globalTrees = 100 * tbiMsCmdIdx.size();
 //		stringstream stst;
 //		stst << globalTrees;
 //		stst >> ms_argv[2];
@@ -601,13 +620,13 @@ int main(int argc, char* argv[]) {
 		double maxLnL;
 		vector<double> parVec;
 		int parCount = 0;
-		for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++) {
+		for (map<string, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
 			parVec.push_back(it->second);
-			parOrder[it->first] = parCount;
+			tbiOrder[it->first] = parCount;
 			++parCount;
 		}
 
-		nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiIdx.size());
+		nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
 		opt.set_lower_bounds(globalLower);
 		opt.set_upper_bounds(globalUpper);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
@@ -620,7 +639,7 @@ int main(int argc, char* argv[]) {
 		}
 
 
-		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiIdx.size());
+		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
@@ -674,8 +693,11 @@ int main(int argc, char* argv[]) {
 				parVec = it->second;
 				maxLnL = it->first;
 			}
+
+			time(&likEndTime);
+			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
-		else {
+		else if (!onlyProfiles) {
 			printf("Skipping global search!\n");
 			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
 			time(&likStartTime);
@@ -693,21 +715,21 @@ int main(int argc, char* argv[]) {
 			for (size_t i = 0; i < parVec.size(); i++)
 				printf("%.6f ", parVec[i]);
 			printf("LnL = %.6f\n\n", maxLnL);
+
+			time(&likEndTime);
+			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 
-		time(&likEndTime);
-		printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
-
-		if (profileLikBool)
-			profileLik(parVec, maxLnL);
+		if (onlyProfiles || profileLikBool)
+			profileLik(parVec);
 	}
 	else if ((estimate == 1) || bSFS) {
 
 		readDataConfigs();
 
 		printf("Evaluating point likelihood at : \n");
-		if (!tbiStartVal.empty()) {
-			for (map<string, double>::iterator it = tbiStartVal.begin(); it != tbiStartVal.end(); it++)
+		if (!tbiUserVal.empty()) {
+			for (map<string, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
 				printf("%.6f ", it->second);
 			printf("\n");
 		}
