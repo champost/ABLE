@@ -83,7 +83,7 @@ int estimate = 0, evalCount = 0;
 int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
 
 double globalUpper = 5, globalLower = 1e-3;
-bool skipGlobal = false, globalSearch = true, bSFS, profileLikBool = true, onlyProfiles = false;
+bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
 unsigned long int finalTableSize;
 
 
@@ -270,7 +270,7 @@ double computeLik() {
 	main_ms(ms_argc, ms_argv);
 
 	double loglik = 0.0;
-	if (bSFS && (estimate < 2)) {
+	if (bSFS) {
 		ofstream ofs("bSFS.txt",ios::out);
 		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
 			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
@@ -563,7 +563,7 @@ void readConfigFile(int argc, char* argv[]) {
 				stst >> ms_argv[i];
 			}
 		}
-		else if ((i == 2) && (estimate > 0) && (globalTrees != 400)) {
+		else if ((i == 2) && (estimate == 2)) {
 			stst << globalTrees;
 			stst >> ms_argv[2];
 		}
