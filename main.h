@@ -47,6 +47,8 @@ void profileLik(vector<double> MLEparVec, double maxLnL);
 vector<int> getMutConfigVec(unsigned long int i);
 string getMutConfigStr(unsigned long int i);
 string getMutConfigStr(vector<int> configVec);
+void freePoissonProbs();
+void calcFinalTable();
 double computeLik();
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data);
 void readDataConfigs();
@@ -59,12 +61,12 @@ int main_ms(int ms_argc, char *ms_argv[]);
 //double *** d3matrix(int x, int y, int z);
 //void freed3matrix(double ***m, int x, int y);
 //double ** d2matrix(int x, int y);
-//void freed2matrix(double **m, int x);
+void freed2matrix(double **m, int x);
 //int ** d2int_matrix(int x, int y);
 //void freed2int_matrix(int **m, int x);
 
 double ranMT();
-void calcFinalTable(double **onetreeTable);
+void storePoissonProbs(double **onetreeTable);
 int getBrConfigNum(int *brConfVec);
 }
 

@@ -51,6 +51,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <algorithm>
 
 #include <nlopt.hpp>
+#include <omp.h>
 
 #include "MersenneTwister.h"
 #include "main.h"
@@ -76,6 +77,7 @@ vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs;
 map<int, int> trackSelectConfigs;
+vector<double**> poissonProbTable;
 
 char **ms_argv;
 
@@ -214,52 +216,69 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 
-void calcFinalTable(double **onetreeTable) {
-
+void storePoissonProbs(double **onetreeTable) {
 	++treesSampled;
+	poissonProbTable.push_back(onetreeTable);
+}
 
-	double loglik = 0.0;
 
+void freePoissonProbs() {
+	for (size_t i = 0; i < poissonProbTable.size(); i++)
+		freed2matrix(poissonProbTable[i],brClass);
+	poissonProbTable.clear();
+}
+
+
+void calcFinalTable() {
 	if (bSFS || (estimate == 2)) {
-		for (size_t i = 0; i < dataConfigs.size(); i++) {
-		    double jointPoisson = 1.0;
+#pragma omp parallel for
+		for (int trees = 0; trees < treesSampled; trees++) {
+			for (size_t i = 0; i < dataConfigs.size(); i++) {
+			    double jointPoisson = 1.0;
 
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][dataConfigs[i][j]];
+				for (int j = 0; j < brClass; j++)
+					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
 
-			if (jointPoisson > 0.0)
-				selectConfigFreqs[i] += jointPoisson;
+				if (jointPoisson > 0.0)
+					selectConfigFreqs[i] += jointPoisson;
+			}
 		}
 	}
 	else if (estimate == 1) {
-		for (size_t i = 0; i < dataConfigs.size(); i++) {
-		    double jointPoisson = 1.0;
+		for (int trees = 0; trees < treesSampled; trees++) {
+			double loglik = 0.0;
+			for (size_t i = 0; i < dataConfigs.size(); i++) {
+			    double jointPoisson = 1.0;
 
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][dataConfigs[i][j]];
+				for (int j = 0; j < brClass; j++)
+					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
 
-			if (jointPoisson > 0.0)
-				selectConfigFreqs[i] += jointPoisson;
+				if (jointPoisson > 0.0)
+					selectConfigFreqs[i] += jointPoisson;
 
-			if (selectConfigFreqs[i] != 0.0) {
-				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
-				trackSelectConfigs[i] = 1;
+				if (selectConfigFreqs[i] != 0.0) {
+					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+					trackSelectConfigs[i] = 1;
+				}
 			}
+			testLik << scientific << loglik << endl;
+			testConfig << scientific << (double) trackSelectConfigs.size()/dataConfigs.size() << endl;
 		}
-		testLik << scientific << loglik << endl;
-		testConfig << scientific << (double) trackSelectConfigs.size()/dataConfigs.size() << endl;
 	}
 	else {
-		for (unsigned long int i = 0; i < finalTableSize; i++) {
-		    double jointPoisson = 1.0;
+#pragma omp parallel for
+		for (int trees = 0; trees < treesSampled; trees++) {
+			for (unsigned long int i = 0; i < finalTableSize; i++) {
+			    double jointPoisson = 1.0;
 
-		    vector<int> vec = getMutConfigVec(i);
-			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
+			    vector<int> vec = getMutConfigVec(i);
+				for (int j = 0; j < brClass; j++)
+					jointPoisson *= poissonProbTable[trees][j][vec[j]];
 
-			if (jointPoisson > 0.0) {
-				allConfigs.push_back(i);
-				allConfigFreqs[i] += jointPoisson;
+				if (jointPoisson > 0.0) {
+					allConfigs.push_back(i);
+					allConfigFreqs[i] += jointPoisson;
+				}
 			}
 		}
 	}
@@ -272,8 +291,12 @@ double computeLik() {
 	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
 	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
-	// calling ms
+	// calling ms for sampling genealogies
 	main_ms(ms_argc, ms_argv);
+
+	//	calculating the bSFS config. probs.
+	calcFinalTable();
+	freePoissonProbs();
 
 	double loglik = 0.0;
 	if (bSFS) {
@@ -777,6 +800,10 @@ int main(int argc, char* argv[]) {
 
 		printf("\n\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
 	}
+
+	for(int i = 0; i < argc; i++)
+		free(ms_argv[i]);
+	free(ms_argv);
 
 	return 0;
 }

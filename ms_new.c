@@ -290,7 +290,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
  	void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen);
  	double ** d2matrix(int x, int y);
  	void freed2matrix(double **m, int x);
- 	void calcFinalTable(double **onetreeTable);
+ 	void storePoissonProbs(double **onetreeTable);
 
 
 	nsites = pars.cp.nsites ;
@@ -373,12 +373,11 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
     		}
     	}
 
-	    calcFinalTable(onetreeTable);
+	    storePoissonProbs(onetreeTable);
 
 //	    printf("\n");
 
 
-	    freed2matrix(onetreeTable, brClass);
 	    freed2matrix(totSegBrLen, nsegs);
 	    free(totBrLen);
 	    free(onetreesegs);
