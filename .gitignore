@@ -35,10 +35,10 @@
 TODO.txt
 
 # Latex auxillary files
-/doc/*.tex
 /doc/*.aux
 /doc/*.bbl
 /doc/*.blg
 /doc/*.log
 /doc/*.out
+/doc/*.toc
 /doc/*.synctex.gz

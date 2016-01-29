@@ -64,9 +64,6 @@ int brClass, mutClass, foldBrClass = 0, allBrClasses;
 
 MTRand rMT;
 vector<int> npopVec;
-map<vector<int>, double> dataConfigs;
-map<vector<int>, double> selectConfigsMap;
-map<unsigned long int, double> allConfigsMap;
 map<vector<int>, int> intVec2BrConfig;
 map<string, vector<int> > tbiMsCmdIdx;
 map<string, double> tbiUserVal;
@@ -75,12 +72,17 @@ map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMa
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
+vector<vector<int> > dataConfigs;
+vector<int> allConfigs;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs;
+map<int, int> trackSelectConfigs;
+
 char **ms_argv;
 
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 500, localTrees = 1500, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
+int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
 
 double globalUpper = 5, globalLower = 1e-3;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
@@ -219,33 +221,33 @@ void calcFinalTable(double **onetreeTable) {
 	double loglik = 0.0;
 
 	if (bSFS || (estimate == 2)) {
-		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		for (size_t i = 0; i < dataConfigs.size(); i++) {
 		    double jointPoisson = 1.0;
 
-		    vector<int> vec = it->first;
 			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
+				jointPoisson *= onetreeTable[j][dataConfigs[i][j]];
 
 			if (jointPoisson > 0.0)
-				selectConfigsMap[vec] += jointPoisson;
+				selectConfigFreqs[i] += jointPoisson;
 		}
 	}
 	else if (estimate == 1) {
-		for (map<vector<int>, double>::iterator it = dataConfigs.begin(); it != dataConfigs.end(); it++) {
+		for (size_t i = 0; i < dataConfigs.size(); i++) {
 		    double jointPoisson = 1.0;
 
-		    vector<int> vec = it->first;
 			for (int j = 0; j < brClass; j++)
-				jointPoisson *= onetreeTable[j][vec[j]];
+				jointPoisson *= onetreeTable[j][dataConfigs[i][j]];
 
 			if (jointPoisson > 0.0)
-				selectConfigsMap[vec] += jointPoisson;
+				selectConfigFreqs[i] += jointPoisson;
 
-			if (selectConfigsMap.count(vec))
-				loglik += log(selectConfigsMap[vec] / treesSampled) * it->second;
+			if (selectConfigFreqs[i] != 0.0) {
+				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+				trackSelectConfigs[i] = 1;
+			}
 		}
 		testLik << scientific << loglik << endl;
-		testConfig << scientific << (double) selectConfigsMap.size()/dataConfigs.size() << endl;
+		testConfig << scientific << (double) trackSelectConfigs.size()/dataConfigs.size() << endl;
 	}
 	else {
 		for (unsigned long int i = 0; i < finalTableSize; i++) {
@@ -255,8 +257,10 @@ void calcFinalTable(double **onetreeTable) {
 			for (int j = 0; j < brClass; j++)
 				jointPoisson *= onetreeTable[j][vec[j]];
 
-			if (jointPoisson > 0.0)
-				allConfigsMap[i] += jointPoisson;
+			if (jointPoisson > 0.0) {
+				allConfigs.push_back(i);
+				allConfigFreqs[i] += jointPoisson;
+			}
 		}
 	}
 }
@@ -265,6 +269,8 @@ void calcFinalTable(double **onetreeTable) {
 double computeLik() {
 
 	treesSampled = 0;
+	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
+	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
 	// calling ms
 	main_ms(ms_argc, ms_argv);
@@ -272,31 +278,32 @@ double computeLik() {
 	double loglik = 0.0;
 	if (bSFS) {
 		ofstream ofs("bSFS.txt",ios::out);
-		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++) {
-			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
-			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
+		for (size_t i = 0; i < dataConfigs.size(); i++) {
+			if (selectConfigFreqs[i] != 0.0) {
+				ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / treesSampled << endl;
+				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+			}
 		}
 		ofs.close();
 
-		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
-
-		selectConfigsMap.clear();
+		selectConfigFreqs.clear();
 	}
 	else if (estimate > 0) {
-		for (map<vector<int>, double>::iterator it = selectConfigsMap.begin(); it != selectConfigsMap.end(); it++)
-			loglik += log(it->second / treesSampled) * dataConfigs[it->first];
+		for (size_t i = 0; i < dataConfigs.size(); i++) {
+			if (selectConfigFreqs[i] != 0.0)
+				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+		}
 
-		loglik = loglik * dataConfigs.size() / selectConfigsMap.size();
-
-		selectConfigsMap.clear();
+		selectConfigFreqs.clear();
 	}
 	else if (estimate == 0) {
 		ofstream ofs("expected_bSFS.txt",ios::out);
-		for (map<unsigned long int, double>::iterator it = allConfigsMap.begin(); it != allConfigsMap.end(); it++)
-			ofs << getMutConfigStr(it->first) << " : " << scientific << it->second / treesSampled << endl;
+		for (size_t i = 0; i < allConfigs.size(); i++)
+			ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
 		ofs.close();
 
-		allConfigsMap.clear();
+		allConfigs.clear();
+		allConfigFreqs.clear();
 	}
 
 	return loglik;
@@ -358,7 +365,9 @@ void readDataConfigs() {
 			TrimSpaces(tokens[j]);
 			config.push_back(atoi(tokens[j].c_str()));
 		}
-		dataConfigs[config] = val;
+		dataConfigs.push_back(config);
+		dataConfigFreqs.push_back(val);
+
 		config.clear();
 	}
 	ifs.close();
@@ -587,13 +596,6 @@ void readConfigFile(int argc, char* argv[]) {
 
 	if (onlyProfiles)
 		skipGlobal = true;
-
-//	if ((estimate > 0) && (globalTrees < 100 * tbiMsCmdIdx.size())) {
-//		globalTrees = 100 * tbiMsCmdIdx.size();
-//		stringstream stst;
-//		stst << globalTrees;
-//		stst >> ms_argv[2];
-//	}
 }
 
 
