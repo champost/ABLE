@@ -117,320 +117,351 @@ static struct segl *seglst = NULL ;
 
 	struct segl *
 segtre_mig(struct c_params *cp, int *pnsegs ) 
-{
-	int i, j, k, dec, pop, pop2, c1, c2, ind, rchrom;
-	int migrant, source_pop, *config;
-//	double  ran1(), sum, x, ttemp, rft, clefta,  tmin, p  ;
-	double  ran1(), sum, x, ttemp, rft, clefta,  tmin = 0, p  ;
-	double prec, cin,  prect, mig, ran, coal_prob, rdum , arg ;
-//	char event ;
-	char event = ' ';
-//	int re(), cinr(), cleftr(), eflag, cpop, ic  ;
-	int re(), cinr(), cleftr(), eflag, cpop = 0, ic  ;
-	int nsam, npop, nsites, *inconfig ;
-	double r,  f, rf,  track_len, **migm ;
-	double *size, *alphag, *tlast ;
-	struct devent *nextevent ;
-    int ca(int nsam, int nsites, int c1, int c2);
-	void pick2_chrom(int pop,int config[], int *pc1, int *pc2);
+	{
+		int i, j, k, dec, pop, pop2, c1, c2, ind, rchrom;
+		int migrant, source_pop, *config;
+		//	double  ran1(), sum, x, ttemp, rft, clefta,  tmin, p  ;
+		double ran1(), sum, x, ttemp, rft, clefta, tmin = 0, p;
+		double prec, cin, prect, mig, ran, coal_prob, rdum, arg;
+		//	char event ;
+		char event = ' ';
+		//	int re(), cinr(), cleftr(), eflag, cpop, ic  ;
+		int re(), cinr(), cleftr(), eflag, cpop = 0, ic;
+		int nsam, npop, nsites, *inconfig;
+		double r, f, rf, track_len, **migm;
+		double *size, *alphag, *tlast;
+		struct devent *nextevent;
+		int ca(int nsam, int nsites, int c1, int c2);
+		void pick2_chrom(int pop, int config[], int *pc1, int *pc2);
 
-	nsam = cp->nsam;
-	npop = cp->npop;
-	nsites = cp->nsites;
-	inconfig = cp->config;
-	r = cp->r ;
-	f = cp->f ;
-	track_len = cp->track_len ;
-	migm = (double **)malloc( (unsigned)npop*sizeof(double *) ) ;
-	for( i=0; i<npop; i++) {
-	  migm[i] = (double *)malloc( (unsigned)npop*sizeof( double) ) ;
-	  for( j=0; j<npop; j++) migm[i][j] = (cp->mig_mat)[i][j] ;
-	  }
-	nextevent = cp->deventlist ;
-	
-/* Initialization */
-	if( chrom == NULL ) {
-	   maxchr = nsam + 20 ;
-	   chrom = (struct chromo *)malloc( (unsigned)( maxchr*sizeof( struct chromo) )) ;
-	  if( chrom == NULL ) perror( "malloc error. segtre");
-	  }
-	if( nnodes == NULL ){
-		nnodes = (int*) malloc((unsigned)(seglimit*sizeof(int)))  ;
-		if( nnodes == NULL ) perror("malloc error. segtre_mig");
+		nsam = cp->nsam;
+		npop = cp->npop;
+		nsites = cp->nsites;
+		inconfig = cp->config;
+		r = cp->r;
+		f = cp->f;
+		track_len = cp->track_len;
+		migm = (double **) malloc((unsigned) npop * sizeof(double *));
+		for (i = 0; i < npop; i++) {
+			migm[i] = (double *) malloc((unsigned) npop * sizeof(double));
+			for (j = 0; j < npop; j++)
+				migm[i][j] = (cp->mig_mat)[i][j];
 		}
-	if( seglst == NULL ) {
-		seglst = (struct segl *)malloc((unsigned)(seglimit*sizeof(struct segl)) ) ;
-		if( seglst == NULL ) perror("malloc error. segtre_mig.c 2");
+		nextevent = cp->deventlist;
+
+		/* Initialization */
+		if (chrom == NULL) {
+			maxchr = nsam + 20;
+			chrom = (struct chromo *) malloc(
+					(unsigned) (maxchr * sizeof(struct chromo)));
+			if (chrom == NULL)
+				perror("malloc error. segtre");
+		}
+		if (nnodes == NULL) {
+			nnodes = (int*) malloc((unsigned) (seglimit * sizeof(int)));
+			if (nnodes == NULL)
+				perror("malloc error. segtre_mig");
+		}
+		if (seglst == NULL) {
+			seglst = (struct segl *) malloc(
+					(unsigned) (seglimit * sizeof(struct segl)));
+			if (seglst == NULL)
+				perror("malloc error. segtre_mig.c 2");
 		}
 
-	config = (int *)malloc( (unsigned) ((npop+1)*sizeof(int) )) ;
-	if( config == NULL ) perror("malloc error. segtre.");
-	size = (double *)malloc( (unsigned) ((npop)*sizeof(double) )) ;
-	if( size == NULL ) perror("malloc error. segtre.");
-	alphag = (double *)malloc( (unsigned) ((npop)*sizeof(double) )) ;
-	if( alphag == NULL ) perror("malloc error. segtre.");
-	tlast = (double *)malloc( (unsigned) ((npop)*sizeof(double) )) ;
-	if( alphag == NULL ) perror("malloc error. segtre.");
-	for(pop=0;pop<npop;pop++) {
-	   config[pop] = inconfig[pop] ;
-	   size[pop] = (cp->size)[pop] ;
-	   alphag[pop] = (cp->alphag)[pop] ;
-	   tlast[pop] = 0.0 ;
-	}
-	for(pop=ind=0;pop<npop;pop++)
-		for(j=0; j<inconfig[pop];j++,ind++) {
-			
-			chrom[ind].nseg = 1;
-			if( !(chrom[ind].pseg = (struct seg*)malloc((unsigned)sizeof(struct seg)) ))
-			  ERROR("calloc error. se1");
+		config = (int *) malloc((unsigned) ((npop + 1) * sizeof(int)));
+		if (config == NULL)
+			perror("malloc error. segtre.");
+		size = (double *) malloc((unsigned) ((npop) * sizeof(double)));
+		if (size == NULL)
+			perror("malloc error. segtre.");
+		alphag = (double *) malloc((unsigned) ((npop) * sizeof(double)));
+		if (alphag == NULL)
+			perror("malloc error. segtre.");
+		tlast = (double *) malloc((unsigned) ((npop) * sizeof(double)));
+		if (alphag == NULL)
+			perror("malloc error. segtre.");
+		for (pop = 0; pop < npop; pop++) {
+			config[pop] = inconfig[pop];
+			size[pop] = (cp->size)[pop];
+			alphag[pop] = (cp->alphag)[pop];
+			tlast[pop] = 0.0;
+		}
+		for (pop = ind = 0; pop < npop; pop++)
+			for (j = 0; j < inconfig[pop]; j++, ind++) {
 
-			(chrom[ind].pseg)->beg = 0;
-			(chrom[ind].pseg)->end = nsites-1;
-			(chrom[ind].pseg)->desc = ind ;
-			chrom[ind].pop = pop ;
+				chrom[ind].nseg = 1;
+				if (!(chrom[ind].pseg = (struct seg*) malloc(
+						(unsigned) sizeof(struct seg))))
+					ERROR("calloc error. se1");
+
+				(chrom[ind].pseg)->beg = 0;
+				(chrom[ind].pseg)->end = nsites - 1;
+				(chrom[ind].pseg)->desc = ind;
+				chrom[ind].pop = pop;
 			}
-	seglst[0].beg = 0;
-	if( !(seglst[0].ptree = (struct node *)calloc((unsigned)(2*nsam),sizeof(struct node)) ))
-		 perror("calloc error. se2");
+		seglst[0].beg = 0;
+		if (!(seglst[0].ptree = (struct node *) calloc((unsigned) (2 * nsam),
+				sizeof(struct node))))
+			perror("calloc error. se2");
 
+		nnodes[0] = nsam - 1;
+		nchrom = nsam;
+		nlinks = ((long) (nsam)) * (nsites - 1);
+		nsegs = 1;
+		t = 0.;
+		r /= (nsites - 1);
+		if (f > 0.0)
+			pc = (track_len - 1.0) / track_len;
+		else
+			pc = 1.0;
+		lnpc = log(pc);
+		cleft = nsam * (1.0 - pow(pc, (double) (nsites - 1)));
+		if (r > 0.0)
+			rf = r * f;
+		else
+			rf = f / (nsites - 1);
+		rft = rf * track_len;
 
+		/* Main loop */
 
-	nnodes[0] = nsam - 1 ;
-	nchrom=nsam;
-	nlinks = ((long)(nsam))*(nsites-1) ;
-	nsegs=1;
-	t = 0.;
-	r /= (nsites-1);
-	if( f > 0.0 ) 	pc = (track_len -1.0)/track_len ;
-	else pc = 1.0 ;
-	lnpc = log( pc ) ;
-	cleft = nsam* ( 1.0 - pow( pc, (double)(nsites-1) ) ) ;
-	if( r > 0.0 ) rf = r*f ;
-	else rf = f /(nsites-1) ;
-	rft = rf*track_len ;
-
-/* Main loop */
-
-	while( nchrom > 1 ) {
-		prec = nlinks*r;
-		cin = nlinks*rf ;
-		clefta = cleft*rft ;
-		prect = prec + cin + clefta ;
-		mig = 0.0;
-		for( i=0; i<npop; i++) mig += config[i]*migm[i][i] ;
-		if( (npop > 1) && ( mig == 0.0) && ( nextevent == NULL)) {
-		   i = 0;
-		   for( j=0; j<npop; j++) 
-			if( config[j] > 0 ) i++;
-		   if( i > 1 ) {
-			fprintf(stderr," Infinite coalescent time. No migration.\n");
-			exit(1);
-		   }
-		}
-		eflag = 0 ;
-
-		if( prect > 0.0 ) {      /* cross-over or gene conversion */
-		  while( (rdum = ran1() )  == 0.0 ) ;
-		  ttemp = -log( rdum)/prect ;
-		  if( (eflag == 0) || (ttemp < tmin ) ){
-		    tmin = ttemp;
-		    event = 'r' ;
-		    eflag = 1;
-		  }
-	        }
-		if(mig > 0.0 ) {         /* migration   */
-		  while( (rdum = ran1() ) == 0.0 ) ;
-		  ttemp = -log( rdum)/mig ;
-		  if( (eflag == 0) || (ttemp < tmin ) ){
-		    tmin = ttemp;
-		    event = 'm' ;
-		    eflag = 1 ;
-		  }
-	        }
-		
-	    for(pop=0; pop<npop ; pop++) {     /* coalescent */
-		coal_prob = ((double)config[pop])*(config[pop]-1.) ;
-	        if( coal_prob > 0.0 ) {
-		   while( ( rdum = ran1() )  == .0 )
-               ;
-	  	   if( alphag[pop] == 0 ){
-			 ttemp = -log( rdum )*size[pop] /coal_prob ;
-		         if( (eflag == 0) || (ttemp < tmin ) ){
-		            tmin = ttemp;
-		            event = 'c' ;
-		            eflag = 1 ;
-			    cpop = pop;
-			 }
-		    }
-	  	   else {
-		     arg  = 1. - alphag[pop]*size[pop]*exp(-alphag[pop]*(t - tlast[pop] ) )* log(rdum) / coal_prob     ;
-		     if( arg > 0.0 ) {                          /*if arg <= 0,  no coalescent within interval */ 
-		         ttemp = log( arg ) / alphag[pop]  ;
-		         if( (eflag == 0) || (ttemp < tmin ) ){
-		            tmin = ttemp;
-		            event = 'c' ;
-		            eflag = 1 ;
-			    cpop = pop ;
-			 }
-		     }
-		   }
-	         }		
- 	      }
-
-	    if( (eflag == 0) && ( nextevent == NULL) ) {
-	      fprintf(stderr,
-               " infinite time to next event. Negative growth rate in last time interval or non-communicating subpops.\n");
-	      exit( 0);
-	    }
-	if( ( ( eflag == 0) && (nextevent != NULL))|| ( (nextevent != NULL) &&  ( (t+tmin) >=  nextevent->time)) ) {
-	    t = nextevent->time ;
-	    switch(  nextevent->detype ) {
-		case 'N' :
-		   for(pop =0; pop <npop; pop++){
-			 size[pop]= nextevent->paramv ;
-			 alphag[pop] = 0.0 ;
+		while (nchrom > 1) {
+			prec = nlinks * r;
+			cin = nlinks * rf;
+			clefta = cleft * rft;
+			prect = prec + cin + clefta;
+			mig = 0.0;
+			for (i = 0; i < npop; i++)
+				mig += config[i] * migm[i][i];
+			if ((npop > 1) && (mig == 0.0) && (nextevent == NULL)) {
+				i = 0;
+				for (j = 0; j < npop; j++)
+					if (config[j] > 0)
+						i++;
+				if (i > 1) {
+					fprintf(stderr, " Infinite coalescent time. No migration.\n");
+					exit(1);
+				}
 			}
-		   nextevent = nextevent->nextde ;
-		   break;
-		case 'n' :
-		   size[nextevent->popi]= nextevent->paramv ;
-		   alphag[nextevent->popi] = 0.0 ;
-		   nextevent = nextevent->nextde ;
-		   break;
-		case 'G' :
-		   for(pop =0; pop <npop; pop++){
-		     size[pop] = size[pop]*exp( -alphag[pop]*(t - tlast[pop]) ) ;
-		     alphag[pop]= nextevent->paramv ;
-		     tlast[pop] = t ;
-		   }
-		   nextevent = nextevent->nextde ;
-		   break;
-		case 'g' :
-		     pop = nextevent->popi ;
-		     size[pop] = size[pop]*exp( - alphag[pop]*(t-tlast[pop]) ) ;
-		     alphag[pop]= nextevent->paramv ;
-		     tlast[pop] = t ;
-		     nextevent = nextevent->nextde ;
-		     break;
-		case 'M' :
-		   for(pop =0; pop <npop; pop++)
-		     for( pop2 = 0; pop2 <npop; pop2++) migm[pop][pop2] = (nextevent->paramv) /(npop-1.0) ;
-		   for( pop = 0; pop <npop; pop++)
-		     migm[pop][pop]= nextevent->paramv ;
-		   nextevent = nextevent->nextde ;
-		   break;
-		case 'a' :
-		   for(pop =0; pop <npop; pop++)
-		     for( pop2 = 0; pop2 <npop; pop2++) migm[pop][pop2] = (nextevent->mat)[pop][pop2]  ;
-		   nextevent = nextevent->nextde ;
-		   break;
-		case 'm' :
-		  i = nextevent->popi ;
-		  j = nextevent->popj ;
-		  migm[i][i] += nextevent->paramv - migm[i][j];
-		   migm[i][j]= nextevent->paramv ;
-		   nextevent = nextevent->nextde ;
-		   break;
-	        case 'j' :         /* merge pop i into pop j  (join) */
-		  i = nextevent->popi ;
-		  j = nextevent->popj ;
-		  config[j] += config[i] ;
-		  config[i] = 0 ;
-		  for( ic = 0; ic<nchrom; ic++) if( chrom[ic].pop == i ) chrom[ic].pop = j ;
-		/*  the following was added 19 May 2007 */
-		  for( k=0; k < npop; k++){
-		     if( k != i) {
-		        migm[k][k] -= migm[k][i] ;
-		        migm[k][i] = 0. ;
-			 }
-		   }
-		/* end addition */
-		   nextevent = nextevent->nextde ;
-		   break;
-	        case 's' :         /*split  pop i into two;p is the proportion from pop i, and 1-p from pop n+1  */
-		  i = nextevent->popi ;
-		  p = nextevent->paramv ;
-		  npop++;
-		  config = (int *)realloc( config, (unsigned)(npop*sizeof( int) )); 
-		  size = (double *)realloc(size, (unsigned)(npop*sizeof(double) ));
-		  alphag = (double *)realloc(alphag, (unsigned)(npop*sizeof(double) ));
-		  tlast = (double *)realloc(tlast,(unsigned)(npop*sizeof(double) ) ) ;
-		  tlast[npop-1] = t ;
-		  size[npop-1] = 1.0 ;
-		  alphag[npop-1] = 0.0 ;
-		  migm = (double **)realloc(migm, (unsigned)(npop*sizeof( double *)));
-		  for( j=0; j< npop-1; j++)
-			 migm[j] = (double *)realloc(migm[j],(unsigned)(npop*sizeof(double)));
-		  migm[npop-1] = (double *)malloc( (unsigned)(npop*sizeof( double) ) ) ;
-		  for( j=0; j<npop; j++) migm[npop-1][j] = migm[j][npop-1] = 0.0 ;
-		  config[npop-1] = 0 ;
-		  config[i] = 0 ;
-		  for( ic = 0; ic<nchrom; ic++){
-		    if( chrom[ic].pop == i ) {
-		      if( ran1() < p ) config[i]++;
-		      else {
-			 chrom[ic].pop = npop-1 ;
-			 config[npop-1]++;
-		      }
-		    }
-		  }
-		   nextevent = nextevent->nextde ;
-		   break;
-		}
- 	   } 
-	else {
-		   t += tmin ;	
-		   if( event == 'r' ) {   
-		      if( (ran = ran1()) < ( prec / prect ) ){ /*recombination*/
-		     	  rchrom = re(nsam);
-			  config[ chrom[rchrom].pop ] += 1 ;
-		      }
-		      else if( ran < (prec + clefta)/(prect) ){    /*  cleft event */
-			 rchrom = cleftr(nsam);
-			 config[ chrom[rchrom].pop ] += 1 ;
-		      }
-		      else  {         /* cin event */
-			 rchrom = cinr(nsam,nsites);
-			 if( rchrom >= 0 ) config[ chrom[rchrom].pop ] += 1 ;
-		      }
-		   }
-	           else if ( event == 'm' ) {  /* migration event */
-			x = mig*ran1();
-			sum = 0.0 ;
-			for( i=0; i<nchrom; i++) {
-			  sum += migm[chrom[i].pop][chrom[i].pop] ;
-			  if( x <sum ) break;
-			  }
-			migrant = i ;
-			x = ran1()*migm[chrom[i].pop][chrom[i].pop];
-			sum = 0.0;
-			for(i=0; i<npop; i++){
-			  if( i != chrom[migrant].pop ){
-			    sum += migm[chrom[migrant].pop][i];
-			    if( x < sum ) break;
-			   }
+			eflag = 0;
+
+			if (prect > 0.0) { /* cross-over or gene conversion */
+				while ((rdum = ran1()) == 0.0)
+					;
+				ttemp = -log(rdum) / prect;
+				if ((eflag == 0) || (ttemp < tmin)) {
+					tmin = ttemp;
+					event = 'r';
+					eflag = 1;
+				}
 			}
-			source_pop = i;
-			  config[chrom[migrant].pop] -= 1;
-			  config[source_pop] += 1;
-			  chrom[migrant].pop = source_pop ;
-	           }
-		   else { 								 /* coalescent event */
-			/* pick the two, c1, c2  */
-			pick2_chrom( cpop, config, &c1,&c2);  /* c1 and c2 are chrom's to coalesce */
-			dec = ca(nsam,nsites,c1,c2 );
-			config[cpop] -= dec ;
-		   }
-		 }
-	     }  
-	*pnsegs = nsegs ;
-	free(config); 
-	free( size ) ;
-	free( alphag );
-	free( tlast );
-	for( i=0; i<npop; i++) free ( migm[i] ) ;
-	free( migm ) ;
-	return( seglst );
+			if (mig > 0.0) { /* migration   */
+				while ((rdum = ran1()) == 0.0)
+					;
+				ttemp = -log(rdum) / mig;
+				if ((eflag == 0) || (ttemp < tmin)) {
+					tmin = ttemp;
+					event = 'm';
+					eflag = 1;
+				}
+			}
+
+			for (pop = 0; pop < npop; pop++) { /* coalescent */
+				coal_prob = ((double) config[pop]) * (config[pop] - 1.);
+				if (coal_prob > 0.0) {
+					while ((rdum = ran1()) == .0)
+						;
+					if (alphag[pop] == 0) {
+						ttemp = -log(rdum) * size[pop] / coal_prob;
+						if ((eflag == 0) || (ttemp < tmin)) {
+							tmin = ttemp;
+							event = 'c';
+							eflag = 1;
+							cpop = pop;
+						}
+					} else {
+						arg = 1. - alphag[pop] * size[pop] * exp(-alphag[pop] * (t - tlast[pop])) * log(rdum) / coal_prob;
+						if (arg > 0.0) { /*if arg <= 0,  no coalescent within interval */
+							ttemp = log(arg) / alphag[pop];
+							if ((eflag == 0) || (ttemp < tmin)) {
+								tmin = ttemp;
+								event = 'c';
+								eflag = 1;
+								cpop = pop;
+							}
+						}
+					}
+				}
+			}
+
+			if ((eflag == 0) && (nextevent == NULL)) {
+				fprintf(stderr,
+						" infinite time to next event. Negative growth rate in last time interval or non-communicating subpops.\n");
+				exit(0);
+			}
+			if (((eflag == 0) && (nextevent != NULL))
+					|| ((nextevent != NULL) && ((t + tmin) >= nextevent->time))) {
+				t = nextevent->time;
+				switch (nextevent->detype) {
+				case 'N':
+					for (pop = 0; pop < npop; pop++) {
+						size[pop] = nextevent->paramv;
+						alphag[pop] = 0.0;
+					}
+					nextevent = nextevent->nextde;
+					break;
+				case 'n':
+					size[nextevent->popi] = nextevent->paramv;
+					alphag[nextevent->popi] = 0.0;
+					nextevent = nextevent->nextde;
+					break;
+				case 'G':
+					for (pop = 0; pop < npop; pop++) {
+						size[pop] = size[pop]
+						                 * exp(-alphag[pop] * (t - tlast[pop]));
+						alphag[pop] = nextevent->paramv;
+						tlast[pop] = t;
+					}
+					nextevent = nextevent->nextde;
+					break;
+				case 'g':
+					pop = nextevent->popi;
+					size[pop] = size[pop] * exp(-alphag[pop] * (t - tlast[pop]));
+					alphag[pop] = nextevent->paramv;
+					tlast[pop] = t;
+					nextevent = nextevent->nextde;
+					break;
+				case 'M':
+					for (pop = 0; pop < npop; pop++)
+						for (pop2 = 0; pop2 < npop; pop2++)
+							migm[pop][pop2] = (nextevent->paramv) / (npop - 1.0);
+					for (pop = 0; pop < npop; pop++)
+						migm[pop][pop] = nextevent->paramv;
+					nextevent = nextevent->nextde;
+					break;
+				case 'a':
+					for (pop = 0; pop < npop; pop++)
+						for (pop2 = 0; pop2 < npop; pop2++)
+							migm[pop][pop2] = (nextevent->mat)[pop][pop2];
+					nextevent = nextevent->nextde;
+					break;
+				case 'm':
+					i = nextevent->popi;
+					j = nextevent->popj;
+					migm[i][i] += nextevent->paramv - migm[i][j];
+					migm[i][j] = nextevent->paramv;
+					nextevent = nextevent->nextde;
+					break;
+				case 'j': /* merge pop i into pop j  (join) */
+					i = nextevent->popi;
+					j = nextevent->popj;
+					config[j] += config[i];
+					config[i] = 0;
+					for (ic = 0; ic < nchrom; ic++)
+						if (chrom[ic].pop == i)
+							chrom[ic].pop = j;
+					/*  the following was added 19 May 2007 */
+					for (k = 0; k < npop; k++) {
+						if (k != i) {
+							migm[k][k] -= migm[k][i];
+							migm[k][i] = 0.;
+						}
+					}
+					/* end addition */
+					nextevent = nextevent->nextde;
+					break;
+				case 's': /*split  pop i into two;p is the proportion from pop i, and 1-p from pop n+1  */
+					i = nextevent->popi;
+					p = nextevent->paramv;
+					npop++;
+					config = (int *) realloc(config,
+							(unsigned) (npop * sizeof(int)));
+					size = (double *) realloc(size,
+							(unsigned) (npop * sizeof(double)));
+					alphag = (double *) realloc(alphag,
+							(unsigned) (npop * sizeof(double)));
+					tlast = (double *) realloc(tlast,
+							(unsigned) (npop * sizeof(double)));
+					tlast[npop - 1] = t;
+					size[npop - 1] = 1.0;
+					alphag[npop - 1] = 0.0;
+					migm = (double **) realloc(migm,
+							(unsigned) (npop * sizeof(double *)));
+					for (j = 0; j < npop - 1; j++)
+						migm[j] = (double *) realloc(migm[j],
+								(unsigned) (npop * sizeof(double)));
+					migm[npop - 1] = (double *) malloc(
+							(unsigned) (npop * sizeof(double)));
+					for (j = 0; j < npop; j++)
+						migm[npop - 1][j] = migm[j][npop - 1] = 0.0;
+					config[npop - 1] = 0;
+					config[i] = 0;
+					for (ic = 0; ic < nchrom; ic++) {
+						if (chrom[ic].pop == i) {
+							if (ran1() < p)
+								config[i]++;
+							else {
+								chrom[ic].pop = npop - 1;
+								config[npop - 1]++;
+							}
+						}
+					}
+					nextevent = nextevent->nextde;
+					break;
+				}
+			} else {
+				t += tmin;
+				if (event == 'r') {
+					if ((ran = ran1()) < (prec / prect)) { /*recombination*/
+						rchrom = re(nsam);
+						config[chrom[rchrom].pop] += 1;
+					} else if (ran < (prec + clefta) / (prect)) { /*  cleft event */
+						rchrom = cleftr(nsam);
+						config[chrom[rchrom].pop] += 1;
+					} else { /* cin event */
+						rchrom = cinr(nsam, nsites);
+						if (rchrom >= 0)
+							config[chrom[rchrom].pop] += 1;
+					}
+				} else if (event == 'm') { /* migration event */
+					x = mig * ran1();
+					sum = 0.0;
+					for (i = 0; i < nchrom; i++) {
+						sum += migm[chrom[i].pop][chrom[i].pop];
+						if (x < sum)
+							break;
+					}
+					migrant = i;
+					x = ran1() * migm[chrom[i].pop][chrom[i].pop];
+					sum = 0.0;
+					for (i = 0; i < npop; i++) {
+						if (i != chrom[migrant].pop) {
+							sum += migm[chrom[migrant].pop][i];
+							if (x < sum)
+								break;
+						}
+					}
+					source_pop = i;
+					config[chrom[migrant].pop] -= 1;
+					config[source_pop] += 1;
+					chrom[migrant].pop = source_pop;
+				} else { /* coalescent event */
+					/* pick the two, c1, c2  */
+					pick2_chrom(cpop, config, &c1, &c2); /* c1 and c2 are chrom's to coalesce */
+					dec = ca(nsam, nsites, c1, c2);
+					config[cpop] -= dec;
+				}
+			}
+		}
+		*pnsegs = nsegs;
+		free(config);
+		free(size);
+		free(alphag);
+		free(tlast);
+		for (i = 0; i < npop; i++)
+			free(migm[i]);
+		free(migm);
+		return (seglst);
 }
 
 /******  recombination subroutine ***************************
