@@ -69,13 +69,14 @@ map<vector<int>, int> intVec2BrConfig;
 map<string, vector<int> > tbiMsCmdIdx;
 map<string, double> tbiUserVal;
 map<string, int> tbiOrder;
+map<string, vector<double> > tbiSearchBounds;
 map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBoundsVec, lowerBoundsVec;
 map<int, int> trackSelectConfigs;
 vector<double**> poissonProbTable;
 
@@ -84,7 +85,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 400, localEvals = 0, bestGlobalSearchPoints = 1;
+int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0, bestGlobalSearchPoints = 1;
 
 double globalUpper = 5, globalLower = 1e-3;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
@@ -526,32 +527,40 @@ void readConfigFile(int argc, char* argv[]) {
 			}
 			else if (tokens[0] == "folded")
 				foldBrClass = 1;
-			else if (tokens[0] == "global_trees") {
+			else if (tokens[0] == "global_search_trees") {
 				stringstream stst(tokens[1]);
 				stst >> globalTrees;
 			}
-			else if (tokens[0] == "local_trees") {
+			else if (tokens[0] == "local_search_trees") {
 				stringstream stst(tokens[1]);
 				stst >> localTrees;
 			}
-			else if (tokens[0] == "global_evals") {
+			else if (tokens[0] == "global_search_evals") {
 				stringstream stst(tokens[1]);
 				stst >> globalEvals;
 			}
-			else if (tokens[0] == "local_evals") {
+			else if (tokens[0] == "local_search_evals") {
 				stringstream stst(tokens[1]);
 				stst >> localEvals;
 			}
-			else if (tokens[0] == "global_upper") {
+			else if (tokens[0] == "global_upper_bound") {
 				stringstream stst(tokens[1]);
 				stst >> globalUpper;
 			}
-			else if (tokens[0] == "global_lower") {
+			else if (tokens[0] == "global_lower_bound") {
 				stringstream stst(tokens[1]);
 				stst >> globalLower;
 			}
 			else if (tokens[0] == "skip_global_search") {
 				skipGlobal = true;
+			}
+			else if (tokens[0] == "bounds") {
+				for(unsigned int j = 2; j < 4; j++) {
+					double val;
+					stringstream stst(tokens[j]);
+					stst >> val;
+					tbiSearchBounds[tokens[1]].push_back(val);
+				}
 			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
@@ -649,18 +658,25 @@ int main(int argc, char* argv[]) {
 			parVec.push_back(it->second);
 			tbiOrder[it->first] = parCount;
 			++parCount;
+
+			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
+				lowerBoundsVec.push_back(tbiSearchBounds[it->first][0]);
+				upperBoundsVec.push_back(tbiSearchBounds[it->first][1]);
+			}
+			else {
+				lowerBoundsVec.push_back(globalLower);
+				upperBoundsVec.push_back(globalUpper);
+			}
 		}
 
-		nlopt::opt opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
-		opt.set_lower_bounds(globalLower);
-		opt.set_upper_bounds(globalUpper);
+		nlopt::opt opt(nlopt::GN_DIRECT_L_RAND, tbiMsCmdIdx.size());
+		opt.set_lower_bounds(lowerBoundsVec);
+		opt.set_upper_bounds(upperBoundsVec);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		opt.set_maxeval(globalEvals);
-		if ((globalEvals == 400) && (pow(4,parVec.size()) > globalEvals)) {
-			if (pow(4,parVec.size()) > 20000)
-				opt.set_maxeval(20000);
-			else
-				opt.set_maxeval(pow(4,parVec.size()));
+		if ((globalEvals <= tbiMsCmdIdx.size())) {
+			if (globalEvals)
+				printf("Too few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
+			opt.set_maxeval(1000*tbiMsCmdIdx.size());
 		}
 
 
