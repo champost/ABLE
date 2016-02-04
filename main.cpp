@@ -71,27 +71,25 @@ map<string, double> tbiUserVal;
 map<string, int> tbiOrder;
 map<string, vector<double> > tbiSearchBounds;
 map<string, string> parConstraints;
-map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
 map<int, int> trackSelectConfigs;
 vector<double**> poissonProbTable;
 nlopt::opt opt;
 nlopt::opt local_opt;
-
 
 char **ms_argv;
 
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0, bestGlobalSearchPoints = 1;
+int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL;
+double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
 unsigned long int finalTableSize;
 
@@ -349,7 +347,8 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		exit(-1);
 	}
 
-	if (evalCount > globalEvals-1)
+	//	global search exit status
+	if (globalSearch && (evalCount > globalEvals-1))
 		return loglik;
 
 	for (map<string, string>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
@@ -368,9 +367,6 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		}
 
 		loglik = computeLik();
-
-		if (globalSearch)
-			bestGlobalSearchPointsMap[-loglik] = vars;
 
 		++evalCount;
 		printf("%5d ", evalCount);
@@ -393,6 +389,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	}
 
 	penLnL = loglik;
+	if (globalSearch && (loglik > bestGlobalSlLnL)) {
+		bestGlobalSlLnL = loglik;
+		bestGlobalSPars = vars;
+	}
 	return loglik;
 }
 
@@ -431,6 +431,8 @@ void readDataConfigs() {
 	dataLnL = 0.0;
 	for (size_t i = 0; i < dataConfigs.size(); i++)
 		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
+
+	bestGlobalSlLnL = 100000*dataLnL;
 }
 
 
@@ -604,10 +606,6 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
 			}
-			else if (tokens[0] == "best_global_points") {
-				stringstream stst(tokens[1]);
-				stst >> bestGlobalSearchPoints;
-			}
 			else if (tokens[0] == "no_profiles") {
 				profileLikBool = false;
 			}
@@ -715,7 +713,7 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if ((globalEvals < (int) 1000*tbiMsCmdIdx.size())) {
+		if ((globalEvals < 1000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("Too few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
 			globalEvals = 1000*tbiMsCmdIdx.size();
@@ -741,38 +739,16 @@ int main(int argc, char* argv[]) {
 			stst << localTrees;
 			stst >> ms_argv[2];
 
-			int totEvalCount = 0;
-			map<double, vector<double> >::iterator it = bestGlobalSearchPointsMap.begin();
-			for (int localStart = 1; localStart <= bestGlobalSearchPoints; localStart++) {
-				parVec = it->second;
-				globalSearch = false;
-				if (bestGlobalSearchPoints > 1)
-					printf("Starting local search %d\n", localStart);
+			globalSearch = false;
+			evalCount = 0;
+			parVec = bestGlobalSPars;
+			local_opt.optimize(parVec, maxLnL);
 
-				evalCount = 0;
-				local_opt.optimize(parVec, maxLnL);
-
-				printf("Found the local maximum after %d evaluations\n", evalCount);
-				printf("Found a maximum at ");
-				for (size_t i = 0; i < parVec.size(); i++)
-					printf("%.6f ", parVec[i]);
-				printf("LnL = %.6f\n\n", maxLnL);
-
-				bestLocalSearchResultsMap[-maxLnL] = parVec;
-				totEvalCount += evalCount;
-				++it;
-			}
-			if (bestGlobalSearchPoints > 1) {
-				printf("\nFound the BEST local maximum after a total of %d evaluations\n", totEvalCount);
-				printf("Found a maximum at ");
-				it = bestLocalSearchResultsMap.begin();
-				for (size_t i = 0; i < it->second.size(); i++)
-					printf("%.6f ", it->second[i]);
-				printf("LnL: %.6f \n\n", -it->first);
-
-				parVec = it->second;
-				maxLnL = it->first;
-			}
+			printf("Found the local maximum after %d evaluations\n", evalCount);
+			printf("Found a maximum at ");
+			for (size_t i = 0; i < parVec.size(); i++)
+				printf("%.6f ", parVec[i]);
+			printf("LnL = %.6f\n\n", maxLnL);
 
 			time(&likEndTime);
 			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
