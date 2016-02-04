@@ -70,15 +70,19 @@ map<string, vector<int> > tbiMsCmdIdx;
 map<string, double> tbiUserVal;
 map<string, int> tbiOrder;
 map<string, vector<double> > tbiSearchBounds;
+map<string, string> parConstraints;
 map<double, vector<double> > bestGlobalSearchPointsMap, bestLocalSearchResultsMap;
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBoundsVec, lowerBoundsVec;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds;
 map<int, int> trackSelectConfigs;
 vector<double**> poissonProbTable;
+nlopt::opt opt;
+nlopt::opt local_opt;
+
 
 char **ms_argv;
 
@@ -87,7 +91,7 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
 int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0, bestGlobalSearchPoints = 1;
 
-double globalUpper = 5, globalLower = 1e-3;
+double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
 unsigned long int finalTableSize;
 
@@ -336,31 +340,59 @@ double computeLik() {
 
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
 
-	++evalCount;
+	bool parConstraintPass = true;
+	double loglik = 0.0;
+
 	if (!grad.empty()) {
 		cerr << "Cannot proceed with ABLE" << endl;
 		cerr << "Gradient based optimization not yet implemented..." << endl;
 		exit(-1);
 	}
 
-	for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
-		stringstream stst;
-		stst << vars[tbiOrder[it->first]];
-		for (size_t i = 0; i < it->second.size(); i++)
-			stst >> ms_argv[it->second[i]];
+	if (evalCount > globalEvals-1)
+		return loglik;
+
+	for (map<string, string>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
+		if (vars[tbiOrder[it->first]] > vars[tbiOrder[it->second]]) {
+			parConstraintPass = false;
+			break;
+		}
 	}
 
-	double loglik = computeLik();
-	
-	if (globalSearch)
-		bestGlobalSearchPointsMap[-loglik] = vars;
+	if (parConstraintPass) {
+		for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+			stringstream stst;
+			stst << vars[tbiOrder[it->first]];
+			for (size_t i = 0; i < it->second.size(); i++)
+				stst >> ms_argv[it->second[i]];
+		}
 
-	printf("%5d ", evalCount);
-	for (size_t i = 0; i < vars.size(); i++)
-		printf("%.5e ", vars[i]);
-	printf(" Trees: %d ", treesSampled);
-	printf(" LnL: %.6f\n", loglik);
+		loglik = computeLik();
 
+		if (globalSearch)
+			bestGlobalSearchPointsMap[-loglik] = vars;
+
+		++evalCount;
+		printf("%5d ", evalCount);
+		for (size_t i = 0; i < vars.size(); i++)
+			printf("%.5e ", vars[i]);
+		printf(" Trees: %d ", treesSampled);
+		printf(" LnL: %.6f\n", loglik);
+	}
+	else {
+//		printf("%5d ", evalCount);
+//		for (size_t i = 0; i < vars.size(); i++)
+//			printf("%.5e ", vars[i]);
+		if (evalCount == 0)
+			penLnL = 10000*dataLnL;
+		else
+			penLnL *= 2;
+//		printf(" Trees: %d ", 0);
+//		printf(" Penalised LnL: %.6f\n", penLnL);
+		return penLnL;
+	}
+
+	penLnL = loglik;
 	return loglik;
 }
 
@@ -395,6 +427,10 @@ void readDataConfigs() {
 		config.clear();
 	}
 	ifs.close();
+
+	dataLnL = 0.0;
+	for (size_t i = 0; i < dataConfigs.size(); i++)
+		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
 }
 
 
@@ -562,6 +598,9 @@ void readConfigFile(int argc, char* argv[]) {
 					tbiSearchBounds[tokens[1]].push_back(val);
 				}
 			}
+			else if (tokens[0] == "constrain") {
+				parConstraints[tokens[1]] = tokens[2];
+			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
 			}
@@ -660,27 +699,28 @@ int main(int argc, char* argv[]) {
 			++parCount;
 
 			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
-				lowerBoundsVec.push_back(tbiSearchBounds[it->first][0]);
-				upperBoundsVec.push_back(tbiSearchBounds[it->first][1]);
+				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
+				upperBounds.push_back(tbiSearchBounds[it->first][1]);
 			}
 			else {
-				lowerBoundsVec.push_back(globalLower);
-				upperBoundsVec.push_back(globalUpper);
+				lowerBounds.push_back(globalLower);
+				upperBounds.push_back(globalUpper);
 			}
 		}
 
-		nlopt::opt opt(nlopt::GN_DIRECT_L_RAND, tbiMsCmdIdx.size());
-		opt.set_lower_bounds(lowerBoundsVec);
-		opt.set_upper_bounds(upperBoundsVec);
+		opt = nlopt::opt(nlopt::GN_DIRECT_L_RAND, tbiMsCmdIdx.size());
+		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
+
+		opt.set_stopval(0.0);
+		opt.set_lower_bounds(lowerBounds);
+		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if ((globalEvals <= tbiMsCmdIdx.size())) {
+		if ((globalEvals < (int) 1000*tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("Too few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
-			opt.set_maxeval(1000*tbiMsCmdIdx.size());
+			globalEvals = 1000*tbiMsCmdIdx.size();
 		}
 
-
-		nlopt::opt local_opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
@@ -688,7 +728,6 @@ int main(int argc, char* argv[]) {
 			local_opt.set_maxeval(localEvals);
 		local_opt.set_xtol_rel(1e-4);
 		local_opt.set_initial_step((globalUpper-globalLower)/5);
-
 
 		if (!skipGlobal) {
 			printf("Starting global search: \n");
