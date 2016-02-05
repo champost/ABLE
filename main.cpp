@@ -64,21 +64,24 @@ int brClass, mutClass, foldBrClass = 0, allBrClasses;
 //**********************************
 
 MTRand rMT;
-vector<int> npopVec;
+
 map<vector<int>, int> intVec2BrConfig;
 map<string, vector<int> > tbiMsCmdIdx;
 map<string, double> tbiUserVal;
 map<string, int> tbiOrder;
 map<string, vector<double> > tbiSearchBounds;
 map<string, string> parConstraints;
+map<int, int> trackSelectConfigs;
+
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
+vector<int> npopVec;
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, globalLnLSeq;
-map<int, int> trackSelectConfigs;
 vector<double**> poissonProbTable;
+
 nlopt::opt opt;
 nlopt::opt local_opt;
 
@@ -99,14 +102,16 @@ double ranMT() { return(rMT()); }
 
 void profileLik(vector<double> MLEparVec) {
 
-	double parLowerBound, parUpperBound, quarterGlobalRange = (globalUpper - globalLower) / 4, MLEparVal;
+	double parLowerBound, parUpperBound, MLEparVal, MLEparLik;
 
 	stringstream ststTree;
 	ststTree << localTrees;
 	ststTree >> ms_argv[2];
 
+	size_t parIdx = 0;
 	//	Likelihood profiles for all parameters to be inferred (tbi)
 	for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+		double quarterGlobalRange = (upperBounds[parIdx] - lowerBounds[parIdx]) / 4;
 		MLEparVal = MLEparVec[tbiOrder[it->first]];
 		parUpperBound = MLEparVal + quarterGlobalRange;
 		parLowerBound = MLEparVal - quarterGlobalRange;
@@ -123,7 +128,9 @@ void profileLik(vector<double> MLEparVec) {
 			ststMLEPar << MLEparVal;
 			ststMLEPar >> ms_argv[it->second[i]];
 		}
-		outFile << scientific << MLEparVal << "\t" << computeLik() << endl;
+		MLEparLik = computeLik();
+		outFile << scientific << MLEparVal << "\t" << MLEparLik << endl;
+		bool insertMLEpar = true;
 
 		//	Likelihood profiles for this parameter
 		vector<double> parRange = logspaced(parLowerBound, parUpperBound, 10);
@@ -132,6 +139,10 @@ void profileLik(vector<double> MLEparVec) {
 				stringstream ststProfilePar;
 				ststProfilePar << parRange[j];
 				ststProfilePar >> ms_argv[it->second[i]];
+			}
+			if (insertMLEpar && (parRange[j] > MLEparVal)) {
+				outFile << scientific << MLEparVal << "\t" << MLEparLik << endl;
+				insertMLEpar = false;
 			}
 			outFile << scientific << parRange[j] << "\t" << computeLik() << endl;
 		}
@@ -144,6 +155,7 @@ void profileLik(vector<double> MLEparVec) {
 			ststMLEPar << MLEparVal;
 			ststMLEPar >> ms_argv[it->second[i]];
 		}
+		++parIdx;
 	}
 }
 
@@ -690,6 +702,13 @@ void readConfigFile(int argc, char* argv[]) {
 				stst >> ms_argv[i];
 			}
 			else {
+				if (onlyProfiles) {
+					cerr << "\nCannot proceed with plotting only profiles" << endl;
+					cerr << "You need to specify the maximum likelihood estimate" << endl;
+					cerr << "Exiting ABLE...\n" << endl;
+					exit(-1);
+				}
+
 				double tmpPar = ranMT();
 				tbiUserVal[param] = tmpPar;
 				stst << tmpPar;
@@ -714,9 +733,9 @@ void readConfigFile(int argc, char* argv[]) {
 */
 
 	if ((estimate == 2) && !tbiMsCmdIdx.size()) {
-		cerr << "Cannot proceed with inference" << endl;
+		cerr << "\nCannot proceed with inference" << endl;
 		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
-		cerr << "Exiting ABLE..." << endl;
+		cerr << "Exiting ABLE...\n" << endl;
 		exit(-1);
 	}
 
@@ -772,7 +791,7 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if ((globalEvals < 1000*(int)tbiMsCmdIdx.size())) {
+		if (!skipGlobal && (globalEvals < 1000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
 			globalEvals = 1000*tbiMsCmdIdx.size();
