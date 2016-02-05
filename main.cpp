@@ -76,7 +76,7 @@ ofstream testLik, testConfig;
 
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, globalLnLSeq;
 map<int, int> trackSelectConfigs;
 vector<double**> poissonProbTable;
 nlopt::opt opt;
@@ -87,10 +87,10 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0;
+int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500;
 
-double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL;
-bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false;
+double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
+bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false;
 unsigned long int finalTableSize;
 
 
@@ -180,9 +180,11 @@ string getMutConfigStr(unsigned long int i) {
 		if (quo) {
 			rem = quo % mutClass;
 			quo /= mutClass;
-//			if (rem == mutClass-1)
-//				stst << rem-1 << ">";
-//			else
+/*
+			if (rem == mutClass-1)
+				stst << rem-1 << ">";
+			else
+*/
 				stst << rem;
 		}
 		else
@@ -347,10 +349,25 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		exit(-1);
 	}
 
-	//	global search exit status
-	if (globalSearch && (evalCount > globalEvals-1))
-		return loglik;
+	if (globalSearch) {
+		if (evalCount == globalEvals) {
+			checkGlobalTol = true;
 
+			//	extending globalEvals in order to sample LNL after every globalSearchTolStep evaluations
+			globalEvals += globalSearchExt;
+		}
+
+		size_t size = globalLnLSeq.size();
+		//	checking LNL tolerance after sampling every globalSearchTolStep after globalEvals evaluations
+		if (size > 1) {
+			double LnLtol = fabs(globalLnLSeq[size-1]-globalLnLSeq[size-2]);
+			//	global search exit status : loglik = 0.0
+			if (LnLtol <= globalSearchTol)
+				return loglik;
+		}
+	}
+
+	//	checking for simple non linear constraints between the free params
 	for (map<string, string>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
 		if (vars[tbiOrder[it->first]] > vars[tbiOrder[it->second]]) {
 			parConstraintPass = false;
@@ -358,6 +375,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		}
 	}
 
+	//	the standard global/local LnL search procedure (when all else is OK)
 	if (parConstraintPass) {
 		for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 			stringstream stst;
@@ -375,24 +393,41 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		printf(" Trees: %d ", treesSampled);
 		printf(" LnL: %.6f\n", loglik);
 	}
+	//	penalising likelihood evaluation when searching outside the constrained zone
+	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
+	//	special case of first search point is in the forbidden zone : 10000*dataLnL
 	else {
-//		printf("%5d ", evalCount);
-//		for (size_t i = 0; i < vars.size(); i++)
-//			printf("%.5e ", vars[i]);
+/*
+		printf("%5d ", evalCount);
+		for (size_t i = 0; i < vars.size(); i++)
+			printf("%.5e ", vars[i]);
+*/
+
 		if (evalCount == 0)
 			penLnL = 10000*dataLnL;
 		else
 			penLnL *= 2;
-//		printf(" Trees: %d ", 0);
-//		printf(" Penalised LnL: %.6f\n", penLnL);
+
+/*
+		printf(" Trees: %d ", 0);
+		printf(" Penalised LnL: %.6f\n", penLnL);
+*/
 		return penLnL;
 	}
 
-	penLnL = loglik;
-	if (globalSearch && (loglik > bestGlobalSlLnL)) {
-		bestGlobalSlLnL = loglik;
-		bestGlobalSPars = vars;
+	if (globalSearch) {
+		//	side stepping nlopt by storing the best LnL and parameters
+		if (loglik > bestGlobalSlLnL) {
+			bestGlobalSlLnL = loglik;
+			bestGlobalSPars = vars;
+		}
+
+		//	sampling LNL every globalSearchTolStep after globalEvals evaluations
+		if (checkGlobalTol && !(evalCount % globalSearchTolStep))
+			globalLnLSeq.push_back(loglik);
 	}
+	penLnL = loglik;
+
 	return loglik;
 }
 
@@ -468,8 +503,10 @@ void evalBranchConfigs() {
 	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,npopVec.size()); i++) {
 		quo = i;
 		rem = 0;
-//		stringstream stst;
-//		stst << ")";
+/*
+		stringstream stst;
+		stst << ")";
+*/
 		sumConfig = 0;
 		skipConfig = false;
 		vector<int> vec;
@@ -491,22 +528,28 @@ void evalBranchConfigs() {
 				vec.push_back(0);
 			}
 
-//			if (j < npopVec.size() - 1)
-//				stst << ",";
+/*
+			if (j < npopVec.size() - 1)
+				stst << ",";
+*/
 		}
 
 		if (sumConfig == totPopSum)
 			break;
 
 		if (!skipConfig) {
-//			stst << "(";
-//			string config = stst.str();
-//			reverse(config.begin(),config.end());
+/*
+			stst << "(";
+			string config = stst.str();
+			reverse(config.begin(),config.end());
+*/
 			reverse(vec.begin(),vec.end());
 			intVec2BrConfig[vec] = count;
 			++count;
-//			printf("%d\t%d\t%s\n", i, count, config.c_str());
-//			printf("%d\t%s\n", count, config.c_str());
+/*
+			printf("%d\t%d\t%s\n", i, count, config.c_str());
+			printf("%d\t%s\n", count, config.c_str());
+*/
 		}
 	}
 }
@@ -603,6 +646,18 @@ void readConfigFile(int argc, char* argv[]) {
 			else if (tokens[0] == "constrain") {
 				parConstraints[tokens[1]] = tokens[2];
 			}
+			else if (tokens[0] == "global_search_term_tol") {
+				stringstream stst(tokens[1]);
+				stst >> globalSearchTol;
+			}
+			else if (tokens[0] == "global_search_term_tol_step") {
+				stringstream stst(tokens[1]);
+				stst >> globalSearchTolStep;
+			}
+			else if (tokens[0] == "global_search_extension") {
+				stringstream stst(tokens[1]);
+				stst >> globalSearchExt;
+			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
 			}
@@ -651,10 +706,12 @@ void readConfigFile(int argc, char* argv[]) {
 		}
 	}
 
-//		for(int i = 1; i < ms_argc; i++)
-//			printf("%s ",ms_argv[i]);
-//		printf("\n");
-//		exit(-1);
+/*
+		for(int i = 1; i < ms_argc; i++)
+			printf("%s ",ms_argv[i]);
+		printf("\n");
+		exit(-1);
+*/
 
 	if ((estimate == 2) && !tbiMsCmdIdx.size()) {
 		cerr << "Cannot proceed with inference" << endl;
@@ -671,8 +728,10 @@ void readConfigFile(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
 
 	time_t likStartTime, likEndTime;
-//	int nsam = atoi(argv[1]);
-//	ntrees = atoi(argv[2]);
+/*
+	int nsam = atoi(argv[1]);
+	ntrees = atoi(argv[2]);
+*/
 	ms_argc = argc;
 	configFile = string(argv[argc - 1]);
 	if (configFile == "-T")
@@ -715,7 +774,7 @@ int main(int argc, char* argv[]) {
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		if ((globalEvals < 1000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
-				printf("Too few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
+				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
 			globalEvals = 1000*tbiMsCmdIdx.size();
 		}
 
@@ -728,7 +787,7 @@ int main(int argc, char* argv[]) {
 		local_opt.set_initial_step((globalUpper-globalLower)/5);
 
 		if (!skipGlobal) {
-			printf("Starting global search: \n");
+			printf("\nStarting global search: \n");
 
 			evalCount = 0;
 			time(&likStartTime);
