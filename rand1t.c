@@ -49,47 +49,53 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
          double
 ran1()
 {
-//        double drand48();
-//        return( drand48() );
+/*
+        double drand48();
+        return( drand48() );
 
-//        int i;
-//    	for (i = 0; i < 10; i++) {
-//    		printf("%.5e\t%.5e\n", drand48(), ran2());
-//    	}
-//    	exit(-1);
+        int i;
+    	for (i = 0; i < 10; i++) {
+    		printf("%.5e\t%.5e\n", drand48(), ran2());
+    	}
+    	exit(-1);
+*/
         	 double ranMT();
         	 return ranMT();
-//             int rand();
-//             return rand()/(RAND_MAX+1.0);
+/*
+             int rand();
+             return rand()/(RAND_MAX+1.0);
+*/
 }
 
 
-//	void seedit( char *flag )
-//{
-//	FILE *fopen();
-//	unsigned short seedv[3], *seed48();
-//
-//	if( flag[0] == 's' ){
-//	  seedv[0] =  (unsigned short) time(NULL) ;
-//            seedv[1] = 27011; seedv[2] = 59243;
-//          seed48( seedv );
-//
-//       printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
-//	}
-//}
+/*
+	void seedit( char *flag )
+{
+	FILE *fopen();
+	unsigned short seedv[3], *seed48();
+
+	if( flag[0] == 's' ){
+	  seedv[0] =  (unsigned short) time(NULL) ;
+            seedv[1] = 27011; seedv[2] = 59243;
+          seed48( seedv );
+
+       printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
+	}
+}
 
 
-//	int
-//commandlineseed( char **seeds)
-//{
-//	unsigned short seedv[3], *seed48();
-//
-//	seedv[0] = atoi( seeds[0] );
-//	seedv[1] = atoi( seeds[1] );
-//	seedv[2] = atoi( seeds[2] );
-////	printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
-//
-//	seed48(seedv);
-//	return(3);
-//}
+	int
+commandlineseed( char **seeds)
+{
+	unsigned short seedv[3], *seed48();
+
+	seedv[0] = atoi( seeds[0] );
+	seedv[1] = atoi( seeds[1] );
+	seedv[2] = atoi( seeds[2] );
+//	printf("\n%d %d %d\n", seedv[0], seedv[1], seedv[2] );
+
+	seed48(seedv);
+	return(3);
+}
+*/
 

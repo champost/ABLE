@@ -589,7 +589,6 @@ void readConfigFile(int argc, char* argv[]) {
 					stst2 >> tmp;
 					npopVec.push_back(tmp);
 				}
-
 			}
 			else if (tokens[0] == "start") {
 				double val;
@@ -702,9 +701,12 @@ void readConfigFile(int argc, char* argv[]) {
 				stst >> ms_argv[i];
 			}
 			else {
-				if (onlyProfiles) {
-					cerr << "\nCannot proceed with plotting only profiles" << endl;
-					cerr << "You need to specify the maximum likelihood estimate" << endl;
+				if (estimate == 2) {
+					if (onlyProfiles)
+						cerr << "\nCannot proceed with plotting only profiles" << endl;
+					else if (skipGlobal)
+						cerr << "\nCannot proceed with local search" << endl;
+					cerr << "You need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
 					cerr << "Exiting ABLE...\n" << endl;
 					exit(-1);
 				}

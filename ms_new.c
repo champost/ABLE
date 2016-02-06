@@ -169,10 +169,12 @@ struct params pars ;
 
 int main_ms(int ms_argc, char *ms_argv[])
 {
-//	int i, k, howmany, segsites, listX, listY;
-//	char **list, **cmatrix(), **tbsparamstrs ;
-//	FILE *pf, *fopen() ;
-//	char **list, **cmatrix(), **tbsparamstrs ;
+/*
+	int i, k, howmany, segsites, listX, listY;
+	char **list, **cmatrix(), **tbsparamstrs ;
+	FILE *pf, *fopen() ;
+	char **list, **cmatrix(), **tbsparamstrs ;
+*/
 	int i, howmany, listX;
 	char **list, **cmatrix();
 	FILE *fopen() ;
@@ -184,15 +186,17 @@ int main_ms(int ms_argc, char *ms_argv[])
  	void freed2matrix(double **m, int x);
 
 
-//	ntbs = 0 ;   /* these next few lines are for reading in parameters from a file (for each sample) */
-//	tbsparamstrs = (char **)malloc( ms_argc*sizeof(char *) ) ;
-//
-//	for( i=1; i<ms_argc; i++)
-//		printf("%s ",ms_argv[i]);
-//	printf("\n");
-//	for( i =0; i<ms_argc; i++) tbsparamstrs[i] = (char *)malloc(30*sizeof(char) ) ;
-//	for( i = 1; i<ms_argc ; i++)
-//			if( strcmp( ms_argv[i],"tbs") == 0 )  ms_argv[i] = tbsparamstrs[ ntbs++] ;
+/*
+	ntbs = 0 ;    these next few lines are for reading in parameters from a file (for each sample)
+	tbsparamstrs = (char **)malloc( ms_argc*sizeof(char *) ) ;
+
+	for( i=1; i<ms_argc; i++)
+		printf("%s ",ms_argv[i]);
+	printf("\n");
+	for( i =0; i<ms_argc; i++) tbsparamstrs[i] = (char *)malloc(30*sizeof(char) ) ;
+	for( i = 1; i<ms_argc ; i++)
+			if( strcmp( ms_argv[i],"tbs") == 0 )  ms_argv[i] = tbsparamstrs[ ntbs++] ;
+*/
 
 	count=0;
 
@@ -219,37 +223,41 @@ int main_ms(int ms_argc, char *ms_argv[])
 	}
 
     while( howmany-count++ ) {
-//	   if( (ntbs > 0) && (count >1 ) ){
-//	         for( k=0; k<ntbs; k++){
-//			    if( scanf(" %s", tbsparamstrs[k]) == EOF ){
-//			       if( !pars.commandlineseedflag ) seedit( "end" );
-//				   exit(0);
-//				}
-//			 }
-//			 getpars( ms_argc, ms_argv, &howmany) ;
-//	   }
+/*
+	   if( (ntbs > 0) && (count >1 ) ){
+	         for( k=0; k<ntbs; k++){
+			    if( scanf(" %s", tbsparamstrs[k]) == EOF ){
+			       if( !pars.commandlineseedflag ) seedit( "end" );
+				   exit(0);
+				}
+			 }
+			 getpars( ms_argc, ms_argv, &howmany) ;
+	   }
 
-//       fprintf(pf,"\n//");
-//	   if( ntbs >0 ){
-//			for(k=0; k< ntbs; k++) printf("\t%s", tbsparamstrs[k] ) ;
-//		}
-//		printf("\n");
+       fprintf(pf,"\n//");
+	   if( ntbs >0 ){
+			for(k=0; k< ntbs; k++) printf("\t%s", tbsparamstrs[k] ) ;
+		}
+		printf("\n");
 
-//        segsites = gensam( list, &probss, &tmrca, &ttot) ;
+        segsites = gensam( list, &probss, &tmrca, &ttot) ;
+*/
         gensam( list, &probss, &tmrca, &ttot);
 
-//  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
-//        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
-//   	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
-//		       fprintf(pf,"prob: %g\n", probss ) ;
-//           fprintf(pf,"segsites: %d\n",segsites);
-//		   if( segsites > 0 )	fprintf(pf,"positions: ");
-//		   for( i=0; i<segsites; i++)
-//              fprintf(pf,"%6.*lf ", pars.output_precision,posit[i] );
-//           fprintf(pf,"\n");
-//	       if( segsites > 0 )
-//		          for(i=0;i<pars.cp.nsam; i++) { fprintf(pf,"%s\n", list[i] ); }
-//	    }
+/*
+  		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
+        if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
+   	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
+		       fprintf(pf,"prob: %g\n", probss ) ;
+           fprintf(pf,"segsites: %d\n",segsites);
+		   if( segsites > 0 )	fprintf(pf,"positions: ");
+		   for( i=0; i<segsites; i++)
+              fprintf(pf,"%6.*lf ", pars.output_precision,posit[i] );
+           fprintf(pf,"\n");
+	       if( segsites > 0 )
+		          for(i=0;i<pars.cp.nsam; i++) { fprintf(pf,"%s\n", list[i] ); }
+	    }
+*/
     }
 //	if( !pars.commandlineseedflag ) seedit( "end" );
 
@@ -270,14 +278,16 @@ int main_ms(int ms_argc, char *ms_argv[])
 	int 
 gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 {
-//	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
-//	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
-//	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
-//	double *pk;
-//	int *ss;
-//	int segsitesin,nsites;
-//	double theta, es ;
-//	int nsam, mfreq ;
+/*
+	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
+	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ;  used to be: [MAXSEG];
+	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
+	double *pk;
+	int *ss;
+	int segsitesin,nsites;
+	double theta, es ;
+	int nsam, mfreq ;
+*/
 	int nsegs, i, j, k, seg, ns, start, end, len;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
 	double ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
@@ -355,16 +365,6 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //    			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
 //    			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
     		}
-/*
-	    	double poisson_pmf(const double k, const double lambda);
-	    	if (totBrLen[i-1] > 0.0) {
-				onetreeTable[i-1][0] = poisson_pmf(0,totBrLen[i-1]*pars.mp.theta);
-    			for(j = 1; j < mutClass-1; j++) {
-    				onetreeTable[i-1][j] = onetreeTable[i-1][j-1] + poisson_pmf(j,totBrLen[i-1]*pars.mp.theta);
-    			}
-    			onetreeTable[i-1][j] = 1.0 - onetreeTable[i-1][j-1];
-	    	}
-*/
     		else {
 //    			printf("Total folded branch length = 0\n\n");
     			onetreeTable[i-1][0] = 1.0;
@@ -388,99 +388,95 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
 //	}
 
-//	if( pars.mp.timeflag ) {
-//      tt = 0.0 ;
-//	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
-//		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
-//		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
-//		start = seglst[seg].beg ;
-//		if( (nsegs==1) || ( ( start <= nsites/2) && ( end >= nsites/2 ) ) )
-//		  *ptmrca = (seglst[seg].ptree + 2*nsam-2) -> time ;
-//		len = end - start + 1 ;
-//		tseg = len/(double)nsites ;
-//		if( mfreq == 1 ) tt += ttime(seglst[seg].ptree,nsam)*tseg ;
-//		else tt += ttimemf(seglst[seg].ptree,nsam, mfreq)*tseg ;
-//		if( (segsitesin == 0) && ( theta == 0.0 )  )
-//	  	      free(seglst[seg].ptree) ;
-//	    }
-//		*pttot = tt ;
-//	 }
-//
-//    if( (segsitesin == 0) && ( theta > 0.0)   ) {
-//	  ns = 0 ;
-//	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
-//		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
-//		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
-//		start = seglst[seg].beg ;
-//		len = end - start + 1 ;
-//		tseg = len*(theta/nsites) ;
-//		if( mfreq == 1) tt = ttime(seglst[seg].ptree, nsam);
-//                else tt = ttimemf(seglst[seg].ptree, nsam, mfreq );
-//		segsit = poisso( tseg*tt );
-//		if( (segsit + ns) >= maxsites ) {
-//			maxsites = segsit + ns + SITESINC ;
-//			posit = (double *)realloc(posit, maxsites*sizeof(double) ) ;
-//			  biggerlist(nsam, list) ;
-//		}
-//		make_gametes(nsam,mfreq,seglst[seg].ptree,tt, segsit, ns, list );
-//		free(seglst[seg].ptree) ;
-//		locate(segsit,start*nsinv, len*nsinv,posit+ns);
-//		ns += segsit;
-//	  }
-//    }
-//   else if( segsitesin > 0 ) {
-//
-//        pk = (double *)malloc((unsigned)(nsegs*sizeof(double)));
-//        ss = (int *)malloc((unsigned)(nsegs*sizeof(int)));
-//        if( (pk==NULL) || (ss==NULL) ) perror("malloc error. gensam.2");
-//
-//
-//	  tt = 0.0 ;
-//	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
-//		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
-//		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
-//		start = seglst[seg].beg ;
-//		len = end - start + 1 ;
-//		tseg = len/(double)nsites ;
-//               if( mfreq == 1 ) pk[k] = ttime(seglst[seg].ptree,nsam)*tseg ;
-//               else pk[k] = ttimemf(seglst[seg].ptree,nsam, mfreq)*tseg ;
-//                 tt += pk[k] ;
-//	  }
-//	  if( theta > 0.0 ) {
-//	    es = theta * tt ;
-//	    *pprobss = exp( -es )*pow( es, (double) segsitesin) / segfac ;
-//	  }
-//	  if( tt > 0.0 ) {
-//          for (k=0;k<nsegs;k++) pk[k] /= tt ;
-//          mnmial(segsitesin,nsegs,pk,ss);
-//	  }
-//	  else
-//            for( k=0; k<nsegs; k++) ss[k] = 0 ;
-//	  ns = 0 ;
-//	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
-//		 end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
-//		 start = seglst[seg].beg ;
-//		 len = end - start + 1 ;
-//		 tseg = len/(double)nsites;
-//		 make_gametes(nsam,mfreq,seglst[seg].ptree,tt*pk[k]/tseg, ss[k], ns, list);
-//
-//		 free(seglst[seg].ptree) ;
-//		 locate(ss[k],start*nsinv, len*nsinv,posit+ns);
-//		 ns += ss[k] ;
-//	  }
-//	  free(pk);
-//	  free(ss);
-//
-//    }
-//	for(i=0;i<nsam;i++) list[i][ns] = '\0' ;
+/*
+	if( pars.mp.timeflag ) {
+      tt = 0.0 ;
+	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
+		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
+		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
+		start = seglst[seg].beg ;
+		if( (nsegs==1) || ( ( start <= nsites/2) && ( end >= nsites/2 ) ) )
+		  *ptmrca = (seglst[seg].ptree + 2*nsam-2) -> time ;
+		len = end - start + 1 ;
+		tseg = len/(double)nsites ;
+		if( mfreq == 1 ) tt += ttime(seglst[seg].ptree,nsam)*tseg ;
+		else tt += ttimemf(seglst[seg].ptree,nsam, mfreq)*tseg ;
+		if( (segsitesin == 0) && ( theta == 0.0 )  )
+	  	      free(seglst[seg].ptree) ;
+	    }
+		*pttot = tt ;
+	 }
+
+    if( (segsitesin == 0) && ( theta > 0.0)   ) {
+	  ns = 0 ;
+	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
+		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
+		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
+		start = seglst[seg].beg ;
+		len = end - start + 1 ;
+		tseg = len*(theta/nsites) ;
+		if( mfreq == 1) tt = ttime(seglst[seg].ptree, nsam);
+                else tt = ttimemf(seglst[seg].ptree, nsam, mfreq );
+		segsit = poisso( tseg*tt );
+		if( (segsit + ns) >= maxsites ) {
+			maxsites = segsit + ns + SITESINC ;
+			posit = (double *)realloc(posit, maxsites*sizeof(double) ) ;
+			  biggerlist(nsam, list) ;
+		}
+		make_gametes(nsam,mfreq,seglst[seg].ptree,tt, segsit, ns, list );
+		free(seglst[seg].ptree) ;
+		locate(segsit,start*nsinv, len*nsinv,posit+ns);
+		ns += segsit;
+	  }
+    }
+   else if( segsitesin > 0 ) {
+
+        pk = (double *)malloc((unsigned)(nsegs*sizeof(double)));
+        ss = (int *)malloc((unsigned)(nsegs*sizeof(int)));
+        if( (pk==NULL) || (ss==NULL) ) perror("malloc error. gensam.2");
+
+
+	  tt = 0.0 ;
+	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
+		if( mfreq > 1 ) ndes_setup( seglst[seg].ptree, nsam );
+		end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
+		start = seglst[seg].beg ;
+		len = end - start + 1 ;
+		tseg = len/(double)nsites ;
+               if( mfreq == 1 ) pk[k] = ttime(seglst[seg].ptree,nsam)*tseg ;
+               else pk[k] = ttimemf(seglst[seg].ptree,nsam, mfreq)*tseg ;
+                 tt += pk[k] ;
+	  }
+	  if( theta > 0.0 ) {
+	    es = theta * tt ;
+	    *pprobss = exp( -es )*pow( es, (double) segsitesin) / segfac ;
+	  }
+	  if( tt > 0.0 ) {
+          for (k=0;k<nsegs;k++) pk[k] /= tt ;
+          mnmial(segsitesin,nsegs,pk,ss);
+	  }
+	  else
+            for( k=0; k<nsegs; k++) ss[k] = 0 ;
+	  ns = 0 ;
+	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
+		 end = ( k<nsegs-1 ? seglst[seglst[seg].next].beg -1 : nsites-1 );
+		 start = seglst[seg].beg ;
+		 len = end - start + 1 ;
+		 tseg = len/(double)nsites;
+		 make_gametes(nsam,mfreq,seglst[seg].ptree,tt*pk[k]/tseg, ss[k], ns, list);
+
+		 free(seglst[seg].ptree) ;
+		 locate(ss[k],start*nsinv, len*nsinv,posit+ns);
+		 ns += ss[k] ;
+	  }
+	  free(pk);
+	  free(ss);
+
+    }
+	for(i=0;i<nsam;i++) list[i][ns] = '\0' ;
+*/
 	return( ns ) ;
 }
-
-/*
-double poisson_pmf(const double k, const double lambda) {
-	return exp(k * log(lambda) - lgamma(k + 1.0) - lambda);
-}
-*/
 
 void ndes_setup(struct node *ptree, int nsam )
 {
@@ -546,10 +542,12 @@ void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen) {
 	}
 
 	//******************************************************************************
-//	printf("\n");
-//	for(i = 0; i < allBrClasses; i++)
-//		printf("%5.3f\n",totbrlen[i]);
-//	exit(-1);
+/*
+	printf("\n");
+	for(i = 0; i < allBrClasses; i++)
+		printf("%5.3f\n",totbrlen[i]);
+	exit(-1);
+*/
 	//******************************************************************************
 
 	freed2int_matrix(branchConfig, 2*nsam-2);
