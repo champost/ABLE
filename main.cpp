@@ -99,6 +99,11 @@ unsigned long int finalTableSize;
 
 double ranMT() { return(rMT()); }
 
+void free_ms_argv() {
+	for(int i = 0; i < ms_argc; i++)
+		free(ms_argv[i]);
+	free(ms_argv);
+}
 
 void profileLik(vector<double> MLEparVec) {
 
@@ -358,6 +363,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	if (!grad.empty()) {
 		cerr << "Cannot proceed with ABLE" << endl;
 		cerr << "Gradient based optimization not yet implemented..." << endl;
+		free_ms_argv();
 		exit(-1);
 	}
 
@@ -567,7 +573,7 @@ void evalBranchConfigs() {
 }
 
 
-void readConfigFile(int argc, char* argv[]) {
+void readConfigFile(char* argv[]) {
 
 	string line, del, keyWord;
 	vector<string> tokens;
@@ -687,11 +693,11 @@ void readConfigFile(int argc, char* argv[]) {
 	}
 	ifs.close();
 
-	ms_argv = (char **)malloc( argc*sizeof(char *) ) ;
-	for(int i =0; i < argc; i++)
+	ms_argv = (char **)malloc( ms_argc*sizeof(char *) ) ;
+	for(int i =0; i < ms_argc; i++)
 		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
 
-	for (int i = 0; i < argc; i++) {
+	for (int i = 0; i < ms_argc; i++) {
 		string param(argv[i]);
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
@@ -708,6 +714,7 @@ void readConfigFile(int argc, char* argv[]) {
 						cerr << "\nCannot proceed with local search" << endl;
 					cerr << "You need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
 					cerr << "Exiting ABLE...\n" << endl;
+					free_ms_argv();
 					exit(-1);
 				}
 
@@ -728,16 +735,18 @@ void readConfigFile(int argc, char* argv[]) {
 	}
 
 /*
-		for(int i = 1; i < ms_argc; i++)
-			printf("%s ",ms_argv[i]);
-		printf("\n");
-		exit(-1);
+	for(int i = 1; i < ms_argc; i++)
+		printf("%s ",ms_argv[i]);
+	printf("\n");
+	free_ms_argv();
+	exit(-1);
 */
 
 	if ((estimate == 2) && !tbiMsCmdIdx.size()) {
 		cerr << "\nCannot proceed with inference" << endl;
 		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
 		cerr << "Exiting ABLE...\n" << endl;
+		free_ms_argv();
 		exit(-1);
 	}
 
@@ -760,7 +769,7 @@ int main(int argc, char* argv[]) {
 	else
 		ms_argc = argc - 1;
 
-	readConfigFile(argc, argv);
+	readConfigFile(argv);
 
 	evalBranchConfigs();
 
@@ -870,7 +879,7 @@ int main(int argc, char* argv[]) {
 			printf("\n");
 		}
 		else {
-			for (int i = 0; i < argc; i++)
+			for (int i = 0; i < ms_argc; i++)
 				cout << argv[i] << " ";
 			cout << endl;
 		}
@@ -901,6 +910,7 @@ int main(int argc, char* argv[]) {
 			cerr << "\nThis is going to be too long a table to compute!" << endl;
 			cerr << "Please contact the author Champak B. Reddy (champak.br@gmail.com) if you are really keen on going ahead with this" << endl;
 			cerr << "Exiting ABLE...\n" << endl;
+			free_ms_argv();
 			exit(-1);
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
@@ -912,9 +922,7 @@ int main(int argc, char* argv[]) {
 		printf("\n\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
 	}
 
-	for(int i = 0; i < argc; i++)
-		free(ms_argv[i]);
-	free(ms_argv);
+	free_ms_argv();
 
 	return 0;
 }
