@@ -298,7 +298,7 @@ void calcFinalTable() {
 					jointPoisson *= poissonProbTable[trees][j][vec[j]];
 
 				if (jointPoisson > 0.0) {
-					allConfigs.push_back(i);
+					allConfigs[i] = i;
 					allConfigFreqs[i] += jointPoisson;
 				}
 			}
@@ -311,6 +311,7 @@ double computeLik() {
 
 	treesSampled = 0;
 	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
+	allConfigs = vector<int>(finalTableSize,-1);
 	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
 	// calling ms for sampling genealogies
@@ -344,7 +345,8 @@ double computeLik() {
 	else if (estimate == 0) {
 		ofstream ofs("expected_bSFS.txt",ios::out);
 		for (size_t i = 0; i < allConfigs.size(); i++)
-			ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
+			if (allConfigs[i] >= 0)
+				ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
 		ofs.close();
 
 		allConfigs.clear();
