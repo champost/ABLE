@@ -68,6 +68,7 @@ void freed2matrix(double **m, int x);
 
 double ranMT();
 void storePoissonProbs(double **onetreeTable);
+int getPopSampleStatus(int pop);
 int getBrConfigNum(int *brConfVec);
 }
 

@@ -49,6 +49,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 
 #include <nlopt.hpp>
 #include <omp.h>
@@ -60,7 +61,7 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass, foldBrClass = 0, allBrClasses;
+int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize;
 //**********************************
 
 MTRand rMT;
@@ -76,7 +77,7 @@ map<int, int> trackSelectConfigs;
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
-vector<int> npopVec;
+vector<int> sampledPops, allPops;
 vector<vector<int> > dataConfigs;
 vector<int> allConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, globalLnLSeq;
@@ -231,10 +232,17 @@ string getMutConfigStr(vector<int> configVec) {
 }
 
 
+int getPopSampleStatus(int pop) { return allPops[pop]; }
+
+
 int getBrConfigNum(int *brConfVec) {
 
-	vector<int> vec(brConfVec, brConfVec+npopVec.size());
-	return intVec2BrConfig[vec];
+	if (accumulate(brConfVec, brConfVec+sampledPops.size(), 0)) {
+		vector<int> vec(brConfVec, brConfVec+sampledPops.size());
+		return intVec2BrConfig[vec];
+	}
+
+	return -1;
 }
 
 
@@ -496,12 +504,12 @@ void evalBranchConfigs() {
 
 	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
 	bool skipConfig;
-	maxPopSize = totPopSum = npopVec[0];
+	maxPopSize = totPopSum = sampledPops[0];
 
 	mutClass = kmax+2;
-	brClass = npopVec[0]+1;
-	for (size_t i = 1; i < npopVec.size(); i++)
-		brClass *= (npopVec[i]+1);
+	brClass = sampledPops[0]+1;
+	for (size_t i = 1; i < sampledPops.size(); i++)
+		brClass *= (sampledPops[i]+1);
 	brClass -= 2;
 	allBrClasses = brClass;
 
@@ -513,14 +521,14 @@ void evalBranchConfigs() {
 			brClass = brClass / 2;
 	}
 
-	for (size_t i = 1; i < npopVec.size(); i++) {
-		totPopSum += npopVec[i];
-		if (npopVec[i] > maxPopSize)
-			maxPopSize = npopVec[i];
+	for (size_t i = 1; i < sampledPops.size(); i++) {
+		totPopSum += sampledPops[i];
+		if (sampledPops[i] > maxPopSize)
+			maxPopSize = sampledPops[i];
 	}
 	++maxPopSize;
 
-	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,npopVec.size()); i++) {
+	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,sampledPops.size()); i++) {
 		quo = i;
 		rem = 0;
 /*
@@ -531,11 +539,11 @@ void evalBranchConfigs() {
 		skipConfig = false;
 		vector<int> vec;
 
-		for (size_t j = 0; j < npopVec.size(); j++) {
+		for (size_t j = 0; j < sampledPops.size(); j++) {
 			if (quo) {
 				rem = quo % (maxPopSize);
 				quo /= (maxPopSize);
-				if (rem > npopVec[npopVec.size()-1-j]) {
+				if (rem > sampledPops[sampledPops.size()-1-j]) {
 					skipConfig = true;
 					break;
 				}
@@ -549,7 +557,7 @@ void evalBranchConfigs() {
 			}
 
 /*
-			if (j < npopVec.size() - 1)
+			if (j < sampledPops.size() - 1)
 				stst << ",";
 */
 		}
@@ -593,10 +601,16 @@ void readConfigFile(char* argv[]) {
 				stst1 >> npops;
 				for (int i = 0; i < npops; i++) {
 					stringstream stst2(tokens[i+2]);
-					int tmp;
-					stst2 >> tmp;
-					npopVec.push_back(tmp);
+					if (stst2.str() != "u") {
+						int tmp;
+						stst2 >> tmp;
+						sampledPops.push_back(tmp);
+						allPops.push_back(1);
+					}
+					else
+						allPops.push_back(0);
 				}
+				sampledPopsSize = sampledPops.size();
 			}
 			else if (tokens[0] == "start") {
 				double val;

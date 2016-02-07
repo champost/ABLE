@@ -505,52 +505,71 @@ void ndes_and_branch_setup(struct node *ptree, int nsam) {
 	ptree[2*nsam -2].brLength = 0 ;
 }
 
-void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen) {
-	int i, j, sum;
+void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totSegBrLenK) {
+	int branch, pop, tip, ind, class;
 
 	void ndes_and_branch_setup(struct node *ptree, int nsam);
 	int ** d2int_matrix(int x, int y);
 	void freed2int_matrix(int **m, int x);
+	int getPopSampleStatus(int pop);
 	int getBrConfigNum(int *brConfVec);
 
 	int **branchConfig = d2int_matrix(2*nsam - 2, pars.cp.npop);
+	int **sampledBranchConfig = d2int_matrix(2*nsam - 2, sampledPopsSize);
 
 	ndes_and_branch_setup(ptree, nsam);
 
-	for(i = 0; i < 2*nsam - 2; i++)
-		for(j = 0; j < pars.cp.npop; j++)
-			branchConfig[i][j] = 0;
+	for(branch = 0; branch < 2*nsam - 2; branch++)
+		for(pop = 0; pop < pars.cp.npop; pop++)
+			branchConfig[branch][pop] = 0;
 
-	sum = 0;
-	for(i = 0; i < pars.cp.npop; i++) {
-		for(j = 1; j <= pars.cp.config[i]; j++) {
-			branchConfig[sum][i] = 1;
-			++sum;
+	tip = 0;
+	for(pop = 0; pop < pars.cp.npop; pop++) {
+		for(ind = 1; ind <= pars.cp.config[pop]; ind++) {
+			branchConfig[tip][pop] = 1;
+			++tip;
 		}
 	}
 
-	for(i = 0; i < 2*nsam - 2; i++)
-		for(j = 0; j < pars.cp.npop; j++)
-			if (ptree[i].abv != 2*nsam - 2)
-				branchConfig[ptree[i].abv][j] += branchConfig[i][j];
+	for(branch = 0; branch < 2*nsam - 2; branch++)
+		for(pop = 0; pop < pars.cp.npop; pop++)
+			if (ptree[branch].abv != 2*nsam - 2)
+				branchConfig[ptree[branch].abv][pop] += branchConfig[branch][pop];
 
-	for(i = 0; i < allBrClasses; i++) {
-		totbrlen[i] = 0.0;
-		for(j = 0; j < 2*nsam-2; j++)
-			if (getBrConfigNum(branchConfig[j]) == i)
-				totbrlen[i] += ptree[j].brLength;
+	//	if ghost/unsampled pops. have been specified
+	if (sampledPopsSize != pars.cp.npop) {
+		for(branch = 0; branch < 2*nsam - 2; branch++)
+			for(pop = 0; pop < pars.cp.npop; pop++)
+				if (getPopSampleStatus(pop))
+					sampledBranchConfig[branch][pop] = branchConfig[branch][pop];
+
+		for(class = 0; class < allBrClasses; class++) {
+			totSegBrLenK[class] = 0.0;
+			for(branch = 0; branch < 2*nsam-2; branch++)
+				if (getBrConfigNum(sampledBranchConfig[branch]) == class)
+					totSegBrLenK[class] += ptree[branch].brLength;
+		}
+	}
+	else {
+		for(class = 0; class < allBrClasses; class++) {
+			totSegBrLenK[class] = 0.0;
+			for(branch = 0; branch < 2*nsam-2; branch++)
+				if (getBrConfigNum(branchConfig[branch]) == class)
+					totSegBrLenK[class] += ptree[branch].brLength;
+		}
 	}
 
 	//******************************************************************************
 /*
 	printf("\n");
-	for(i = 0; i < allBrClasses; i++)
-		printf("%5.3f\n",totbrlen[i]);
+	for(class = 0; class < allBrClasses; class++)
+		printf("%5.3f\n",totSegBrLenK[class]);
 	exit(-1);
 */
 	//******************************************************************************
 
 	freed2int_matrix(branchConfig, 2*nsam-2);
+	freed2int_matrix(sampledBranchConfig, 2*nsam-2);
 }
 
 	void
