@@ -77,9 +77,8 @@ map<int, int> trackSelectConfigs;
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
 
-vector<int> sampledPops, allPops;
+vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
-vector<int> allConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, globalLnLSeq;
 vector<double**> poissonProbTable;
 
@@ -91,7 +90,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500, globalMaxEvals;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false;
@@ -269,8 +268,10 @@ void calcFinalTable() {
 				for (int j = 0; j < brClass; j++)
 					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
 
-				if (jointPoisson > 0.0)
+				if (jointPoisson > 0.0) {
 					selectConfigFreqs[i] += jointPoisson;
+					trackSelectConfigsForInf[i] = 1;
+				}
 			}
 		}
 	}
@@ -319,6 +320,7 @@ double computeLik() {
 
 	treesSampled = 0;
 	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
+	trackSelectConfigsForInf = vector<int>(dataConfigFreqs.size(),0);
 	allConfigs = vector<int>(finalTableSize,-1);
 	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
@@ -340,12 +342,24 @@ double computeLik() {
 		}
 		ofs.close();
 
+		loglik = loglik * dataConfigFreqs.size() / accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
+
 		selectConfigFreqs.clear();
+		trackSelectConfigsForInf.clear();
 	}
 	else if (estimate > 0) {
 		for (size_t i = 0; i < dataConfigs.size(); i++) {
 			if (selectConfigFreqs[i] != 0.0)
 				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+		}
+
+		if (estimate > 1) {
+			loglik = loglik * dataConfigFreqs.size() / accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
+			trackSelectConfigsForInf.clear();
+		}
+		else {
+			loglik = loglik * dataConfigFreqs.size() / trackSelectConfigs.size();
+			trackSelectConfigs.clear();
 		}
 
 		selectConfigFreqs.clear();
@@ -383,6 +397,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 			//	extending globalEvals in order to sample LNL after every globalSearchTolStep evaluations
 			globalEvals += globalSearchExt;
+
+			//	global search exit status : loglik = 0.0
+			if (evalCount > globalMaxEvals)
+				return loglik;
 		}
 
 		size_t size = globalLnLSeq.size();
@@ -832,6 +850,7 @@ int main(int argc, char* argv[]) {
 				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
 			globalEvals = 1000*tbiMsCmdIdx.size();
 		}
+		globalMaxEvals = 2000*tbiMsCmdIdx.size();
 
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
