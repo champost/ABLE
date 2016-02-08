@@ -91,7 +91,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 2000, localTrees = 6000, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false;
@@ -723,7 +723,7 @@ void readConfigFile(char* argv[]) {
 				stst >> ms_argv[i];
 			}
 			else {
-				if (estimate == 2) {
+				if (estimate == 2 && (onlyProfiles || skipGlobal)) {
 					if (onlyProfiles)
 						cerr << "\nCannot proceed with plotting only profiles" << endl;
 					else if (skipGlobal)
@@ -740,10 +740,6 @@ void readConfigFile(char* argv[]) {
 				stst >> ms_argv[i];
 			}
 		}
-		else if ((i == 2) && (estimate == 2)) {
-			stst << globalTrees;
-			stst >> ms_argv[2];
-		}
 		else {
 			stst << argv[i];
 			stst >> ms_argv[i];
@@ -758,12 +754,25 @@ void readConfigFile(char* argv[]) {
 	exit(-1);
 */
 
-	if ((estimate == 2) && !tbiMsCmdIdx.size()) {
-		cerr << "\nCannot proceed with inference" << endl;
-		cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
-		cerr << "Exiting ABLE...\n" << endl;
-		free_ms_argv();
-		exit(-1);
+	if (estimate == 2) {
+		if (!tbiMsCmdIdx.size()) {
+			cerr << "\nCannot proceed with inference" << endl;
+			cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
+			cerr << "Exiting ABLE...\n" << endl;
+			free_ms_argv();
+			exit(-1);
+		}
+		else {
+			stringstream stst;
+			if (globalTrees == 0)
+				stst << 1000*tbiMsCmdIdx.size();
+			else
+				stst << globalTrees;
+			stst >> ms_argv[2];
+
+			if (localTrees == 0)
+				localTrees = 1000*tbiMsCmdIdx.size();
+		}
 	}
 
 	if (onlyProfiles)
