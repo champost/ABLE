@@ -50,6 +50,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <limits>
 
 #include <nlopt.hpp>
 #include <omp.h>
@@ -120,7 +121,7 @@ void profileLik(vector<double> MLEparVec) {
 		MLEparVal = MLEparVec[tbiOrder[it->first]];
 		parUpperBound = MLEparVal + quarterGlobalRange;
 		parLowerBound = MLEparVal - quarterGlobalRange;
-		if (parLowerBound < 0.0)
+		if (parLowerBound < 0)
 			parLowerBound = MLEparVal / 2;
 
 		printf("\nCalculating profiles of the likelihood surface for %s\n", it->first.c_str());
@@ -268,7 +269,7 @@ void calcFinalTable() {
 				for (int j = 0; j < brClass; j++)
 					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
 
-				if (jointPoisson > 0.0) {
+				if (jointPoisson > (numeric_limits<double>::min()*treesSampled)) {
 					selectConfigFreqs[i] += jointPoisson;
 					trackSelectConfigsForInf[i] = 1;
 				}
@@ -284,7 +285,7 @@ void calcFinalTable() {
 				for (int j = 0; j < brClass; j++)
 					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
 
-				if (jointPoisson > 0.0)
+				if (jointPoisson > (numeric_limits<double>::min()*treesSampled))
 					selectConfigFreqs[i] += jointPoisson;
 
 				if (selectConfigFreqs[i] != 0.0) {
@@ -306,7 +307,7 @@ void calcFinalTable() {
 				for (int j = 0; j < brClass; j++)
 					jointPoisson *= poissonProbTable[trees][j][vec[j]];
 
-				if (jointPoisson > 0.0) {
+				if (jointPoisson > (numeric_limits<double>::min()*treesSampled)) {
 					allConfigs[i] = i;
 					allConfigFreqs[i] += jointPoisson;
 				}
