@@ -94,8 +94,11 @@ int estimate = 0, evalCount = 0;
 int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500, globalMaxEvals;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
-bool skipGlobal = false, globalSearch = true, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false;
+bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false, abortNLopt = false;
 unsigned long int finalTableSize;
+
+enum SearchStates {GLOBAL, LOCAL, OTHER};
+SearchStates currState = OTHER;
 
 
 double ranMT() { return(rMT()); }
@@ -104,6 +107,13 @@ void free_ms_argv() {
 	for(int i = 0; i < ms_argc; i++)
 		free(ms_argv[i]);
 	free(ms_argv);
+}
+
+void abortABLE_zeroDiv() {
+	cerr << "Anticipating division by zero during the calculation of the LnL" << endl;
+	cerr << "Aborting ABLE..." << endl;
+	free_ms_argv();
+	exit(-1);
 }
 
 void profileLik(vector<double> MLEparVec) {
@@ -332,6 +342,16 @@ double computeLik() {
 	calcFinalTable();
 	freePoissonProbs();
 
+	int trackedConfigs = 0;
+	if (bSFS || (estimate > 1)) {
+		trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
+		trackSelectConfigsForInf.clear();
+	}
+	else if (estimate == 1) {
+		trackedConfigs = trackSelectConfigs.size();
+		trackSelectConfigs.clear();
+	}
+
 	double loglik = 0.0;
 	if (bSFS) {
 		ofstream ofs("bSFS.txt",ios::out);
@@ -343,10 +363,10 @@ double computeLik() {
 		}
 		ofs.close();
 
-		loglik = loglik * dataConfigFreqs.size() / accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
+		if (trackedConfigs)
+			loglik *= dataConfigFreqs.size() / trackedConfigs;
 
 		selectConfigFreqs.clear();
-		trackSelectConfigsForInf.clear();
 	}
 	else if (estimate > 0) {
 		for (size_t i = 0; i < dataConfigs.size(); i++) {
@@ -354,14 +374,8 @@ double computeLik() {
 				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
 		}
 
-		if (estimate > 1) {
-			loglik = loglik * dataConfigFreqs.size() / accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
-			trackSelectConfigsForInf.clear();
-		}
-		else {
-			loglik = loglik * dataConfigFreqs.size() / trackSelectConfigs.size();
-			trackSelectConfigs.clear();
-		}
+		if (trackedConfigs)
+			loglik *= dataConfigFreqs.size() / trackedConfigs;
 
 		selectConfigFreqs.clear();
 	}
@@ -375,6 +389,9 @@ double computeLik() {
 		allConfigs.clear();
 		allConfigFreqs.clear();
 	}
+
+	if ((loglik == 0.0) && (currState == OTHER))
+		abortABLE_zeroDiv();
 
 	return loglik;
 }
@@ -392,7 +409,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		exit(-1);
 	}
 
-	if (globalSearch) {
+	if (currState == GLOBAL) {
 		if (evalCount == globalEvals) {
 			checkGlobalTol = true;
 
@@ -439,6 +456,14 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			printf("%.5e ", vars[i]);
 		printf(" Trees: %d ", treesSampled);
 		printf(" LnL: %.6f\n", loglik);
+
+		if (loglik == 0.0) {
+			abortNLopt = true;
+			if (currState == GLOBAL)
+				opt.force_stop();
+			else if (currState == LOCAL)
+				local_opt.force_stop();
+		}
 	}
 	//	penalising likelihood evaluation when searching outside the constrained zone
 	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
@@ -462,7 +487,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		return penLnL;
 	}
 
-	if (globalSearch) {
+	if (currState == GLOBAL) {
 		//	side stepping nlopt by storing the best LnL and parameters
 		if (loglik > bestGlobalSlLnL) {
 			bestGlobalSlLnL = loglik;
@@ -865,18 +890,25 @@ int main(int argc, char* argv[]) {
 			printf("\nStarting global search: \n");
 
 			evalCount = 0;
+			currState = GLOBAL;
 			time(&likStartTime);
 			opt.optimize(parVec, maxLnL);
+
+			if (abortNLopt)
+				abortABLE_zeroDiv();
 
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
 			stringstream stst;
 			stst << localTrees;
 			stst >> ms_argv[2];
 
-			globalSearch = false;
 			evalCount = 0;
+			currState = LOCAL;
 			parVec = bestGlobalSPars;
 			local_opt.optimize(parVec, maxLnL);
+
+			if (abortNLopt)
+				abortABLE_zeroDiv();
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
 			printf("Found a maximum at ");
@@ -896,9 +928,12 @@ int main(int argc, char* argv[]) {
 			stst << localTrees;
 			stst >> ms_argv[2];
 
-			globalSearch = false;
 			evalCount = 0;
+			currState = LOCAL;
 			local_opt.optimize(parVec, maxLnL);
+
+			if (abortNLopt)
+				abortABLE_zeroDiv();
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
 			printf("Found a maximum at ");
@@ -910,6 +945,7 @@ int main(int argc, char* argv[]) {
 			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 
+		currState = OTHER;
 		if (onlyProfiles || profileLikBool)
 			profileLik(parVec);
 	}
@@ -929,6 +965,7 @@ int main(int argc, char* argv[]) {
 			cout << endl;
 		}
 
+		currState = OTHER;
 		if (!bSFS) {
 			testLik.open("logliks.txt",ios::out);
 			testConfig.open("propConfigs.txt",ios::out);
@@ -960,8 +997,10 @@ int main(int argc, char* argv[]) {
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
 
+		currState = OTHER;
 		time(&likStartTime);
-		computeLik();
+		double loglik = computeLik();
+		printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
 		time(&likEndTime);
 
 		printf("\n\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
