@@ -53,9 +53,9 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <limits>
 
 #include <nlopt.hpp>
+#include <gsl/gsl_rng.h>
 #include <omp.h>
 
-#include "MersenneTwister.h"
 #include "main.h"
 #include "utils.h"
 
@@ -65,7 +65,7 @@ using namespace std;
 int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize;
 //**********************************
 
-MTRand rMT;
+gsl_rng * prng;
 
 map<vector<int>, int> intVec2BrConfig;
 map<string, vector<int> > tbiMsCmdIdx;
@@ -94,14 +94,12 @@ int estimate = 0, evalCount = 0;
 int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500, globalMaxEvals;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
-bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false, abortNLopt = false;
-unsigned long int finalTableSize;
+bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false, abortNLopt = false, seedPRNGBool = false;
+unsigned long int finalTableSize, seedPRNG = 67144630;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
 SearchStates currState = OTHER;
 
-
-double ranMT() { return(rMT()); }
 
 void free_ms_argv() {
 	for(int i = 0; i < ms_argc; i++)
@@ -744,6 +742,12 @@ void readConfigFile(char* argv[]) {
 			else if (tokens[0] == "only_profiles") {
 				onlyProfiles = true;
 			}
+			else if (tokens[0] == "seed_PRNG") {
+				stringstream stst(tokens[1]);
+				stst >> seedPRNG;
+				seedPRNGBool = true;
+				gsl_rng_set(prng, seedPRNG);
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -778,7 +782,7 @@ void readConfigFile(char* argv[]) {
 					exit(-1);
 				}
 
-				double tmpPar = ranMT();
+				double tmpPar = gsl_rng_uniform(prng);
 				tbiUserVal[param] = tmpPar;
 				stst << tmpPar;
 				stst >> ms_argv[i];
@@ -826,6 +830,9 @@ void readConfigFile(char* argv[]) {
 
 int main(int argc, char* argv[]) {
 
+	prng = gsl_rng_alloc(gsl_rng_mt19937);
+	gsl_rng_set(prng, seedPRNG);
+
 	time_t likStartTime, likEndTime;
 /*
 	int nsam = atoi(argv[1]);
@@ -864,7 +871,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		opt = nlopt::opt(nlopt::GN_DIRECT_L_RAND, tbiMsCmdIdx.size());
+		opt = nlopt::opt(nlopt::GN_DIRECT_L, tbiMsCmdIdx.size());
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
 		opt.set_stopval(0.0);
@@ -1007,6 +1014,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	free_ms_argv();
+	gsl_rng_free(prng);
 
 	return 0;
 }

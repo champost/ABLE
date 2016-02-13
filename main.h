@@ -66,7 +66,6 @@ void freed2matrix(double **m, int x);
 //int ** d2int_matrix(int x, int y);
 //void freed2int_matrix(int **m, int x);
 
-double ranMT();
 void storePoissonProbs(double **onetreeTable);
 int getPopSampleStatus(int pop);
 int getBrConfigNum(int *brConfVec);

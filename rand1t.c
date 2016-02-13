@@ -45,6 +45,9 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <gsl/gsl_rng.h>
+
+extern gsl_rng * prng;
 
          double
 ran1()
@@ -59,8 +62,7 @@ ran1()
     	}
     	exit(-1);
 */
-        	 double ranMT();
-        	 return ranMT();
+        	 return gsl_rng_uniform(prng);
 /*
              int rand();
              return rand()/(RAND_MAX+1.0);
