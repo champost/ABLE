@@ -364,7 +364,7 @@ double computeLik() {
 		ofs.close();
 
 		if (trackedConfigs)
-			loglik *= dataConfigFreqs.size() / trackedConfigs;
+			loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 
 		selectConfigFreqs.clear();
 	}
@@ -375,7 +375,7 @@ double computeLik() {
 		}
 
 		if (trackedConfigs)
-			loglik *= dataConfigFreqs.size() / trackedConfigs;
+			loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 
 		selectConfigFreqs.clear();
 	}
