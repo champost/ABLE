@@ -69,7 +69,7 @@ gsl_rng * prng;
 
 map<vector<int>, int> intVec2BrConfig;
 map<string, vector<int> > tbiMsCmdIdx;
-map<string, double> tbiUserVal;
+map<int, double> tbiUserVal;
 map<string, int> tbiOrder;
 map<string, vector<double> > tbiSearchBounds;
 map<string, string> parConstraints;
@@ -658,16 +658,15 @@ void readConfigFile(char* argv[]) {
 				double val;
 				if (tokens[1] == "all") {
 					for(unsigned int j = 2; j < tokens.size(); j++) {
-						stringstream stst, stst_val(tokens[j]);
-						stst << "tbi" << j-1;
+						stringstream stst_val(tokens[j]);
 						stst_val >> val;
-						tbiUserVal[stst.str()] = val;
+						tbiUserVal[j-1] = val;
 					}
 				}
 				else {
 					stringstream stst(tokens[2]);
 					stst >> val;
-					tbiUserVal[tokens[1]] = val;
+					tbiUserVal[atoi(tokens[1].substr(3).c_str())] = val;
 				}
 			}
 			else if (tokens[0] == "datafile") {
@@ -766,8 +765,9 @@ void readConfigFile(char* argv[]) {
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
 			tbiMsCmdIdx[param].push_back(i);
-			if (tbiUserVal.find(param) != tbiUserVal.end()) {
-				stst << tbiUserVal[param];
+			int paramID = atoi(param.substr(3).c_str());
+			if (tbiUserVal.find(paramID) != tbiUserVal.end()) {
+				stst << tbiUserVal[paramID];
 				stst >> ms_argv[i];
 			}
 			else {
@@ -783,7 +783,7 @@ void readConfigFile(char* argv[]) {
 				}
 
 				double tmpPar = gsl_rng_uniform(prng);
-				tbiUserVal[param] = tmpPar;
+				tbiUserVal[paramID] = tmpPar;
 				stst << tmpPar;
 				stst >> ms_argv[i];
 			}
@@ -856,14 +856,18 @@ int main(int argc, char* argv[]) {
 		double maxLnL;
 		vector<double> parVec;
 		int parCount = 0;
-		for (map<string, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
+		for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
+			stringstream stst;
+			stst << "tbi" << it->first;
+			string paramID = stst.str();
+
 			parVec.push_back(it->second);
-			tbiOrder[it->first] = parCount;
+			tbiOrder[paramID] = parCount;
 			++parCount;
 
-			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
-				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
-				upperBounds.push_back(tbiSearchBounds[it->first][1]);
+			if (tbiSearchBounds.find(paramID) != tbiSearchBounds.end()) {
+				lowerBounds.push_back(tbiSearchBounds[paramID][0]);
+				upperBounds.push_back(tbiSearchBounds[paramID][1]);
 			}
 			else {
 				lowerBounds.push_back(globalLower);
@@ -962,7 +966,7 @@ int main(int argc, char* argv[]) {
 
 		printf("Evaluating point likelihood at : \n");
 		if (!tbiUserVal.empty()) {
-			for (map<string, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
+			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
 				printf("%.6f ", it->second);
 			printf("\n");
 		}
