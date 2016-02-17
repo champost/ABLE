@@ -91,7 +91,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 500, globalSearchExt = 500, globalMaxEvals;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 100, globalSearchExt = 500, globalMaxEvals;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false, abortNLopt = false, seedPRNGBool = false;
@@ -871,17 +871,17 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		opt = nlopt::opt(nlopt::GN_DIRECT_L, tbiMsCmdIdx.size());
+		opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
 		opt.set_stopval(0.0);
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if (!skipGlobal && (globalEvals < 1000*(int)tbiMsCmdIdx.size())) {
+		if (!skipGlobal && (globalEvals < 1500*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
-			globalEvals = 1000*tbiMsCmdIdx.size();
+			globalEvals = 1500*tbiMsCmdIdx.size();
 		}
 		globalMaxEvals = 2000*tbiMsCmdIdx.size();
 
