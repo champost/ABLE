@@ -431,7 +431,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	//	checking for simple non linear constraints between the free params
 	for (map<string, string>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
-		if (vars[tbiOrder[it->first]] > vars[tbiOrder[it->second]]) {
+		if (vars[tbiOrder[it->first]] >= vars[tbiOrder[it->second]]) {
 			parConstraintPass = false;
 			break;
 		}
