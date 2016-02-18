@@ -62,7 +62,7 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize;
+int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize, ms_crash_flag;
 //**********************************
 
 gsl_rng * prng;
@@ -327,6 +327,7 @@ void calcFinalTable() {
 
 double computeLik() {
 
+	double loglik = 0.0;
 	treesSampled = 0;
 	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
 	trackSelectConfigsForInf = vector<int>(dataConfigFreqs.size(),0);
@@ -334,62 +335,68 @@ double computeLik() {
 	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
 	// calling ms for sampling genealogies
+	ms_crash_flag = 0;
 	main_ms(ms_argc, ms_argv);
 
-	//	calculating the bSFS config. probs.
-	calcFinalTable();
-	freePoissonProbs();
-
-	int trackedConfigs = 0;
-	if (bSFS || (estimate > 1)) {
-		trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
-		trackSelectConfigsForInf.clear();
+	if (ms_crash_flag) {
+		if (treesSampled)
+			freePoissonProbs();
 	}
-	else if (estimate == 1) {
-		trackedConfigs = trackSelectConfigs.size();
-		trackSelectConfigs.clear();
-	}
+	else {
+		//	calculating the bSFS config. probs.
+		calcFinalTable();
+		freePoissonProbs();
 
-	double loglik = 0.0;
-	if (bSFS) {
-		ofstream ofs("bSFS.txt",ios::out);
-		for (size_t i = 0; i < dataConfigs.size(); i++) {
-			if (selectConfigFreqs[i] != 0.0) {
-				ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / treesSampled << endl;
-				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+		int trackedConfigs = 0;
+		if (bSFS || (estimate > 1)) {
+			trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
+			trackSelectConfigsForInf.clear();
+		}
+		else if (estimate == 1) {
+			trackedConfigs = trackSelectConfigs.size();
+			trackSelectConfigs.clear();
+		}
+
+		if (bSFS) {
+			ofstream ofs("bSFS.txt",ios::out);
+			for (size_t i = 0; i < dataConfigs.size(); i++) {
+				if (selectConfigFreqs[i] != 0.0) {
+					ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / treesSampled << endl;
+					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+				}
 			}
+			ofs.close();
+
+			if (trackedConfigs)
+				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
+
+			selectConfigFreqs.clear();
 		}
-		ofs.close();
+		else if (estimate > 0) {
+			for (size_t i = 0; i < dataConfigs.size(); i++) {
+				if (selectConfigFreqs[i] != 0.0)
+					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+			}
 
-		if (trackedConfigs)
-			loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
+			if (trackedConfigs)
+				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 
-		selectConfigFreqs.clear();
-	}
-	else if (estimate > 0) {
-		for (size_t i = 0; i < dataConfigs.size(); i++) {
-			if (selectConfigFreqs[i] != 0.0)
-				loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+			selectConfigFreqs.clear();
+		}
+		else if (estimate == 0) {
+			ofstream ofs("expected_bSFS.txt",ios::out);
+			for (size_t i = 0; i < allConfigs.size(); i++)
+				if (allConfigs[i] >= 0)
+					ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
+			ofs.close();
+
+			allConfigs.clear();
+			allConfigFreqs.clear();
 		}
 
-		if (trackedConfigs)
-			loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
-
-		selectConfigFreqs.clear();
+		if ((loglik == 0.0) && (currState == OTHER))
+			abortABLE_zeroDiv();
 	}
-	else if (estimate == 0) {
-		ofstream ofs("expected_bSFS.txt",ios::out);
-		for (size_t i = 0; i < allConfigs.size(); i++)
-			if (allConfigs[i] >= 0)
-				ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
-		ofs.close();
-
-		allConfigs.clear();
-		allConfigFreqs.clear();
-	}
-
-	if ((loglik == 0.0) && (currState == OTHER))
-		abortABLE_zeroDiv();
 
 	return loglik;
 }
@@ -446,7 +453,36 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 				stst >> ms_argv[it->second[i]];
 		}
 
+/*
+		for(int i = 1; i < ms_argc; i++)
+			printf("%s ",ms_argv[i]);
+		printf("\n");
+//		free_ms_argv(); exit(-1);
+*/
+
 		loglik = computeLik();
+
+		if (ms_crash_flag) {
+/*
+			printf("%5d ", evalCount);
+			for (size_t i = 0; i < vars.size(); i++)
+				printf("%.5e ", vars[i]);
+*/
+
+			if (penLnL == 0)
+				penLnL = 100*dataLnL;
+			else
+				penLnL += dataLnL;
+
+/*
+			printf(" Trees: %d ", 0);
+			printf(" Penalised LnL: %.6f ", penLnL);
+			printf(" ms CRASH!\n");
+*/
+
+			return penLnL;
+		}
+
 
 		++evalCount;
 		printf("%5d ", evalCount);
@@ -473,15 +509,16 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			printf("%.5e ", vars[i]);
 */
 
-		if (evalCount == 0)
-			penLnL = 10000*dataLnL;
+		if (penLnL == 0)
+			penLnL = 100*dataLnL;
 		else
-			penLnL *= 2;
+			penLnL += dataLnL;
 
 /*
 		printf(" Trees: %d ", 0);
 		printf(" Penalised LnL: %.6f\n", penLnL);
 */
+
 		return penLnL;
 	}
 
@@ -901,6 +938,7 @@ int main(int argc, char* argv[]) {
 			printf("\nStarting global search: \n");
 
 			evalCount = 0;
+			penLnL = 0;
 			currState = GLOBAL;
 			time(&likStartTime);
 			opt.optimize(parVec, maxLnL);
@@ -914,6 +952,7 @@ int main(int argc, char* argv[]) {
 			stst >> ms_argv[2];
 
 			evalCount = 0;
+			penLnL = 0;
 			currState = LOCAL;
 			parVec = bestGlobalSPars;
 			local_opt.optimize(parVec, maxLnL);
@@ -940,6 +979,7 @@ int main(int argc, char* argv[]) {
 			stst >> ms_argv[2];
 
 			evalCount = 0;
+			penLnL = 0;
 			currState = LOCAL;
 			local_opt.optimize(parVec, maxLnL);
 

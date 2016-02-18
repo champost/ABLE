@@ -244,6 +244,9 @@ int main_ms(int ms_argc, char *ms_argv[])
 */
         gensam( list, &probss, &tmrca, &ttot);
 
+        if (ms_crash_flag)
+        	break;
+
 /*
   		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
         if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
@@ -307,6 +310,12 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 //	nsinv = 1./nsites;
 	seglst = segtre_mig(&(pars.cp),  &nsegs ) ;
 	
+	if (ms_crash_flag) {
+	    for(seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++)
+	    	free(seglst[seg].ptree);
+		return 0;
+	}
+
 	nsam = pars.cp.nsam;
 	segsitesin = pars.mp.segsitesin ;
 	theta = pars.mp.theta ;
