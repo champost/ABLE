@@ -68,12 +68,11 @@ int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize, ms_crash_
 gsl_rng * prng;
 
 map<vector<int>, int> intVec2BrConfig;
-map<string, vector<int> > tbiMsCmdIdx;
+map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
-map<string, int> tbiOrder;
-map<string, vector<double> > tbiSearchBounds;
-map<string, string> parConstraints;
-map<int, int> trackSelectConfigs;
+//map<string, int> tbiOrder;
+map<int, vector<double> > tbiSearchBounds;
+map<int, int> trackSelectConfigs, parConstraints;
 
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
@@ -124,17 +123,20 @@ void profileLik(vector<double> MLEparVec) {
 
 	size_t parIdx = 0;
 	//	Likelihood profiles for all parameters to be inferred (tbi)
-	for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+	for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+		stringstream tbiFileName;
 		double quarterGlobalRange = (upperBounds[parIdx] - lowerBounds[parIdx]) / 4;
-		MLEparVal = MLEparVec[tbiOrder[it->first]];
+		MLEparVal = MLEparVec[it->first-1];
 		parUpperBound = MLEparVal + quarterGlobalRange;
 		parLowerBound = MLEparVal - quarterGlobalRange;
 		if (parLowerBound < 0)
 			parLowerBound = MLEparVal / 2;
 
-		printf("\nCalculating profiles of the likelihood surface for %s\n", it->first.c_str());
+		tbiFileName << "tbi" << it->first;
+		printf("\nCalculating profiles of the likelihood surface for %s\n", tbiFileName.str().c_str());
 
-		ofstream outFile((it->first+".txt").c_str(),ios::out);
+		tbiFileName << ".txt";
+		ofstream outFile(tbiFileName.str().c_str(),ios::out);
 
 		//	Calculating the LnL at the MLE
 		for (size_t i = 0; i < it->second.size(); i++) {
@@ -437,8 +439,8 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	}
 
 	//	checking for simple non linear constraints between the free params
-	for (map<string, string>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
-		if (vars[tbiOrder[it->first]] >= vars[tbiOrder[it->second]]) {
+	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
+		if (vars[it->first-1] >= vars[it->second-1]) {
 			parConstraintPass = false;
 			break;
 		}
@@ -446,11 +448,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	//	the standard global/local LnL search procedure (when all else is OK)
 	if (parConstraintPass) {
-		for (map<string, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
-			stringstream stst;
-			stst << vars[tbiOrder[it->first]];
-			for (size_t i = 0; i < it->second.size(); i++)
+		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+			for (size_t i = 0; i < it->second.size(); i++) {
+				stringstream stst;
+				stst << vars[it->first-1];
 				stst >> ms_argv[it->second[i]];
+			}
 		}
 
 /*
@@ -472,7 +475,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			if (penLnL == 0)
 				penLnL = 100*dataLnL;
 			else
-				penLnL += dataLnL;
+				--penLnL;
 
 /*
 			printf(" Trees: %d ", 0);
@@ -482,7 +485,6 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 			return penLnL;
 		}
-
 
 		++evalCount;
 		printf("%5d ", evalCount);
@@ -512,7 +514,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		if (penLnL == 0)
 			penLnL = 100*dataLnL;
 		else
-			penLnL += dataLnL;
+			--penLnL;
 
 /*
 		printf(" Trees: %d ", 0);
@@ -747,15 +749,17 @@ void readConfigFile(char* argv[]) {
 				skipGlobal = true;
 			}
 			else if (tokens[0] == "bounds") {
+				int paramID = atoi(tokens[1].substr(3).c_str());
 				for(unsigned int j = 2; j < 4; j++) {
 					double val;
 					stringstream stst(tokens[j]);
 					stst >> val;
-					tbiSearchBounds[tokens[1]].push_back(val);
+					tbiSearchBounds[paramID].push_back(val);
 				}
 			}
 			else if (tokens[0] == "constrain") {
-				parConstraints[tokens[1]] = tokens[2];
+				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
+				parConstraints[paramID1] = paramID2;
 			}
 			else if (tokens[0] == "global_search_term_tol") {
 				stringstream stst(tokens[1]);
@@ -801,8 +805,8 @@ void readConfigFile(char* argv[]) {
 		string param(argv[i]);
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
-			tbiMsCmdIdx[param].push_back(i);
 			int paramID = atoi(param.substr(3).c_str());
+			tbiMsCmdIdx[paramID].push_back(i);
 			if (tbiUserVal.find(paramID) != tbiUserVal.end()) {
 				stst << tbiUserVal[paramID];
 				stst >> ms_argv[i];
@@ -892,19 +896,12 @@ int main(int argc, char* argv[]) {
 
 		double maxLnL;
 		vector<double> parVec;
-		int parCount = 0;
 		for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
-			stringstream stst;
-			stst << "tbi" << it->first;
-			string paramID = stst.str();
-
 			parVec.push_back(it->second);
-			tbiOrder[paramID] = parCount;
-			++parCount;
 
-			if (tbiSearchBounds.find(paramID) != tbiSearchBounds.end()) {
-				lowerBounds.push_back(tbiSearchBounds[paramID][0]);
-				upperBounds.push_back(tbiSearchBounds[paramID][1]);
+			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
+				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
+				upperBounds.push_back(tbiSearchBounds[it->first][1]);
 			}
 			else {
 				lowerBounds.push_back(globalLower);
