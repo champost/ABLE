@@ -106,13 +106,6 @@ void free_ms_argv() {
 	free(ms_argv);
 }
 
-void abortABLE_zeroDiv() {
-	cerr << "Anticipating division by zero during the calculation of the LnL" << endl;
-	cerr << "Aborting ABLE..." << endl;
-	free_ms_argv();
-	exit(-1);
-}
-
 void profileLik(vector<double> MLEparVec) {
 
 	double parLowerBound, parUpperBound, MLEparVal, MLEparLik;
@@ -395,9 +388,6 @@ double computeLik() {
 			allConfigs.clear();
 			allConfigFreqs.clear();
 		}
-
-		if ((loglik == 0.0) && (currState == OTHER))
-			abortABLE_zeroDiv();
 	}
 
 	return loglik;
@@ -425,7 +415,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 			//	global search exit status : loglik = 0.0
 			if (evalCount > globalMaxEvals)
-				return loglik;
+				return 0;
 		}
 
 		size_t size = globalLnLSeq.size();
@@ -434,7 +424,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			double LnLtol = fabs(globalLnLSeq[size-1]-globalLnLSeq[size-2]);
 			//	global search exit status : loglik = 0.0
 			if (LnLtol <= globalSearchTol)
-				return loglik;
+				return 0;
 		}
 	}
 
@@ -486,20 +476,18 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			return penLnL;
 		}
 
+		if (loglik == 0.0) {
+			//	global/local search exit status : loglik = 0.0
+			abortNLopt = true;
+			return 0;
+		}
+
 		++evalCount;
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
 			printf("%.5e ", vars[i]);
 		printf(" Trees: %d ", treesSampled);
 		printf(" LnL: %.6f\n", loglik);
-
-		if (loglik == 0.0) {
-			abortNLopt = true;
-			if (currState == GLOBAL)
-				opt.force_stop();
-			else if (currState == LOCAL)
-				local_opt.force_stop();
-		}
 	}
 	//	penalising likelihood evaluation when searching outside the constrained zone
 	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
@@ -912,7 +900,7 @@ int main(int argc, char* argv[]) {
 		opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
-		opt.set_stopval(0.0);
+		opt.set_stopval(0);
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
@@ -923,11 +911,14 @@ int main(int argc, char* argv[]) {
 		}
 		globalMaxEvals = 2000*tbiMsCmdIdx.size();
 
+		local_opt.set_stopval(0);
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(globalLower);
 		local_opt.set_upper_bounds(globalUpper);
 		if (localEvals)
 			local_opt.set_maxeval(localEvals);
+		else
+			local_opt.set_maxeval(10000);
 		local_opt.set_xtol_rel(1e-4);
 		local_opt.set_initial_step((globalUpper-globalLower)/5);
 
@@ -940,8 +931,17 @@ int main(int argc, char* argv[]) {
 			time(&likStartTime);
 			opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt)
-				abortABLE_zeroDiv();
+			if (abortNLopt) {
+				cerr << "Something went wrong in the calculation of the LnL!" << endl;
+				cerr << "Aborting ABLE..." << endl;
+
+				for (size_t i = 0; i < parVec.size(); i++)
+					printf("%.6f ", parVec[i]);
+				printf("LnL = %.6f\n\n", maxLnL);
+
+				free_ms_argv();
+				exit(-1);
+			}
 
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
 			stringstream stst;
@@ -954,8 +954,17 @@ int main(int argc, char* argv[]) {
 			parVec = bestGlobalSPars;
 			local_opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt)
-				abortABLE_zeroDiv();
+			if (abortNLopt) {
+				cerr << "Something went wrong in the calculation of the LnL!" << endl;
+				cerr << "Aborting ABLE..." << endl;
+
+				for (size_t i = 0; i < parVec.size(); i++)
+					printf("%.6f ", parVec[i]);
+				printf("LnL = %.6f\n\n", maxLnL);
+
+				free_ms_argv();
+				exit(-1);
+			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
 			printf("Found a maximum at ");
@@ -980,8 +989,17 @@ int main(int argc, char* argv[]) {
 			currState = LOCAL;
 			local_opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt)
-				abortABLE_zeroDiv();
+			if (abortNLopt) {
+				cerr << "Something went wrong in the calculation of the LnL!" << endl;
+				cerr << "Aborting ABLE..." << endl;
+
+				for (size_t i = 0; i < parVec.size(); i++)
+					printf("%.6f ", parVec[i]);
+				printf("LnL = %.6f\n\n", maxLnL);
+
+				free_ms_argv();
+				exit(-1);
+			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
 			printf("Found a maximum at ");
@@ -1019,7 +1037,7 @@ int main(int argc, char* argv[]) {
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
 			double loglik = computeLik();
-			printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, treesSampled);
 			time(&likEndTime);
 			testLik.close();
 			testConfig.close();
@@ -1027,7 +1045,7 @@ int main(int argc, char* argv[]) {
 		else {
 			time(&likStartTime);
 			double loglik = computeLik();
-			printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, treesSampled);
 			time(&likEndTime);
 		}
 
@@ -1047,11 +1065,11 @@ int main(int argc, char* argv[]) {
 
 		currState = OTHER;
 		time(&likStartTime);
-		double loglik = computeLik();
-		printf("LnL : %.6f (Sampled trees : %d)\n", loglik, treesSampled);
+		computeLik();
+		printf("Trees sampled : %d\n", treesSampled);
 		time(&likEndTime);
 
-		printf("\n\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
+		printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
 	}
 
 	free_ms_argv();
