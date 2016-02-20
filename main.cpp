@@ -79,7 +79,7 @@ ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, globalLnLSeq;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
 vector<double**> poissonProbTable;
 
 nlopt::opt opt;
@@ -90,10 +90,10 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, globalSearchTolStep = 100, globalSearchExt = 500, globalMaxEvals;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
-bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, checkGlobalTol = false, abortNLopt = false, seedPRNGBool = false;
+bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
 unsigned long int finalTableSize, seedPRNG = 67144630;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -406,27 +406,9 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		exit(-1);
 	}
 
-	if (currState == GLOBAL) {
-		if (evalCount == globalEvals) {
-			checkGlobalTol = true;
-
-			//	extending globalEvals in order to sample LNL after every globalSearchTolStep evaluations
-			globalEvals += globalSearchExt;
-
-			//	global search exit status : loglik = 0.0
-			if (evalCount > globalMaxEvals)
-				return 0;
-		}
-
-		size_t size = globalLnLSeq.size();
-		//	checking LNL tolerance after sampling every globalSearchTolStep after globalEvals evaluations
-		if (size > 1) {
-			double LnLtol = fabs(globalLnLSeq[size-1]-globalLnLSeq[size-2]);
-			//	global search exit status : loglik = 0.0
-			if (LnLtol <= globalSearchTol)
-				return 0;
-		}
-	}
+	//	global search exit status : 1234567
+	if ((currState == GLOBAL) && (evalCount > globalEvals))
+			return 1234567;
 
 	//	checking for simple non linear constraints between the free params
 	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
@@ -465,7 +447,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			if (penLnL == 0)
 				penLnL = 100*dataLnL;
 			else
-				--penLnL;
+				penLnL += dataLnL;
 
 /*
 			printf(" Trees: %d ", 0);
@@ -476,22 +458,25 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			return penLnL;
 		}
 
-		if (loglik == 0.0) {
-			//	global/local search exit status : loglik = 0.0
-			abortNLopt = true;
-			return 0;
-		}
-
 		++evalCount;
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
 			printf("%.5e ", vars[i]);
 		printf(" Trees: %d ", treesSampled);
 		printf(" LnL: %.6f\n", loglik);
+
+		if (loglik == 0.0) {
+			//	global/local search exit status : 1234567
+			abortNLopt = true;
+			if (currState == GLOBAL)
+				return 1234567;
+			else if (currState == LOCAL)
+				return 7654321;
+		}
 	}
 	//	penalising likelihood evaluation when searching outside the constrained zone
 	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
-	//	special case of first search point is in the forbidden zone : 10000*dataLnL
+	//	special case of first search point is in the forbidden zone : 100*dataLnL
 	else {
 /*
 		printf("%5d ", evalCount);
@@ -502,7 +487,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		if (penLnL == 0)
 			penLnL = 100*dataLnL;
 		else
-			--penLnL;
+			penLnL += dataLnL;
 
 /*
 		printf(" Trees: %d ", 0);
@@ -512,17 +497,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		return penLnL;
 	}
 
-	if (currState == GLOBAL) {
-		//	side stepping nlopt by storing the best LnL and parameters
-		if (loglik > bestGlobalSlLnL) {
+	//	side stepping nlopt by storing the best LnL and parameters
+	if ((currState == GLOBAL) && (loglik > bestGlobalSlLnL)) {
 			bestGlobalSlLnL = loglik;
 			bestGlobalSPars = vars;
-		}
-
-		//	sampling LNL every globalSearchTolStep after globalEvals evaluations
-		if (checkGlobalTol && !(evalCount % globalSearchTolStep))
-			globalLnLSeq.push_back(loglik);
 	}
+
 	penLnL = loglik;
 
 	return loglik;
@@ -753,14 +733,6 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> globalSearchTol;
 			}
-			else if (tokens[0] == "global_search_term_tol_step") {
-				stringstream stst(tokens[1]);
-				stst >> globalSearchTolStep;
-			}
-			else if (tokens[0] == "global_search_extension") {
-				stringstream stst(tokens[1]);
-				stst >> globalSearchExt;
-			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
 			}
@@ -900,21 +872,20 @@ int main(int argc, char* argv[]) {
 		opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
-		opt.set_stopval(0);
+		opt.set_stopval(1234567);
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if (!skipGlobal && (globalEvals < 1500*(int)tbiMsCmdIdx.size())) {
+		if (!skipGlobal && (globalEvals < 2000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
-			globalEvals = 1500*tbiMsCmdIdx.size();
+			globalEvals = 2000*tbiMsCmdIdx.size();
 		}
-		globalMaxEvals = 2000*tbiMsCmdIdx.size();
 
-		local_opt.set_stopval(0);
+		local_opt.set_stopval(7654321);
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		local_opt.set_lower_bounds(globalLower);
-		local_opt.set_upper_bounds(globalUpper);
+		local_opt.set_lower_bounds(lowerBounds);
+		local_opt.set_upper_bounds(upperBounds);
 		if (localEvals)
 			local_opt.set_maxeval(localEvals);
 		else
@@ -929,18 +900,23 @@ int main(int argc, char* argv[]) {
 			penLnL = 0;
 			currState = GLOBAL;
 			time(&likStartTime);
-			opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt) {
-				cerr << "Something went wrong in the calculation of the LnL!" << endl;
-				cerr << "Aborting ABLE..." << endl;
+			try {
+				opt.optimize(parVec, maxLnL);
+				throw abortNLopt;
+			}
+			catch (...) {
+				if (abortNLopt) {
+					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Aborting ABLE..." << endl;
 
-				for (size_t i = 0; i < parVec.size(); i++)
-					printf("%.6f ", parVec[i]);
-				printf("LnL = %.6f\n\n", maxLnL);
+					for (size_t i = 0; i < parVec.size(); i++)
+						printf("%.6f ", parVec[i]);
+					printf("LnL = %.6f\n\n", maxLnL);
 
-				free_ms_argv();
-				exit(-1);
+					free_ms_argv();
+					exit(-1);
+				}
 			}
 
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
@@ -952,18 +928,23 @@ int main(int argc, char* argv[]) {
 			penLnL = 0;
 			currState = LOCAL;
 			parVec = bestGlobalSPars;
-			local_opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt) {
-				cerr << "Something went wrong in the calculation of the LnL!" << endl;
-				cerr << "Aborting ABLE..." << endl;
+			try {
+				local_opt.optimize(parVec, maxLnL);
+				throw abortNLopt;
+			}
+			catch (...) {
+				if (abortNLopt) {
+					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Aborting ABLE..." << endl;
 
-				for (size_t i = 0; i < parVec.size(); i++)
-					printf("%.6f ", parVec[i]);
-				printf("LnL = %.6f\n\n", maxLnL);
+					for (size_t i = 0; i < parVec.size(); i++)
+						printf("%.6f ", parVec[i]);
+					printf("LnL = %.6f\n\n", maxLnL);
 
-				free_ms_argv();
-				exit(-1);
+					free_ms_argv();
+					exit(-1);
+				}
 			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
@@ -987,18 +968,23 @@ int main(int argc, char* argv[]) {
 			evalCount = 0;
 			penLnL = 0;
 			currState = LOCAL;
-			local_opt.optimize(parVec, maxLnL);
 
-			if (abortNLopt) {
-				cerr << "Something went wrong in the calculation of the LnL!" << endl;
-				cerr << "Aborting ABLE..." << endl;
+			try {
+				local_opt.optimize(parVec, maxLnL);
+				throw abortNLopt;
+			}
+			catch (...) {
+				if (abortNLopt) {
+					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Aborting ABLE..." << endl;
 
-				for (size_t i = 0; i < parVec.size(); i++)
-					printf("%.6f ", parVec[i]);
-				printf("LnL = %.6f\n\n", maxLnL);
+					for (size_t i = 0; i < parVec.size(); i++)
+						printf("%.6f ", parVec[i]);
+					printf("LnL = %.6f\n\n", maxLnL);
 
-				free_ms_argv();
-				exit(-1);
+					free_ms_argv();
+					exit(-1);
+				}
 			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
