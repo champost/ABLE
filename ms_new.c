@@ -138,8 +138,6 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
      requirements.  4 Mar 2014.
 ***************************************************************************/
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -154,12 +152,6 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
 
 unsigned maxsites = SITESINC ;
 
-
-struct segl {
-        int beg;
-        struct node *ptree;
-        int next;
-        };
 
 //double *posit ;
 double segfac ;

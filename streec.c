@@ -82,7 +82,7 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
 
 #define SEGINC 80 
 
-extern int flag;
+//extern int flag;
 
 int nchrom, begs, nsegs;
 long nlinks ;
@@ -92,27 +92,10 @@ double t, cleft , pc, lnpc ;
 static unsigned seglimit = SEGINC ;
 static unsigned maxchr ;
 
-struct seg{
-	int beg;
-	int end;
-	int desc;
-	};
-
-struct chromo{
-	int nseg;
-	int pop;
-	struct seg  *pseg;
-	} ;
-
 static struct chromo *chrom = NULL ;
 
 struct node *ptree1, *ptree2;
 
-struct segl {
-        int beg;
-        struct node *ptree;
-        int next;
-        }  ;
 static struct segl *seglst = NULL ;
 
 	struct segl *

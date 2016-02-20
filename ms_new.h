@@ -39,6 +39,9 @@ and thereafter modified by Champak Beeravolu Reddy (champak.br@gmail.com)
 
 ***************************************************************************/
 
+#ifndef MS_NEW_H_
+#define MS_NEW_H_
+
 
 struct devent {
 	double time;
@@ -49,6 +52,7 @@ struct devent {
 	char detype ;
 	struct devent *nextde;
 	} ;
+
 struct c_params {
 	int npop;
 	int nsam;
@@ -62,6 +66,7 @@ struct c_params {
 	double *alphag;
 	struct devent *deventlist ;
 	} ;
+
 struct m_params {
 	 double theta;
 	int segsitesin;
@@ -69,6 +74,7 @@ struct m_params {
 	int timeflag;
 	int mfreq;
 	 } ;
+
 struct params { 
 	struct c_params cp;
 	struct m_params mp;
@@ -83,6 +89,23 @@ struct node{
 	float brLength;
 };
 
+struct seg{
+	int beg;
+	int end;
+	int desc;
+	};
+
+struct chromo{
+	int nseg;
+	int pop;
+	struct seg  *pseg;
+	} ;
+
+struct segl {
+        int beg;
+        struct node *ptree;
+        int next;
+        };
 
 /*KRT -- prototypes added*/
 void ordran(int n, double pbuf[]);
@@ -100,3 +123,5 @@ int xover(int nsam,int ic, int is);
 int links(int c);
 
 extern int brClass, mutClass, foldBrClass, allBrClasses, sampledPopsSize, ms_crash_flag;
+
+#endif /* MS_NEW_H_ */
