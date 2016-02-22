@@ -58,7 +58,7 @@ void readConfigFile(char* argv[]);
 
 
 extern "C" {
-int main_ms(int ms_argc, char *ms_argv[]);
+int main_ms_ABLE(int ms_argc, char *ms_argv[]);
 //double *** d3matrix(int x, int y, int z);
 //void freed3matrix(double ***m, int x, int y);
 //double ** d2matrix(int x, int y);

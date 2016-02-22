@@ -331,7 +331,7 @@ double computeLik() {
 
 	// calling ms for sampling genealogies
 	ms_crash_flag = 0;
-	main_ms(ms_argc, ms_argv);
+	main_ms_ABLE(ms_argc, ms_argv);
 
 	if (ms_crash_flag) {
 		if (treesSampled)

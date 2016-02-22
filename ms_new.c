@@ -155,18 +155,239 @@ unsigned maxsites = SITESINC ;
 
 //double *posit ;
 double segfac ;
-int count, ntbs, nseeds ;
+int count;
 struct params pars ;
 
 
+int main_ms_ABLE(int ms_argc, char *ms_argv[])
+{
+	int howmany;
+	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
+	int gensam_ABLE() ;
+ 	void freed2matrix(double **m, int x);
+
+	count=0;
+
+	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
+
+    while( howmany-count++ ) {
+        gensam_ABLE();
+
+        if (ms_crash_flag)
+        	break;
+    }
+
+	// based on Valgrind Memcheck
+	free(pars.cp.config);
+	free(pars.cp.size);
+	free(pars.cp.alphag);
+	free(pars.cp.deventlist);
+	freed2matrix(pars.cp.mig_mat, pars.cp.npop);
+
+	return 0;
+}
+
+
+int gensam_ABLE()
+{
+	int nsegs, i, j, k, seg, ns, start, end, len;
+	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
+	int segsitesin,nsites;
+	double theta;
+	int nsam;
+	void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totbrlen);
+	double ** d2matrix(int x, int y);
+	void freed2matrix(double **m, int x);
+	void storePoissonProbs(double **onetreeTable);
+
+
+	nsites = pars.cp.nsites;
+	seglst = segtre_mig(&(pars.cp), &nsegs);
+
+	if (ms_crash_flag) {
+		for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++)
+			free(seglst[seg].ptree);
+		return 0;
+	}
+
+	nsam = pars.cp.nsam;
+	segsitesin = pars.mp.segsitesin;
+	theta = pars.mp.theta;
+
+	ns = 0;
+
+	double **onetreeTable = d2matrix(brClass, mutClass);
+	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
+	double **totSegBrLen = d2matrix(nsegs, allBrClasses);
+	double *totBrLen = (double *) malloc(brClass * sizeof(double));
+
+	for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++) {
+		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0)) {
+			end = (k < nsegs - 1 ? seglst[seglst[seg].next].beg - 1 : nsites - 1);
+			start = seglst[seg].beg;
+			len = end - start + 1;
+			onetreesegs[k] = len;
+		}
+
+		evalTreeBranchConfigs(seglst[seg].ptree, nsam, totSegBrLen[k]);
+
+		if ((segsitesin == 0) && (theta == 0.0) && (pars.mp.timeflag == 0))
+			free(seglst[seg].ptree);
+	}
+
+	for (i = 1; i <= brClass; i++) {
+		totBrLen[i - 1] = 0.0;
+
+		for (k = 0; k < nsegs; k++) {
+			double totFoldedSegBrLen = totSegBrLen[k][i - 1]
+					+ (foldBrClass * totSegBrLen[k][allBrClasses - i]);
+			if (foldBrClass && ((i - 1) == (allBrClasses - i)))
+				totFoldedSegBrLen /= 2;
+
+			if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
+				totBrLen[i - 1] += totFoldedSegBrLen * onetreesegs[k];
+			else
+				totBrLen[i - 1] += totFoldedSegBrLen;
+		}
+		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
+			totBrLen[i - 1] /= nsites;
+
+//		printf("***Folded %d-ton branches***\n", i);
+		if (totBrLen[i - 1] > 0.0) {
+//			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
+			for (j = 0; j < mutClass - 1; j++) {
+//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
+				onetreeTable[i - 1][j] = gsl_ran_poisson_pdf(j,
+						totBrLen[i - 1] * pars.mp.theta);
+			}
+			onetreeTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1,
+					totBrLen[i - 1] * pars.mp.theta);
+
+//			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
+//			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
+		} else {
+//			printf("Total folded branch length = 0\n\n");
+			onetreeTable[i - 1][0] = 1.0;
+			for (j = 1; j < mutClass; j++)
+				onetreeTable[i - 1][j] = 0.0;
+		}
+	}
+
+	storePoissonProbs(onetreeTable);
+
+//	printf("\n");
+
+	freed2matrix(totSegBrLen, nsegs);
+	free(totBrLen);
+	free(onetreesegs);
+
+	// based on Valgrind Memcheck
+	for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++)
+		free(seglst[seg].ptree);
+
+	return (ns);
+}
+
+
+
+
+
+void ndes_and_branch_setup(struct node *ptree, int nsam) {
+	int i ;
+
+	for(i = 0; i < nsam; i++)
+		ptree[i].ndes = 1 ;
+
+	for(i = nsam; i < 2*nsam - 1; i++)
+		ptree[i].ndes = 0 ;
+
+	for(i = 0; i < 2*nsam - 2; i++) {
+		ptree[(ptree[i].abv)].ndes += ptree[i].ndes ;
+		ptree[i].brLength = ptree[ptree[i].abv].time - ptree[i].time;
+	}
+	//	ROOT!
+	ptree[2*nsam -2].brLength = 0 ;
+}
+
+void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totSegBrLenK) {
+	int branch, pop, tip, ind, class;
+
+	void ndes_and_branch_setup(struct node *ptree, int nsam);
+	int ** d2int_matrix(int x, int y);
+	void freed2int_matrix(int **m, int x);
+	int getPopSampleStatus(int pop);
+	int getBrConfigNum(int *brConfVec);
+
+	int **branchConfig = d2int_matrix(2*nsam - 2, pars.cp.npop);
+	int **sampledBranchConfig = d2int_matrix(2*nsam - 2, sampledPopsSize);
+
+	ndes_and_branch_setup(ptree, nsam);
+
+	for(branch = 0; branch < 2*nsam - 2; branch++)
+		for(pop = 0; pop < pars.cp.npop; pop++)
+			branchConfig[branch][pop] = 0;
+
+	tip = 0;
+	for(pop = 0; pop < pars.cp.npop; pop++) {
+		for(ind = 1; ind <= pars.cp.config[pop]; ind++) {
+			branchConfig[tip][pop] = 1;
+			++tip;
+		}
+	}
+
+	for(branch = 0; branch < 2*nsam - 2; branch++)
+		for(pop = 0; pop < pars.cp.npop; pop++)
+			if (ptree[branch].abv != 2*nsam - 2)
+				branchConfig[ptree[branch].abv][pop] += branchConfig[branch][pop];
+
+	//	if ghost/unsampled pops. have been specified
+	if (sampledPopsSize != pars.cp.npop) {
+		for(branch = 0; branch < 2*nsam - 2; branch++)
+			for(pop = 0; pop < pars.cp.npop; pop++)
+				if (getPopSampleStatus(pop))
+					sampledBranchConfig[branch][pop] = branchConfig[branch][pop];
+
+		for(class = 0; class < allBrClasses; class++) {
+			totSegBrLenK[class] = 0.0;
+			for(branch = 0; branch < 2*nsam-2; branch++)
+				if (getBrConfigNum(sampledBranchConfig[branch]) == class)
+					totSegBrLenK[class] += ptree[branch].brLength;
+		}
+	}
+	else {
+		for(class = 0; class < allBrClasses; class++) {
+			totSegBrLenK[class] = 0.0;
+			for(branch = 0; branch < 2*nsam-2; branch++)
+				if (getBrConfigNum(branchConfig[branch]) == class)
+					totSegBrLenK[class] += ptree[branch].brLength;
+		}
+	}
+
+	//******************************************************************************
+/*
+	printf("\n");
+	for(class = 0; class < allBrClasses; class++)
+		printf("%5.3f\n",totSegBrLenK[class]);
+	exit(-1);
+*/
+	//******************************************************************************
+
+	freed2int_matrix(branchConfig, 2*nsam-2);
+	freed2int_matrix(sampledBranchConfig, 2*nsam-2);
+}
+
+
+
+
+/*
 int main_ms(int ms_argc, char *ms_argv[])
 {
-/*
+
 	int i, k, howmany, segsites, listX, listY;
 	char **list, **cmatrix(), **tbsparamstrs ;
 	FILE *pf, *fopen() ;
 	char **list, **cmatrix(), **tbsparamstrs ;
-*/
+
 	int i, howmany, listX;
 	char **list, **cmatrix();
 	FILE *fopen() ;
@@ -178,7 +399,7 @@ int main_ms(int ms_argc, char *ms_argv[])
  	void freed2matrix(double **m, int x);
 
 
-/*
+
 	ntbs = 0 ;    these next few lines are for reading in parameters from a file (for each sample)
 	tbsparamstrs = (char **)malloc( ms_argc*sizeof(char *) ) ;
 
@@ -188,12 +409,12 @@ int main_ms(int ms_argc, char *ms_argv[])
 	for( i =0; i<ms_argc; i++) tbsparamstrs[i] = (char *)malloc(30*sizeof(char) ) ;
 	for( i = 1; i<ms_argc ; i++)
 			if( strcmp( ms_argv[i],"tbs") == 0 )  ms_argv[i] = tbsparamstrs[ ntbs++] ;
-*/
+
 
 	count=0;
 
 //	if( ntbs > 0 )  for( k=0; k<ntbs; k++)  scanf(" %s", tbsparamstrs[k] );
-	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
+	getpars( ms_argc, ms_argv, &howmany) ;    results are stored in global variable, pars
 //	if( !pars.commandlineseedflag ) seedit( "s");
 //	pf = stdout ;
 
@@ -215,7 +436,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 	}
 
     while( howmany-count++ ) {
-/*
+
 	   if( (ntbs > 0) && (count >1 ) ){
 	         for( k=0; k<ntbs; k++){
 			    if( scanf(" %s", tbsparamstrs[k]) == EOF ){
@@ -233,13 +454,13 @@ int main_ms(int ms_argc, char *ms_argv[])
 		printf("\n");
 
         segsites = gensam( list, &probss, &tmrca, &ttot) ;
-*/
+
         gensam( list, &probss, &tmrca, &ttot);
 
         if (ms_crash_flag)
         	break;
 
-/*
+
   		if( pars.mp.timeflag ) fprintf(pf,"time:\t%lf\t%lf\n",tmrca, ttot ) ;
         if( (segsites > 0 ) || ( pars.mp.theta > 0.0 ) ) {
    	       if( (pars.mp.segsitesin > 0 ) && ( pars.mp.theta > 0.0 ))
@@ -252,7 +473,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 	       if( segsites > 0 )
 		          for(i=0;i<pars.cp.nsam; i++) { fprintf(pf,"%s\n", list[i] ); }
 	    }
-*/
+
     }
 //	if( !pars.commandlineseedflag ) seedit( "end" );
 
@@ -273,7 +494,7 @@ int main_ms(int ms_argc, char *ms_argv[])
 	int 
 gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 {
-/*
+
 	int nsegs, i, j, k, seg, ns, start, end, len, segsit ;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ;  used to be: [MAXSEG];
 	double nsinv,  tseg, tt, ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
@@ -282,9 +503,9 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 	int segsitesin,nsites;
 	double theta, es ;
 	int nsam, mfreq ;
-*/
+
 	int nsegs, i, j, k, seg, ns, start, end, len;
-	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
+	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ;  used to be: [MAXSEG];
 	double ttime(struct node *, int nsam), ttimemf(struct node *, int nsam, int mfreq) ;
 	int segsitesin,nsites;
 	double theta;
@@ -389,7 +610,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
 //	}
 
-/*
+
 	if( pars.mp.timeflag ) {
       tt = 0.0 ;
 	  for( seg=0, k=0; k<nsegs; seg=seglst[seg].next, k++) {
@@ -475,7 +696,7 @@ gensam( char **list, double *pprobss, double *ptmrca, double *pttot)
 
     }
 	for(i=0;i<nsam;i++) list[i][ns] = '\0' ;
-*/
+
 	return( ns ) ;
 }
 
@@ -488,97 +709,18 @@ void ndes_setup(struct node *ptree, int nsam )
 	for( i= 0; i< 2*nsam -2 ; i++)  (ptree+((ptree+i)->abv))->ndes += (ptree+i)->ndes ;
 
 }
-
-void ndes_and_branch_setup(struct node *ptree, int nsam) {
-	int i ;
-
-	for(i = 0; i < nsam; i++)
-		ptree[i].ndes = 1 ;
-
-	for(i = nsam; i < 2*nsam - 1; i++)
-		ptree[i].ndes = 0 ;
-
-	for(i = 0; i < 2*nsam - 2; i++) {
-		ptree[(ptree[i].abv)].ndes += ptree[i].ndes ;
-		ptree[i].brLength = ptree[ptree[i].abv].time - ptree[i].time;
-	}
-	//	ROOT!
-	ptree[2*nsam -2].brLength = 0 ;
-}
-
-void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totSegBrLenK) {
-	int branch, pop, tip, ind, class;
-
-	void ndes_and_branch_setup(struct node *ptree, int nsam);
-	int ** d2int_matrix(int x, int y);
-	void freed2int_matrix(int **m, int x);
-	int getPopSampleStatus(int pop);
-	int getBrConfigNum(int *brConfVec);
-
-	int **branchConfig = d2int_matrix(2*nsam - 2, pars.cp.npop);
-	int **sampledBranchConfig = d2int_matrix(2*nsam - 2, sampledPopsSize);
-
-	ndes_and_branch_setup(ptree, nsam);
-
-	for(branch = 0; branch < 2*nsam - 2; branch++)
-		for(pop = 0; pop < pars.cp.npop; pop++)
-			branchConfig[branch][pop] = 0;
-
-	tip = 0;
-	for(pop = 0; pop < pars.cp.npop; pop++) {
-		for(ind = 1; ind <= pars.cp.config[pop]; ind++) {
-			branchConfig[tip][pop] = 1;
-			++tip;
-		}
-	}
-
-	for(branch = 0; branch < 2*nsam - 2; branch++)
-		for(pop = 0; pop < pars.cp.npop; pop++)
-			if (ptree[branch].abv != 2*nsam - 2)
-				branchConfig[ptree[branch].abv][pop] += branchConfig[branch][pop];
-
-	//	if ghost/unsampled pops. have been specified
-	if (sampledPopsSize != pars.cp.npop) {
-		for(branch = 0; branch < 2*nsam - 2; branch++)
-			for(pop = 0; pop < pars.cp.npop; pop++)
-				if (getPopSampleStatus(pop))
-					sampledBranchConfig[branch][pop] = branchConfig[branch][pop];
-
-		for(class = 0; class < allBrClasses; class++) {
-			totSegBrLenK[class] = 0.0;
-			for(branch = 0; branch < 2*nsam-2; branch++)
-				if (getBrConfigNum(sampledBranchConfig[branch]) == class)
-					totSegBrLenK[class] += ptree[branch].brLength;
-		}
-	}
-	else {
-		for(class = 0; class < allBrClasses; class++) {
-			totSegBrLenK[class] = 0.0;
-			for(branch = 0; branch < 2*nsam-2; branch++)
-				if (getBrConfigNum(branchConfig[branch]) == class)
-					totSegBrLenK[class] += ptree[branch].brLength;
-		}
-	}
-
-	//******************************************************************************
-/*
-	printf("\n");
-	for(class = 0; class < allBrClasses; class++)
-		printf("%5.3f\n",totSegBrLenK[class]);
-	exit(-1);
 */
-	//******************************************************************************
 
-	freed2int_matrix(branchConfig, 2*nsam-2);
-	freed2int_matrix(sampledBranchConfig, 2*nsam-2);
-}
 
+
+
+/*
 	void
 biggerlist(int nsam,  char **list )
 {
 	int i;
 
-/*  fprintf(stderr,"maxsites: %d\n",maxsites);  */	
+  fprintf(stderr,"maxsites: %d\n",maxsites);
 	for( i=0; i<nsam; i++){
 	   list[i] = (char *)realloc( list[i],maxsites*sizeof(char) ) ;
 	   if( list[i] == NULL ) perror( "realloc error. bigger");
@@ -587,7 +729,7 @@ biggerlist(int nsam,  char **list )
 	   
 
 
-/* allocates space for gametes (character strings) */
+ allocates space for gametes (character strings)
 	char **
 cmatrix(nsam,len)
 	int nsam, len;
@@ -613,6 +755,7 @@ void freecmatrix(char **m, int nsam)
 		free(m[i]);
 	free(m);
 }
+*/
 
 
 
@@ -679,7 +822,7 @@ void freed2matrix(double **m, int x)
 
 
 
-/* allocates space for mutation probabilities on branch classes (2-dim int matrix) */
+/* allocates sfreed2matrixpace for mutation probabilities on branch classes (2-dim int matrix) */
 int ** d2int_matrix(int x, int y)
 {
 	int i;
@@ -707,6 +850,7 @@ void freed2int_matrix(int **m, int x)
 
 
 
+/*
 	void
 locate(int n,double beg, double len,double *ptr)
 {
@@ -717,6 +861,7 @@ locate(int n,double beg, double len,double *ptr)
 		ptr[i] = beg + ptr[i]*len ;
 
 }
+*/
 
 int NSEEDS = 3 ;
 
@@ -772,7 +917,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 		if( ms_argv[arg][0] != '-' ) { fprintf(stderr," argument should be -%s ?\n", ms_argv[arg]); usage();}
 		switch ( ms_argv[arg][1] ){
 			case 'f' :
-				if( ntbs > 0 ) { fprintf(stderr," can't use tbs args and -f option.\n"); exit(1); }
+//				if( ntbs > 0 ) { fprintf(stderr," can't use tbs args and -f option.\n"); exit(1); }
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
 				pf = fopen( ms_argv[arg], "r" ) ;
@@ -824,10 +969,11 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 				argcheck( arg, ms_argc, ms_argv);
 				pars.mp.theta = atof(  ms_argv[arg++] );
 				break;
+/*
 			case 's' : 
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
-				if( ms_argv[arg-1][2] == 'e' ){  /* command line seeds */
+				if( ms_argv[arg-1][2] == 'e' ){   command line seeds
 //					pars.commandlineseedflag = 1 ;
 //					if( count == 0 ) nseeds = commandlineseed(ms_argv+arg );
 					arg += nseeds ;
@@ -836,6 +982,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 				    pars.mp.segsitesin = atoi(  ms_argv[arg++] );
 				}
 				break;
+*/
 			case 'F' : 
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
@@ -1136,6 +1283,7 @@ free_eventlist( struct devent *pt, int npop )
 *
 *****************************************************************************/
 
+/*
 #define STATE1 '1'
 #define STATE2 '0'
 
@@ -1155,10 +1303,12 @@ make_gametes(int nsam, int mfreq, struct node *ptree, double tt, int newsites, i
 		   }
 		}
 }
+*/
 
 
 /***  ttime.c : Returns the total time in the tree, *ptree, with nsam tips. **/
 
+/*
 	double
 ttime( ptree, nsam)
 	struct node *ptree;
@@ -1232,9 +1382,9 @@ parens( struct node *ptree, int *descl, int *descr,  int noden)
 		}
 }
 
-/***  pickb : returns a random branch from the tree. The probability of picking
+**  pickb : returns a random branch from the tree. The probability of picking
               a particular branch is proportional to its duration. tt is total
-	      time in tree.   ****/
+	      time in tree.   ***
 
 	int
 pickb(nsam, ptree, tt)
@@ -1250,7 +1400,7 @@ pickb(nsam, ptree, tt)
 		y += (ptree + (ptree+i)->abv )->time - (ptree+i)->time ;
 		if( y >= x ) return( i ) ;
 		}
-	return( 2*nsam - 3  );  /* changed 4 Feb 2010 */
+	return( 2*nsam - 3  );   changed 4 Feb 2010
 }
 
 	int
@@ -1266,14 +1416,14 @@ pickbmf(nsam, mfreq, ptree, tt )
 	for( i=0, y=0; i < 2*nsam-2 ; i++) {
 	  if( ( (ptree+i)->ndes >= mfreq )  && ( (ptree+i)->ndes <= nsam-mfreq) ){
 		y += (ptree + (ptree+i)->abv )->time - (ptree+i)->time ;
-		lastbranch = i ;    /* changed 4 Feb 2010 */
+		lastbranch = i ;     changed 4 Feb 2010
 	  }
 	  if( y >= x ) return( i ) ;
 	}
-	return( lastbranch );   /*  changed 4 Feb 2010 */
+	return( lastbranch );     changed 4 Feb 2010
 }
 
-/****  tdesn : returns 1 if tip is a descendant of node in *ptree, otherwise 0. **/
+***  tdesn : returns 1 if tip is a descendant of node in *ptree, otherwise 0. *
 
 	int
 tdesn(struct node *ptree, int tip, int node )
@@ -1284,6 +1434,7 @@ tdesn(struct node *ptree, int tip, int node )
 	if( k==node ) return(1);
 	else return(0);
 }
+*/
 
 
 /* pick2()  */
@@ -1301,6 +1452,7 @@ pick2(int n, int *i, int *j)
 
 /**** ordran.c  ***/
 
+/*
 	void
 ordran(int n,double pbuf[])
 {
@@ -1382,7 +1534,7 @@ poisso(double u)
 }
 
 
-/* a slight modification of crecipes version */
+ a slight modification of crecipes version
 
 double gasdev(m,v)
 	double m, v;
@@ -1407,4 +1559,5 @@ double gasdev(m,v)
 		return( m + sqrt(v)*gset ) ;
 	}
 }
+*/
 
