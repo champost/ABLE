@@ -90,7 +90,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
@@ -748,6 +748,10 @@ void readConfigFile(char* argv[]) {
 				seedPRNGBool = true;
 				gsl_rng_set(prng, seedPRNG);
 			}
+			else if (tokens[0] == "refine_likelihoods") {
+				stringstream stst(tokens[1]);
+				stst >> refineLikTrees;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -920,9 +924,11 @@ int main(int argc, char* argv[]) {
 			}
 
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
-			stringstream stst;
-			stst << localTrees;
-			stst >> ms_argv[2];
+			{
+				stringstream stst;
+				stst << localTrees;
+				stst >> ms_argv[2];
+			}
 
 			evalCount = 0;
 			penLnL = 0;
@@ -948,6 +954,22 @@ int main(int argc, char* argv[]) {
 			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
+			if (refineLikTrees) {
+				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
+				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+					for (size_t i = 0; i < it->second.size(); i++) {
+						stringstream stst;
+						stst << parVec[it->first-1];
+						stst >> ms_argv[it->second[i]];
+					}
+				}
+				stringstream stst;
+				stst << refineLikTrees;
+				stst >> ms_argv[2];
+
+				maxLnL = computeLik();
+			}
+
 			printf("Found a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
 				printf("%.6f ", parVec[i]);
@@ -961,9 +983,11 @@ int main(int argc, char* argv[]) {
 			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
 			time(&likStartTime);
 
-			stringstream stst;
-			stst << localTrees;
-			stst >> ms_argv[2];
+			{
+				stringstream stst;
+				stst << localTrees;
+				stst >> ms_argv[2];
+			}
 
 			evalCount = 0;
 			penLnL = 0;
@@ -988,6 +1012,22 @@ int main(int argc, char* argv[]) {
 			}
 
 			printf("Found the local maximum after %d evaluations\n", evalCount);
+			if (refineLikTrees) {
+				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
+				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+					for (size_t i = 0; i < it->second.size(); i++) {
+						stringstream stst;
+						stst << parVec[it->first-1];
+						stst >> ms_argv[it->second[i]];
+					}
+				}
+				stringstream stst;
+				stst << refineLikTrees;
+				stst >> ms_argv[2];
+
+				maxLnL = computeLik();
+			}
+
 			printf("Found a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
 				printf("%.6f ", parVec[i]);
