@@ -41,11 +41,40 @@ knowledge of the CeCILL license and that you accept its terms.
 #ifndef UTILS_H_
 #define UTILS_H_
 
+#include <climits> // NOT the C++ version of limits... but defines UCHAR_MAX...
+
 using namespace std;
+
+typedef unsigned long uint32;
 
 vector<double> linspaced(double a, double b, int n);
 vector<double> logspaced(double a, double b, int n);
 void Tokenize(const string& str, vector<string>& tokens, const string& delimiters);
 void TrimSpaces(string& str);
+
+inline uint32 hash( time_t t, clock_t c )
+{
+	// Get a uint32 from t and c
+	// Better than uint32(x) in case x is floating point in [0,1]
+	// Based on code by Lawrence Kirby (fred@genesis.demon.co.uk)
+
+	static uint32 differ = 0;  // guarantee time-based seeds will change
+
+	uint32 h1 = 0;
+	unsigned char *p = (unsigned char *) &t;
+	for( size_t i = 0; i < sizeof(t); ++i )
+	{
+		h1 *= UCHAR_MAX + 2U;
+		h1 += p[i];
+	}
+	uint32 h2 = 0;
+	p = (unsigned char *) &c;
+	for( size_t j = 0; j < sizeof(c); ++j )
+	{
+		h2 *= UCHAR_MAX + 2U;
+		h2 += p[j];
+	}
+	return ( h1 + differ++ ) ^ h2;
+}
 
 #endif /* UTILS_H_ */

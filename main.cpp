@@ -94,7 +94,7 @@ int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEva
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
-unsigned long int finalTableSize, seedPRNG = 67144630;
+unsigned long int finalTableSize, seedPRNG;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
 SearchStates currState = OTHER;
@@ -836,7 +836,7 @@ void readConfigFile(char* argv[]) {
 int main(int argc, char* argv[]) {
 
 	prng = gsl_rng_alloc(gsl_rng_mt19937);
-	gsl_rng_set(prng, seedPRNG);
+	gsl_rng_set(prng, hash(time(NULL), clock()));
 
 	time_t likStartTime, likEndTime;
 /*
