@@ -65,7 +65,7 @@ using namespace std;
 int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize, ms_crash_flag;
 //**********************************
 
-gsl_rng * prng;
+gsl_rng * PRNG;
 
 map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
@@ -81,6 +81,8 @@ vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
 vector<double**> poissonProbTable;
+vector<bool> setPoissonProbTable;
+vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt;
 nlopt::opt local_opt;
@@ -90,7 +92,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0;
+int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
@@ -99,6 +101,11 @@ unsigned long int finalTableSize, seedPRNG;
 enum SearchStates {GLOBAL, LOCAL, OTHER};
 SearchStates currState = OTHER;
 
+
+double ran1()
+{
+	return gsl_rng_uniform(PRNGThreadVec[omp_get_thread_num()]);
+}
 
 void free_ms_argv() {
 	for(int i = 0; i < ms_argc; i++)
@@ -250,15 +257,21 @@ int getBrConfigNum(int *brConfVec) {
 
 
 void storePoissonProbs(double **onetreeTable) {
+#pragma omp critical
+	{
+	poissonProbTable[treesSampled] = onetreeTable;
+	setPoissonProbTable[treesSampled] = true;
 	++treesSampled;
-	poissonProbTable.push_back(onetreeTable);
+	}
 }
 
 
 void freePoissonProbs() {
 	for (size_t i = 0; i < poissonProbTable.size(); i++)
-		freed2matrix(poissonProbTable[i],brClass);
+		if (setPoissonProbTable[i])
+			freed2matrix(poissonProbTable[i],brClass);
 	poissonProbTable.clear();
+	setPoissonProbTable.clear();
 }
 
 
@@ -329,9 +342,19 @@ double computeLik() {
 	allConfigs = vector<int>(finalTableSize,-1);
 	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
-	// calling ms for sampling genealogies
 	ms_crash_flag = 0;
-	main_ms_ABLE(ms_argc, ms_argv);
+	{
+		stringstream stst;
+		stst << 1;
+		stst >> ms_argv[2];
+	}
+	poissonProbTable = vector<double**>(ms_trees, NULL);
+	setPoissonProbTable = vector<bool>(ms_trees, false);
+
+	// calling ms for sampling genealogies
+#pragma omp parallel for
+	for (int trees = 0; trees < ms_trees; trees++)
+		main_ms_ABLE(ms_argc, ms_argv);
 
 	if (ms_crash_flag) {
 		if (treesSampled)
@@ -746,7 +769,6 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> seedPRNG;
 				seedPRNGBool = true;
-				gsl_rng_set(prng, seedPRNG);
 			}
 			else if (tokens[0] == "refine_likelihoods") {
 				stringstream stst(tokens[1]);
@@ -787,7 +809,7 @@ void readConfigFile(char* argv[]) {
 					exit(-1);
 				}
 
-				double tmpPar = gsl_rng_uniform(prng);
+				double tmpPar = gsl_rng_uniform(PRNG);
 				tbiUserVal[paramID] = tmpPar;
 				stst << tmpPar;
 				stst >> ms_argv[i];
@@ -818,10 +840,7 @@ void readConfigFile(char* argv[]) {
 		else {
 			stringstream stst;
 			if (globalTrees == 0)
-				stst << 1000*tbiMsCmdIdx.size();
-			else
-				stst << globalTrees;
-			stst >> ms_argv[2];
+				globalTrees = 1000*tbiMsCmdIdx.size();
 
 			if (localTrees == 0)
 				localTrees = 1000*tbiMsCmdIdx.size();
@@ -835,8 +854,16 @@ void readConfigFile(char* argv[]) {
 
 int main(int argc, char* argv[]) {
 
-	prng = gsl_rng_alloc(gsl_rng_mt19937);
-	gsl_rng_set(prng, hash(time(NULL), clock()));
+	omp_set_num_threads(omp_get_num_procs());
+
+	seedPRNG = hash(time(NULL), clock());
+	for (int i = 0; i < omp_get_num_procs(); i++) {
+		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
+		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
+	}
+
+	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
+	gsl_rng_set(PRNG, hash(time(NULL), clock()));
 
 	time_t likStartTime, likEndTime;
 /*
@@ -851,6 +878,11 @@ int main(int argc, char* argv[]) {
 		ms_argc = argc - 1;
 
 	readConfigFile(argv);
+
+	if (seedPRNGBool) {
+		for (size_t i = 0; i < PRNGThreadVec.size(); i++)
+			gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
+	}
 
 	evalBranchConfigs();
 
@@ -883,7 +915,8 @@ int main(int argc, char* argv[]) {
 		if (!skipGlobal && (globalEvals < 2000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
-			globalEvals = 2000*tbiMsCmdIdx.size();
+			else
+				globalEvals = 2000*tbiMsCmdIdx.size();
 		}
 
 		local_opt.set_stopval(7654321);
@@ -900,6 +933,7 @@ int main(int argc, char* argv[]) {
 		if (!skipGlobal) {
 			printf("\nStarting global search: \n");
 
+			ms_trees = globalTrees;
 			evalCount = 0;
 			penLnL = 0;
 			currState = GLOBAL;
@@ -924,12 +958,8 @@ int main(int argc, char* argv[]) {
 			}
 
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
-			{
-				stringstream stst;
-				stst << localTrees;
-				stst >> ms_argv[2];
-			}
 
+			ms_trees = localTrees;
 			evalCount = 0;
 			penLnL = 0;
 			currState = LOCAL;
@@ -963,10 +993,8 @@ int main(int argc, char* argv[]) {
 						stst >> ms_argv[it->second[i]];
 					}
 				}
-				stringstream stst;
-				stst << refineLikTrees;
-				stst >> ms_argv[2];
 
+				ms_trees = refineLikTrees;
 				maxLnL = computeLik();
 			}
 
@@ -983,12 +1011,7 @@ int main(int argc, char* argv[]) {
 			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
 			time(&likStartTime);
 
-			{
-				stringstream stst;
-				stst << localTrees;
-				stst >> ms_argv[2];
-			}
-
+			ms_trees = localTrees;
 			evalCount = 0;
 			penLnL = 0;
 			currState = LOCAL;
@@ -1021,10 +1044,8 @@ int main(int argc, char* argv[]) {
 						stst >> ms_argv[it->second[i]];
 					}
 				}
-				stringstream stst;
-				stst << refineLikTrees;
-				stst >> ms_argv[2];
 
+				ms_trees = refineLikTrees;
 				maxLnL = computeLik();
 			}
 
@@ -1037,9 +1058,10 @@ int main(int argc, char* argv[]) {
 			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 
-		currState = OTHER;
-		if (onlyProfiles || profileLikBool)
-			profileLik(parVec);
+		// temporarily deactivated!
+//		currState = OTHER;
+//		if (onlyProfiles || profileLikBool)
+//			profileLik(parVec);
 	}
 	else if ((estimate == 1) || bSFS) {
 
@@ -1055,6 +1077,12 @@ int main(int argc, char* argv[]) {
 			for (int i = 0; i < ms_argc; i++)
 				cout << argv[i] << " ";
 			cout << endl;
+		}
+
+		{
+			stringstream stst;
+			stst << ms_argv[2];
+			stst >> ms_trees;
 		}
 
 		currState = OTHER;
@@ -1089,6 +1117,11 @@ int main(int argc, char* argv[]) {
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
 
+		{
+			stringstream stst;
+			stst << ms_argv[2];
+			stst >> ms_trees;
+		}
 		currState = OTHER;
 		time(&likStartTime);
 		computeLik();
@@ -1099,7 +1132,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	free_ms_argv();
-	gsl_rng_free(prng);
+	gsl_rng_free(PRNG);
+	for (size_t i = 0; i < PRNGThreadVec.size(); i++)
+		gsl_rng_free(PRNGThreadVec[i]);
 
 	return 0;
 }

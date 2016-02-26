@@ -158,6 +158,8 @@ double segfac ;
 int count;
 struct params pars ;
 
+#pragma omp threadprivate(segfac, count, pars)
+
 
 int main_ms_ABLE(int ms_argc, char *ms_argv[])
 {
@@ -165,6 +167,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[])
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
 	int gensam_ABLE() ;
  	void freed2matrix(double **m, int x);
+	void free_eventlist( struct devent *pt, int npop );
 
 	count=0;
 
@@ -181,7 +184,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[])
 	free(pars.cp.config);
 	free(pars.cp.size);
 	free(pars.cp.alphag);
-	free(pars.cp.deventlist);
+	free_eventlist(pars.cp.deventlist, pars.cp.npop);
 	freed2matrix(pars.cp.mig_mat, pars.cp.npop);
 
 	return 0;
@@ -207,6 +210,7 @@ int gensam_ABLE()
 	if (ms_crash_flag) {
 		for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++)
 			free(seglst[seg].ptree);
+		free(seglst);
 		return 0;
 	}
 
@@ -284,6 +288,7 @@ int gensam_ABLE()
 	// based on Valgrind Memcheck
 	for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++)
 		free(seglst[seg].ptree);
+	free(seglst);
 
 	return (ns);
 }
