@@ -161,11 +161,11 @@ struct params pars ;
 #pragma omp threadprivate(segfac, count, pars)
 
 
-int main_ms_ABLE(int ms_argc, char *ms_argv[])
+int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 {
 	int howmany;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
-	int gensam_ABLE() ;
+	int gensam_ABLE(double **onetreePoisTable) ;
  	void freed2matrix(double **m, int x);
 	void free_eventlist( struct devent *pt, int npop );
 
@@ -174,7 +174,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[])
 	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
 
     while( howmany-count++ ) {
-        gensam_ABLE();
+        gensam_ABLE(onetreePoisTable);
 
         if (ms_crash_flag)
         	break;
@@ -191,7 +191,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[])
 }
 
 
-int gensam_ABLE()
+int gensam_ABLE(double **onetreePoisTable)
 {
 	int nsegs, i, j, k, seg, ns, start, end, len;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
@@ -220,7 +220,6 @@ int gensam_ABLE()
 
 	ns = 0;
 
-	double **onetreeTable = d2matrix(brClass, mutClass);
 	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
 	double **totSegBrLen = d2matrix(nsegs, allBrClasses);
 	double *totBrLen = (double *) malloc(brClass * sizeof(double));
@@ -261,23 +260,21 @@ int gensam_ABLE()
 //			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
 			for (j = 0; j < mutClass - 1; j++) {
 //				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
-				onetreeTable[i - 1][j] = gsl_ran_poisson_pdf(j,
+				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j,
 						totBrLen[i - 1] * pars.mp.theta);
 			}
-			onetreeTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1,
+			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1,
 					totBrLen[i - 1] * pars.mp.theta);
 
 //			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
 //			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
 		} else {
 //			printf("Total folded branch length = 0\n\n");
-			onetreeTable[i - 1][0] = 1.0;
+			onetreePoisTable[i - 1][0] = 1.0;
 			for (j = 1; j < mutClass; j++)
-				onetreeTable[i - 1][j] = 0.0;
+				onetreePoisTable[i - 1][j] = 0.0;
 		}
 	}
-
-	storePoissonProbs(onetreeTable);
 
 //	printf("\n");
 

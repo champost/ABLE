@@ -70,7 +70,6 @@ gsl_rng * PRNG;
 map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
-//map<string, int> tbiOrder;
 map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints;
 
@@ -80,8 +79,6 @@ ofstream testLik, testConfig;
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
-vector<double**> poissonProbTable;
-vector<bool> setPoissonProbTable;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt;
@@ -89,10 +86,13 @@ nlopt::opt local_opt;
 
 char **ms_argv;
 
+double **onetreePoisTable;
+#pragma omp threadprivate(onetreePoisTable)
+
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int treesSampled = 0, globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1;
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
@@ -256,77 +256,96 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 
-void storePoissonProbs(double **onetreeTable) {
-#pragma omp critical
+void calcBSFSTable() {
+
+	ms_crash_flag = 0;
 	{
-	poissonProbTable[treesSampled] = onetreeTable;
-	setPoissonProbTable[treesSampled] = true;
-	++treesSampled;
+		stringstream stst;
+		stst << 1;
+		stst >> ms_argv[2];
 	}
-}
 
-
-void freePoissonProbs() {
-	for (size_t i = 0; i < poissonProbTable.size(); i++)
-		if (setPoissonProbTable[i])
-			freed2matrix(poissonProbTable[i],brClass);
-	poissonProbTable.clear();
-	setPoissonProbTable.clear();
-}
-
-
-void calcFinalTable() {
 	if (bSFS || (estimate == 2)) {
 #pragma omp parallel for
-		for (int trees = 0; trees < treesSampled; trees++) {
-			for (size_t i = 0; i < dataConfigs.size(); i++) {
-			    double jointPoisson = 1.0;
+		for (int trees = 0; trees < ms_trees; trees++) {
+			if (!ms_crash_flag) {
+				onetreePoisTable = d2matrix(brClass, mutClass);
+				// calling ms for sampling genealogies
+				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
 
-				for (int j = 0; j < brClass; j++)
-					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
+				for (size_t i = 0; i < dataConfigs.size(); i++) {
+				    double jointPoisson = 1.0;
 
-				if (jointPoisson > (numeric_limits<double>::min()*treesSampled)) {
-					selectConfigFreqs[i] += jointPoisson;
-					trackSelectConfigsForInf[i] = 1;
+					for (int j = 0; j < brClass; j++)
+						jointPoisson *= onetreePoisTable[j][dataConfigs[i][j]];
+
+					if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
+						selectConfigFreqs[i] += jointPoisson;
+						trackSelectConfigsForInf[i] = 1;
+					}
 				}
+				freed2matrix(onetreePoisTable, brClass);
 			}
 		}
 	}
 	else if (estimate == 1) {
-		for (int trees = 0; trees < treesSampled; trees++) {
-			double loglik = 0.0;
-			for (size_t i = 0; i < dataConfigs.size(); i++) {
-			    double jointPoisson = 1.0;
+		int treesSampled = 0;
+#pragma omp parallel for
+		for (int trees = 0; trees < ms_trees; trees++) {
+			if (!ms_crash_flag) {
+				onetreePoisTable = d2matrix(brClass, mutClass);
+				// calling ms for sampling genealogies
+				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
 
-				for (int j = 0; j < brClass; j++)
-					jointPoisson *= poissonProbTable[trees][j][dataConfigs[i][j]];
+#pragma omp critical
+				{
+					++treesSampled;
+					double loglik = 0.0;
+					for (size_t i = 0; i < dataConfigs.size(); i++) {
+						double jointPoisson = 1.0;
 
-				if (jointPoisson > (numeric_limits<double>::min()*treesSampled))
-					selectConfigFreqs[i] += jointPoisson;
+						for (int j = 0; j < brClass; j++)
+							jointPoisson *= onetreePoisTable[j][dataConfigs[i][j]];
 
-				if (selectConfigFreqs[i] != 0.0) {
-					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
-					trackSelectConfigs[i] = 1;
+						if (jointPoisson > (numeric_limits<double>::min()*ms_trees))
+							selectConfigFreqs[i] += jointPoisson;
+
+						if (selectConfigFreqs[i] != 0.0) {
+							loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+							trackSelectConfigs[i] = 1;
+						}
+					}
+					testLik << scientific << loglik << endl;
+					testConfig << scientific << (double) trackSelectConfigs.size()/dataConfigs.size() << endl;
 				}
+				freed2matrix(onetreePoisTable, brClass);
 			}
-			testLik << scientific << loglik << endl;
-			testConfig << scientific << (double) trackSelectConfigs.size()/dataConfigs.size() << endl;
 		}
 	}
 	else {
+		allConfigs = vector<int>(finalTableSize,-1);
+		allConfigFreqs = vector<double>(finalTableSize,0.0);
+
 #pragma omp parallel for
-		for (int trees = 0; trees < treesSampled; trees++) {
-			for (unsigned long int i = 0; i < finalTableSize; i++) {
-			    double jointPoisson = 1.0;
+		for (int trees = 0; trees < ms_trees; trees++) {
+			if (!ms_crash_flag) {
+				onetreePoisTable = d2matrix(brClass, mutClass);
+				// calling ms for sampling genealogies
+				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
 
-			    vector<int> vec = getMutConfigVec(i);
-				for (int j = 0; j < brClass; j++)
-					jointPoisson *= poissonProbTable[trees][j][vec[j]];
+				for (unsigned long int i = 0; i < finalTableSize; i++) {
+				    double jointPoisson = 1.0;
 
-				if (jointPoisson > (numeric_limits<double>::min()*treesSampled)) {
-					allConfigs[i] = i;
-					allConfigFreqs[i] += jointPoisson;
+				    vector<int> vec = getMutConfigVec(i);
+					for (int j = 0; j < brClass; j++)
+						jointPoisson *= onetreePoisTable[j][vec[j]];
+
+					if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
+						allConfigs[i] = i;
+						allConfigFreqs[i] += jointPoisson;
+					}
 				}
+				freed2matrix(onetreePoisTable, brClass);
 			}
 		}
 	}
@@ -336,82 +355,58 @@ void calcFinalTable() {
 double computeLik() {
 
 	double loglik = 0.0;
-	treesSampled = 0;
+
 	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
 	trackSelectConfigsForInf = vector<int>(dataConfigFreqs.size(),0);
-	allConfigs = vector<int>(finalTableSize,-1);
-	allConfigFreqs = vector<double>(finalTableSize,0.0);
 
-	ms_crash_flag = 0;
-	{
-		stringstream stst;
-		stst << 1;
-		stst >> ms_argv[2];
-	}
-	poissonProbTable = vector<double**>(ms_trees, NULL);
-	setPoissonProbTable = vector<bool>(ms_trees, false);
+	//	calculating the bSFS config. probs.
+	calcBSFSTable();
 
-	// calling ms for sampling genealogies
-#pragma omp parallel for
-	for (int trees = 0; trees < ms_trees; trees++)
-		main_ms_ABLE(ms_argc, ms_argv);
-
-	if (ms_crash_flag) {
-		if (treesSampled)
-			freePoissonProbs();
-	}
-	else {
-		//	calculating the bSFS config. probs.
-		calcFinalTable();
-		freePoissonProbs();
+	if (!ms_crash_flag) {
 
 		int trackedConfigs = 0;
-		if (bSFS || (estimate > 1)) {
+		if (bSFS || (estimate > 1))
 			trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
-			trackSelectConfigsForInf.clear();
-		}
-		else if (estimate == 1) {
+		else if (estimate == 1)
 			trackedConfigs = trackSelectConfigs.size();
-			trackSelectConfigs.clear();
-		}
 
 		if (bSFS) {
 			ofstream ofs("bSFS.txt",ios::out);
 			for (size_t i = 0; i < dataConfigs.size(); i++) {
 				if (selectConfigFreqs[i] != 0.0) {
-					ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / treesSampled << endl;
-					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+					ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / ms_trees << endl;
+					loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
 				}
 			}
 			ofs.close();
 
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
-
-			selectConfigFreqs.clear();
 		}
 		else if (estimate > 0) {
 			for (size_t i = 0; i < dataConfigs.size(); i++) {
 				if (selectConfigFreqs[i] != 0.0)
-					loglik += log(selectConfigFreqs[i] / treesSampled) * dataConfigFreqs[i];
+					loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
 			}
 
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
-
-			selectConfigFreqs.clear();
 		}
 		else if (estimate == 0) {
 			ofstream ofs("expected_bSFS.txt",ios::out);
 			for (size_t i = 0; i < allConfigs.size(); i++)
 				if (allConfigs[i] >= 0)
-					ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / treesSampled << endl;
+					ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / ms_trees << endl;
 			ofs.close();
 
 			allConfigs.clear();
 			allConfigFreqs.clear();
 		}
 	}
+
+	trackSelectConfigsForInf.clear();
+	trackSelectConfigs.clear();
+	selectConfigFreqs.clear();
 
 	return loglik;
 }
@@ -485,7 +480,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
 			printf("%.5e ", vars[i]);
-		printf(" Trees: %d ", treesSampled);
+		printf(" Trees: %d ", ms_trees);
 		printf(" LnL: %.6f\n", loglik);
 
 		if (loglik == 0.0) {
@@ -1091,7 +1086,7 @@ int main(int argc, char* argv[]) {
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
 			double loglik = computeLik();
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, treesSampled);
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
 			time(&likEndTime);
 			testLik.close();
 			testConfig.close();
@@ -1099,7 +1094,7 @@ int main(int argc, char* argv[]) {
 		else {
 			time(&likStartTime);
 			double loglik = computeLik();
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, treesSampled);
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
 			time(&likEndTime);
 		}
 
@@ -1125,7 +1120,7 @@ int main(int argc, char* argv[]) {
 		currState = OTHER;
 		time(&likStartTime);
 		computeLik();
-		printf("Trees sampled : %d\n", treesSampled);
+		printf("Trees sampled : %d\n", ms_trees);
 		time(&likEndTime);
 
 		printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
