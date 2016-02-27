@@ -92,7 +92,7 @@ double **onetreePoisTable;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
-int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1;
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
@@ -491,6 +491,13 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			else if (currState == LOCAL)
 				return 7654321;
 		}
+
+		if ((currState == GLOBAL) && reportEveryEvals && !(evalCount % reportEveryEvals) && (evalCount < globalEvals)) {
+			printf("\nReporting the best MLE after %d evaluations\n", evalCount);
+			for (size_t i = 0; i < bestGlobalSPars.size(); i++)
+				printf("%.6f ", bestGlobalSPars[i]);
+			printf("LnL = %.6f\n\n", bestGlobalSlLnL);
+		}
 	}
 	//	penalising likelihood evaluation when searching outside the constrained zone
 	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
@@ -769,6 +776,10 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> refineLikTrees;
 			}
+			else if (tokens[0] == "report_likelihoods") {
+				stringstream stst(tokens[1]);
+				stst >> reportEveryEvals;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -909,7 +920,7 @@ int main(int argc, char* argv[]) {
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		if (!skipGlobal && (globalEvals < 2000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
-				printf("\nToo few global_search_points for the specified number of free parameters\nReverting to the default values...\n");
+				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
 			else
 				globalEvals = 2000*tbiMsCmdIdx.size();
 		}
