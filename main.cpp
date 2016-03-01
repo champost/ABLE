@@ -78,7 +78,7 @@ ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, lastValidPars;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt;
@@ -94,7 +94,7 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, globalSearchTol = 0.01;
+double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, lastValidLnL;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -436,6 +436,14 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		}
 	}
 
+	//	adaptive penalization based on the difference from last sampled and valid parameter vector
+	//	in order to better explore non-linearly constrained space
+	double penFactor = 0.0;
+	if (lastValidPars.size() > 0) {
+		for (size_t i = 0; i < vars.size(); i++)
+			penFactor += fabs(vars[i] - lastValidPars[i]);
+	}
+
 	//	the standard global/local LnL search procedure (when all else is OK)
 	if (parConstraintPass) {
 		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
@@ -464,8 +472,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 			if (penLnL == 0)
 				penLnL = 100*dataLnL;
-			else
-				penLnL += dataLnL;
+			else {
+				if (lastValidPars.size() > 0)
+					penLnL = lastValidLnL + penFactor*dataLnL;
+				else
+					penLnL += dataLnL;
+			}
 
 /*
 			printf(" Trees: %d ", 0);
@@ -500,7 +512,6 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		}
 	}
 	//	penalising likelihood evaluation when searching outside the constrained zone
-	//	2 fold increase with respect to previous LNL if consecutive searches reside in the forbidden zone
 	//	special case of first search point is in the forbidden zone : 100*dataLnL
 	else {
 /*
@@ -511,8 +522,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 		if (penLnL == 0)
 			penLnL = 100*dataLnL;
-		else
-			penLnL += dataLnL;
+		else {
+			if (lastValidPars.size() > 0)
+				penLnL = lastValidLnL + penFactor*dataLnL;
+			else
+				penLnL += dataLnL;
+		}
 
 /*
 		printf(" Trees: %d ", 0);
@@ -528,7 +543,8 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			bestGlobalSPars = vars;
 	}
 
-	penLnL = loglik;
+	lastValidLnL = loglik;
+	lastValidPars = vars;
 
 	return loglik;
 }
@@ -754,10 +770,6 @@ void readConfigFile(char* argv[]) {
 				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
 				parConstraints[paramID1] = paramID2;
 			}
-			else if (tokens[0] == "global_search_term_tol") {
-				stringstream stst(tokens[1]);
-				stst >> globalSearchTol;
-			}
 			else if (tokens[0] == "bSFS") {
 				bSFS = true;
 			}
@@ -918,11 +930,11 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if (!skipGlobal && (globalEvals < 2000*(int)tbiMsCmdIdx.size())) {
+		if (!skipGlobal && (globalEvals < 3000*(int)tbiMsCmdIdx.size())) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
 			else
-				globalEvals = 2000*tbiMsCmdIdx.size();
+				globalEvals = 3000*tbiMsCmdIdx.size();
 		}
 
 		local_opt.set_stopval(7654321);
