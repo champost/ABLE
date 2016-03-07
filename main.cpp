@@ -945,7 +945,7 @@ int main(int argc, char* argv[]) {
 			local_opt.set_maxeval(localEvals);
 		else
 			local_opt.set_maxeval(10000);
-		local_opt.set_xtol_rel(1e-4);
+		local_opt.set_xtol_rel(1e-2);
 		local_opt.set_initial_step((globalUpper-globalLower)/5);
 
 		if (!skipGlobal) {
@@ -975,7 +975,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			printf("\nUsing the global search result(s) after %d evaluations as the starting point(s) for a refined local search...\n\n", evalCount);
+			printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
 
 			ms_trees = localTrees;
 			evalCount = 0;

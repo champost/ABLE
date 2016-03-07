@@ -242,8 +242,7 @@ int gensam_ABLE(double **onetreePoisTable)
 		totBrLen[i - 1] = 0.0;
 
 		for (k = 0; k < nsegs; k++) {
-			double totFoldedSegBrLen = totSegBrLen[k][i - 1]
-					+ (foldBrClass * totSegBrLen[k][allBrClasses - i]);
+			double totFoldedSegBrLen = totSegBrLen[k][i - 1] + (foldBrClass * totSegBrLen[k][allBrClasses - i]);
 			if (foldBrClass && ((i - 1) == (allBrClasses - i)))
 				totFoldedSegBrLen /= 2;
 
@@ -260,11 +259,9 @@ int gensam_ABLE(double **onetreePoisTable)
 //			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
 			for (j = 0; j < mutClass - 1; j++) {
 //				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
-				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j,
-						totBrLen[i - 1] * pars.mp.theta);
+				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen[i - 1] * pars.mp.theta);
 			}
-			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1,
-					totBrLen[i - 1] * pars.mp.theta);
+			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen[i - 1] * pars.mp.theta);
 
 //			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
 //			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
@@ -342,6 +339,9 @@ void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totSegBrLenK) {
 			if (ptree[branch].abv != 2*nsam - 2)
 				branchConfig[ptree[branch].abv][pop] += branchConfig[branch][pop];
 
+	for(class = 0; class < allBrClasses; class++)
+		totSegBrLenK[class] = 0.0;
+
 	//	if ghost/unsampled pops. have been specified
 	if (sampledPopsSize != pars.cp.npop) {
 		for(branch = 0; branch < 2*nsam - 2; branch++)
@@ -349,21 +349,12 @@ void evalTreeBranchConfigs(struct node *ptree, int nsam, double *totSegBrLenK) {
 				if (getPopSampleStatus(pop))
 					sampledBranchConfig[branch][pop] = branchConfig[branch][pop];
 
-		for(class = 0; class < allBrClasses; class++) {
-			totSegBrLenK[class] = 0.0;
-			for(branch = 0; branch < 2*nsam-2; branch++)
-				if (getBrConfigNum(sampledBranchConfig[branch]) == class)
-					totSegBrLenK[class] += ptree[branch].brLength;
-		}
+		for(branch = 0; branch < 2*nsam-2; branch++)
+			totSegBrLenK[getBrConfigNum(sampledBranchConfig[branch])] += ptree[branch].brLength;
 	}
-	else {
-		for(class = 0; class < allBrClasses; class++) {
-			totSegBrLenK[class] = 0.0;
-			for(branch = 0; branch < 2*nsam-2; branch++)
-				if (getBrConfigNum(branchConfig[branch]) == class)
-					totSegBrLenK[class] += ptree[branch].brLength;
-		}
-	}
+	else
+		for(branch = 0; branch < 2*nsam-2; branch++)
+			totSegBrLenK[getBrConfigNum(branchConfig[branch])] += ptree[branch].brLength;
 
 	//******************************************************************************
 /*
