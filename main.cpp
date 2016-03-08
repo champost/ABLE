@@ -265,9 +265,9 @@ void calcBSFSTable() {
 		stst >> ms_argv[2];
 	}
 
-	for (int i = 0; i < ms_argc; i++)
-		cout << ms_argv[i] << " ";
-	cout << endl;
+//	for (int i = 0; i < ms_argc; i++)
+//		cout << ms_argv[i] << " ";
+//	cout << endl;
 
 	if (bSFS || (estimate == 2)) {
 #pragma omp parallel for
@@ -386,6 +386,8 @@ double computeLik() {
 
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
+
+			cout << dataConfigFreqs.size() << " " << trackedConfigs << " " << loglik << endl;
 		}
 		else if (estimate > 0) {
 			for (size_t i = 0; i < dataConfigs.size(); i++) {
