@@ -265,6 +265,10 @@ void calcBSFSTable() {
 		stst >> ms_argv[2];
 	}
 
+	for (int i = 0; i < ms_argc; i++)
+		cout << ms_argv[i] << " ";
+	cout << endl;
+
 	if (bSFS || (estimate == 2)) {
 #pragma omp parallel for
 		for (int trees = 0; trees < ms_trees; trees++) {
@@ -1086,16 +1090,20 @@ int main(int argc, char* argv[]) {
 		readDataConfigs();
 
 		printf("Evaluating point likelihood at : \n");
-		if (!tbiUserVal.empty()) {
-			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
-				printf("%.6f ", it->second);
-			printf("\n");
-		}
-		else {
-			for (int i = 0; i < ms_argc; i++)
-				cout << argv[i] << " ";
-			cout << endl;
-		}
+//		if (!tbiUserVal.empty()) {
+//			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
+//				printf("%.6f ", it->second);
+//			printf("\n");
+//		}
+//		else {
+//			for (int i = 0; i < ms_argc; i++)
+//				cout << argv[i] << " ";
+//			cout << endl;
+//		}
+
+		for (int i = 0; i < ms_argc; i++)
+			cout << ms_argv[i] << " ";
+		cout << endl;
 
 		{
 			stringstream stst;
