@@ -115,7 +115,6 @@ void free_objects() {
 	gsl_rng_free(PRNG);
 	for (size_t i = 0; i < PRNGThreadVec.size(); i++)
 		gsl_rng_free(PRNGThreadVec[i]);
-
 }
 
 void profileLik(vector<double> MLEparVec) {
