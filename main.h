@@ -43,7 +43,7 @@ knowledge of the CeCILL license and that you accept its terms.
 
 using namespace std;
 
-void free_ms_argv();
+void free_objects();
 void profileLik(vector<double> MLEparVec, double maxLnL);
 vector<int> getMutConfigVec(unsigned long int i);
 string getMutConfigStr(unsigned long int i);

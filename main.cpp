@@ -107,10 +107,15 @@ double ran1()
 	return gsl_rng_uniform(PRNGThreadVec[omp_get_thread_num()]);
 }
 
-void free_ms_argv() {
+void free_objects() {
 	for(int i = 0; i < ms_argc; i++)
 		free(ms_argv[i]);
 	free(ms_argv);
+
+	gsl_rng_free(PRNG);
+	for (size_t i = 0; i < PRNGThreadVec.size(); i++)
+		gsl_rng_free(PRNGThreadVec[i]);
+
 }
 
 void profileLik(vector<double> MLEparVec) {
@@ -265,10 +270,6 @@ void calcBSFSTable() {
 		stst >> ms_argv[2];
 	}
 
-//	for (int i = 0; i < ms_argc; i++)
-//		cout << ms_argv[i] << " ";
-//	cout << endl;
-
 	if (bSFS || (estimate == 2)) {
 #pragma omp parallel for
 		for (int trees = 0; trees < ms_trees; trees++) {
@@ -386,8 +387,6 @@ double computeLik() {
 
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
-
-			cout << dataConfigFreqs.size() << " " << trackedConfigs << " " << loglik << endl;
 		}
 		else if (estimate > 0) {
 			for (size_t i = 0; i < dataConfigs.size(); i++) {
@@ -426,7 +425,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	if (!grad.empty()) {
 		cerr << "Cannot proceed with ABLE" << endl;
 		cerr << "Gradient based optimization not yet implemented..." << endl;
-		free_ms_argv();
+		free_objects();
 		exit(-1);
 	}
 
@@ -464,7 +463,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		for(int i = 1; i < ms_argc; i++)
 			printf("%s ",ms_argv[i]);
 		printf("\n");
-//		free_ms_argv(); exit(-1);
+//		free_objects(); exit(-1);
 */
 
 		loglik = computeLik();
@@ -829,7 +828,7 @@ void readConfigFile(char* argv[]) {
 						cerr << "\nCannot proceed with local search" << endl;
 					cerr << "You need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
 					cerr << "Exiting ABLE...\n" << endl;
-					free_ms_argv();
+					free_objects();
 					exit(-1);
 				}
 
@@ -849,7 +848,7 @@ void readConfigFile(char* argv[]) {
 	for(int i = 1; i < ms_argc; i++)
 		printf("%s ",ms_argv[i]);
 	printf("\n");
-	free_ms_argv();
+	free_objects();
 	exit(-1);
 */
 
@@ -858,7 +857,7 @@ void readConfigFile(char* argv[]) {
 			cerr << "\nCannot proceed with inference" << endl;
 			cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
 			cerr << "Exiting ABLE...\n" << endl;
-			free_ms_argv();
+			free_objects();
 			exit(-1);
 		}
 		else {
@@ -976,7 +975,7 @@ int main(int argc, char* argv[]) {
 						printf("%.6f ", parVec[i]);
 					printf("LnL = %.6f\n\n", maxLnL);
 
-					free_ms_argv();
+					free_objects();
 					exit(-1);
 				}
 			}
@@ -1002,7 +1001,7 @@ int main(int argc, char* argv[]) {
 						printf("%.6f ", parVec[i]);
 					printf("LnL = %.6f\n\n", maxLnL);
 
-					free_ms_argv();
+					free_objects();
 					exit(-1);
 				}
 			}
@@ -1053,7 +1052,7 @@ int main(int argc, char* argv[]) {
 						printf("%.6f ", parVec[i]);
 					printf("LnL = %.6f\n\n", maxLnL);
 
-					free_ms_argv();
+					free_objects();
 					exit(-1);
 				}
 			}
@@ -1092,20 +1091,16 @@ int main(int argc, char* argv[]) {
 		readDataConfigs();
 
 		printf("Evaluating point likelihood at : \n");
-//		if (!tbiUserVal.empty()) {
-//			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
-//				printf("%.6f ", it->second);
-//			printf("\n");
-//		}
-//		else {
-//			for (int i = 0; i < ms_argc; i++)
-//				cout << argv[i] << " ";
-//			cout << endl;
-//		}
-
-		for (int i = 0; i < ms_argc; i++)
-			cout << ms_argv[i] << " ";
-		cout << endl;
+		if (!tbiUserVal.empty()) {
+			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
+				printf("%.6f ", it->second);
+			printf("\n");
+		}
+		else {
+			for (int i = 0; i < ms_argc; i++)
+				cout << argv[i] << " ";
+			cout << endl;
+		}
 
 		{
 			stringstream stst;
@@ -1114,24 +1109,34 @@ int main(int argc, char* argv[]) {
 		}
 
 		currState = OTHER;
+		double loglik;
 		if (!bSFS) {
 			testLik.open("logliks.txt",ios::out);
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
-			double loglik = computeLik();
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
+			loglik = computeLik();
 			time(&likEndTime);
 			testLik.close();
 			testConfig.close();
 		}
 		else {
 			time(&likStartTime);
-			double loglik = computeLik();
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
+			loglik = computeLik();
 			time(&likEndTime);
 		}
 
-		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+		if (ms_crash_flag) {
+			cerr << "\nABLE failed to simulate genealogies with the demographic parameters that have been specified!" << endl;
+			cerr << "Please consider changing them or contact the author Champak B. Reddy (champak.br@gmail.com)" << endl;
+			cerr << "Exiting ABLE...\n" << endl;
+
+			free_objects();
+			exit(-1);
+		}
+		else {
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
+			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+		}
 	}
 	else if (estimate == 0) {
 
@@ -1140,7 +1145,7 @@ int main(int argc, char* argv[]) {
 			cerr << "\nThis is going to be too long a table to compute!" << endl;
 			cerr << "Please contact the author Champak B. Reddy (champak.br@gmail.com) if you are really keen on going ahead with this" << endl;
 			cerr << "Exiting ABLE...\n" << endl;
-			free_ms_argv();
+			free_objects();
 			exit(-1);
 		}
 //		printf("\n\nfinalTableSize : %.0f", finalTableSize);
@@ -1153,16 +1158,23 @@ int main(int argc, char* argv[]) {
 		currState = OTHER;
 		time(&likStartTime);
 		computeLik();
-		printf("Trees sampled : %d\n", ms_trees);
 		time(&likEndTime);
 
-		printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
+		if (ms_crash_flag) {
+			cerr << "\nABLE failed to simulate genealogies with the demographic parameters that have been specified!" << endl;
+			cerr << "Please consider changing them or contact the author Champak B. Reddy (champak.br@gmail.com)" << endl;
+			cerr << "Exiting ABLE...\n" << endl;
+
+			free_objects();
+			exit(-1);
+		}
+		else {
+			printf("Trees sampled : %d\n", ms_trees);
+			printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
+		}
 	}
 
-	free_ms_argv();
-	gsl_rng_free(PRNG);
-	for (size_t i = 0; i < PRNGThreadVec.size(); i++)
-		gsl_rng_free(PRNGThreadVec[i]);
+	free_objects();
 
 	return 0;
 }

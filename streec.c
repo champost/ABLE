@@ -104,7 +104,7 @@ static int *nnodes;
 
 
 	struct segl *
-segtre_mig(struct c_params *cp, int *pnsegs ) 
+segtre_mig(struct c_params *cp, int *pnsegs, int *crash_flag)
 	{
 		seglimit = SEGINC;
 		chrom = NULL;
@@ -236,7 +236,7 @@ segtre_mig(struct c_params *cp, int *pnsegs )
 					fprintf(stderr, " Infinite coalescent time. No migration.\n");
 					exit(1);
 */
-					ms_crash_flag = 1;
+					*crash_flag = 1;
 					break;
 				}
 			}
@@ -297,7 +297,7 @@ segtre_mig(struct c_params *cp, int *pnsegs )
 						" infinite time to next event. Negative growth rate in last time interval or non-communicating subpops.\n");
 				exit(0);
 */
-				ms_crash_flag = 1;
+				*crash_flag = 1;
 				break;
 			}
 			if (((eflag == 0) && (nextevent != NULL))

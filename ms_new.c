@@ -165,7 +165,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 {
 	int howmany;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
-	int gensam_ABLE(double **onetreePoisTable) ;
+	int gensam_ABLE(double **onetreePoisTable, int *crash_flag) ;
  	void freed2matrix(double **m, int x);
 	void free_eventlist( struct devent *pt, int npop );
 
@@ -174,10 +174,18 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
 
     while( howmany-count++ ) {
-        gensam_ABLE(onetreePoisTable);
+    	int ms_thread_crash_flag = 0;
 
-        if (ms_crash_flag)
-        	break;
+        gensam_ABLE(onetreePoisTable, &ms_thread_crash_flag);
+
+        if (ms_thread_crash_flag) {
+        	if (howmany < 3)
+        		++howmany;
+        	else {
+            	ms_crash_flag = 1;
+            	break;
+        	}
+        }
     }
 
 	// based on Valgrind Memcheck
@@ -191,10 +199,10 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 }
 
 
-int gensam_ABLE(double **onetreePoisTable)
+int gensam_ABLE(double **onetreePoisTable, int *crash_flag)
 {
 	int nsegs, i, j, k, seg, ns, start, end, len;
-	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs ) ; /* used to be: [MAXSEG];  */
+	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs, int *crash_flag) ; /* used to be: [MAXSEG];  */
 	int segsitesin,nsites;
 	double theta;
 	int nsam;
@@ -205,9 +213,9 @@ int gensam_ABLE(double **onetreePoisTable)
 
 
 	nsites = pars.cp.nsites;
-	seglst = segtre_mig(&(pars.cp), &nsegs);
+	seglst = segtre_mig(&(pars.cp), &nsegs, crash_flag);
 
-	if (ms_crash_flag) {
+	if (*crash_flag) {
 		for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++)
 			free(seglst[seg].ptree);
 		free(seglst);
