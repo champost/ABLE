@@ -86,12 +86,9 @@ nlopt::opt local_opt;
 
 char **ms_argv;
 
-double **onetreePoisTable;
-#pragma omp threadprivate(onetreePoisTable)
-
 int ms_argc = 0;
 int npops = 0, kmax = 0;
-int estimate = 0, evalCount = 0;
+int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
 double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, lastValidLnL;
@@ -260,6 +257,37 @@ int getBrConfigNum(int *brConfVec) {
 }
 
 
+void process_tree_1 (double **onetreePoisTable) {
+	for (size_t i = 0; i < dataConfigs.size(); i++) {
+		double jointPoisson = 1.0;
+
+		for (int j = 0; j < brClass; j++)
+			jointPoisson *= onetreePoisTable[j][dataConfigs[i][j]];
+
+		if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
+			selectConfigFreqs[i] += jointPoisson;
+			trackSelectConfigsForInf[i] = 1;
+		}
+	}
+}
+
+
+void process_tree_3 (double **onetreePoisTable) {
+	for (unsigned long int i = 0; i < finalTableSize; i++) {
+	    double jointPoisson = 1.0;
+
+	    vector<int> vec = getMutConfigVec(i);
+		for (int j = 0; j < brClass; j++)
+			jointPoisson *= onetreePoisTable[j][vec[j]];
+
+		if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
+			allConfigs[i] = i;
+			allConfigFreqs[i] += jointPoisson;
+		}
+	}
+}
+
+
 void calcBSFSTable() {
 
 	ms_crash_flag = 0;
@@ -270,33 +298,67 @@ void calcBSFSTable() {
 	}
 
 	if (bSFS || (estimate == 2)) {
-#pragma omp parallel for
-		for (int trees = 0; trees < ms_trees; trees++) {
+
+//#pragma omp parallel for shared(ms_crash_flag)
+//		for (int trees = 0; trees < ms_trees; trees++) {
+//			if (!ms_crash_flag) {
+//				double **onetreePoisTable;
+//				onetreePoisTable = d2matrix(brClass, mutClass);
+//				// calling ms for sampling genealogies
+//				ms_crash_flag = main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
+//
+//				process_tree_1(onetreePoisTable);
+//
+//				freed2matrix(onetreePoisTable, brClass);
+//			}
+//		}
+
+		int sim_trees = ms_trees;
+		crash_counter = sampledTrees = 0;
+
+		do {
+
+#pragma omp parallel for shared(ms_crash_flag, crash_counter)
+		for (int trees = 0; trees < sim_trees; trees++) {
 			if (!ms_crash_flag) {
+				double **onetreePoisTable;
 				onetreePoisTable = d2matrix(brClass, mutClass);
 				// calling ms for sampling genealogies
-				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
+				int crash_flag = main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
 
-				for (size_t i = 0; i < dataConfigs.size(); i++) {
-				    double jointPoisson = 1.0;
-
-					for (int j = 0; j < brClass; j++)
-						jointPoisson *= onetreePoisTable[j][dataConfigs[i][j]];
-
-					if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
-						selectConfigFreqs[i] += jointPoisson;
-						trackSelectConfigsForInf[i] = 1;
-					}
+				if (crash_flag) {
+#pragma omp atomic
+					++crash_counter;
 				}
+				else {
+					process_tree_1(onetreePoisTable);
+#pragma omp atomic
+					++sampledTrees;
+				}
+
+				if (crash_counter == 10)
+					ms_crash_flag = 1;
+
 				freed2matrix(onetreePoisTable, brClass);
 			}
 		}
+
+		if (sampledTrees == ms_trees)
+			break;
+		else if ((sampledTrees < ms_trees) && !ms_crash_flag)
+			sim_trees = ms_trees - sampledTrees;
+
+		} while(!ms_crash_flag);
+
+
 	}
 	else if (estimate == 1) {
+
 		int treesSampled = 0;
 #pragma omp parallel for
 		for (int trees = 0; trees < ms_trees; trees++) {
 			if (!ms_crash_flag) {
+				double **onetreePoisTable;
 				onetreePoisTable = d2matrix(brClass, mutClass);
 				// calling ms for sampling genealogies
 				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
@@ -327,28 +389,26 @@ void calcBSFSTable() {
 		}
 	}
 	else {
+
 		allConfigs = vector<int>(finalTableSize,-1);
 		allConfigFreqs = vector<double>(finalTableSize,0.0);
-
 #pragma omp parallel for
 		for (int trees = 0; trees < ms_trees; trees++) {
 			if (!ms_crash_flag) {
+				int crash_counter = 0;
+
+				double **onetreePoisTable;
 				onetreePoisTable = d2matrix(brClass, mutClass);
 				// calling ms for sampling genealogies
-				main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
-
-				for (unsigned long int i = 0; i < finalTableSize; i++) {
-				    double jointPoisson = 1.0;
-
-				    vector<int> vec = getMutConfigVec(i);
-					for (int j = 0; j < brClass; j++)
-						jointPoisson *= onetreePoisTable[j][vec[j]];
-
-					if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
-						allConfigs[i] = i;
-						allConfigFreqs[i] += jointPoisson;
-					}
+				while (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable) && (crash_counter <= 10)) {
+					++crash_counter;
 				}
+
+				if (crash_counter > 10)
+					ms_crash_flag = 1;
+				else
+					process_tree_3(onetreePoisTable);
+
 				freed2matrix(onetreePoisTable, brClass);
 			}
 		}
@@ -497,6 +557,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		for (size_t i = 0; i < vars.size(); i++)
 			printf("%.5e ", vars[i]);
 		printf(" Trees: %d ", ms_trees);
+		printf(" Sampled: %d ", sampledTrees);
 		printf(" LnL: %.6f\n", loglik);
 
 		if (loglik == 0.0) {
@@ -927,7 +988,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
+		opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
 		opt.set_stopval(1234567);

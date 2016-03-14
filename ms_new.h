@@ -122,6 +122,6 @@ int pick2(int n, int *i, int *j);
 int xover(int nsam,int ic, int is);
 int links(int c);
 
-extern int brClass, mutClass, foldBrClass, allBrClasses, sampledPopsSize, ms_crash_flag;
+extern int brClass, mutClass, foldBrClass, allBrClasses, sampledPopsSize;
 
 #endif /* MS_NEW_H_ */

@@ -154,11 +154,12 @@ unsigned maxsites = SITESINC ;
 
 
 //double *posit ;
-double segfac ;
-int count;
+//double segfac ;
+//int count;
 struct params pars ;
+#pragma omp threadprivate(pars)
 
-#pragma omp threadprivate(segfac, count, pars)
+//#pragma omp threadprivate(segfac, count, pars)
 
 
 int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
@@ -169,24 +170,12 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
  	void freed2matrix(double **m, int x);
 	void free_eventlist( struct devent *pt, int npop );
 
-	count=0;
+//	count=0;
 
-	getpars( ms_argc, ms_argv, &howmany) ;   /* results are stored in global variable, pars */
+	getpars( ms_argc, ms_argv, &howmany) ;
 
-    while( howmany-count++ ) {
-    	int ms_thread_crash_flag = 0;
-
-        gensam_ABLE(onetreePoisTable, &ms_thread_crash_flag);
-
-        if (ms_thread_crash_flag) {
-        	if (howmany < 3)
-        		++howmany;
-        	else {
-            	ms_crash_flag = 1;
-            	break;
-        	}
-        }
-    }
+	int ms_thread_crash_flag = 0;
+    gensam_ABLE(onetreePoisTable, &ms_thread_crash_flag);
 
 	// based on Valgrind Memcheck
 	free(pars.cp.config);
@@ -195,7 +184,7 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 	free_eventlist(pars.cp.deventlist, pars.cp.npop);
 	freed2matrix(pars.cp.mig_mat, pars.cp.npop);
 
-	return 0;
+	return ms_thread_crash_flag;
 }
 
 
@@ -869,18 +858,19 @@ int NSEEDS = 3 ;
   void
 getpars(int ms_argc, char *ms_argv[], int *phowmany )
 {
-	int arg, i, j, sum , pop , argstart, npop , npop2, pop2 ;
+//	int arg, i, j, sum , pop , argstart, npop , npop2, pop2 ;
+	int arg, i, j, sum , pop , npop , npop2, pop2 ;
 	double migr, mij, psize, palpha ;
 	void addtoelist( struct devent *pt, struct devent *elist ); 
 	void argcheck( int arg, int ms_argc, char ** ) ;
 	int commandlineseed( char ** ) ;
 	void free_eventlist( struct devent *pt, int npop );
 	struct devent *ptemp , *pt ;
-	FILE *pf ;
+//	FILE *pf ;
 	char ch3 ;
 	
 
-  if( count == 0 ) {
+//  if( count == 0 ) {
 	if( ms_argc < 4 ){ fprintf(stderr,"Too few command line arguments\n"); usage();}
 	pars.cp.nsam = atoi( ms_argv[1] );
 	if( pars.cp.nsam <= 0 ) { fprintf(stderr,"First argument error. nsam <= 0. \n"); usage();}
@@ -905,11 +895,13 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 	pars.cp.alphag = (double *) malloc( (unsigned)(( pars.cp.npop ) *sizeof( double )) );
 	(pars.cp.alphag)[0] = 0.0  ;
 	pars.cp.nsites = 2 ;
+/*
   }
   else{
 	npop = pars.cp.npop ;
 	free_eventlist( pars.cp.deventlist, npop );
   }
+*/
   	pars.cp.deventlist = NULL ;
 
 	arg = 3 ;
@@ -917,6 +909,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 	while( arg < ms_argc ){
 		if( ms_argv[arg][0] != '-' ) { fprintf(stderr," argument should be -%s ?\n", ms_argv[arg]); usage();}
 		switch ( ms_argv[arg][1] ){
+/*
 			case 'f' :
 //				if( ntbs > 0 ) { fprintf(stderr," can't use tbs args and -f option.\n"); exit(1); }
 				arg++;
@@ -938,6 +931,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 				ms_argc--;
 				arg = argstart ;
 				break;
+*/
 			case 'r' : 
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
@@ -949,6 +943,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 					usage();
 					}
 				break;	
+/*
 			case 'p' :
 				arg++;
 				argcheck(arg,ms_argc,ms_argv);
@@ -965,6 +960,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 					usage();
 					}
 				break;		
+*/
 			case 't' : 
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
@@ -983,7 +979,6 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 				    pars.mp.segsitesin = atoi(  ms_argv[arg++] );
 				}
 				break;
-*/
 			case 'F' : 
 				arg++;
 				argcheck( arg, ms_argc, ms_argv);
@@ -993,28 +988,31 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
                                     usage();
                                     }
 				break;
+*/
 			case 'T' : 
 				pars.mp.treeflag = 1 ;
 				arg++;
 				break;
+/*
 			case 'L' : 
 				pars.mp.timeflag = 1 ;
 				arg++;
 				break;
+*/
 			case 'I' : 
 			    arg++;
-			    if( count == 0 ) {
+//			    if( count == 0 ) {
 				argcheck( arg, ms_argc, ms_argv);
 			       	pars.cp.npop = atoi( ms_argv[arg]);
 			        pars.cp.config = (int *) realloc( pars.cp.config, (unsigned)( pars.cp.npop*sizeof( int)));
 				npop = pars.cp.npop ;
-				}
+//				}
 			    arg++;
 			    for( i=0; i< pars.cp.npop; i++) {
 				argcheck( arg, ms_argc, ms_argv);
 				pars.cp.config[i] = atoi( ms_argv[arg++]);
 				}
-			    if( count == 0 ){
+//			    if( count == 0 ){
 				pars.cp.mig_mat = 
                                         (double **)realloc(pars.cp.mig_mat, (unsigned)(pars.cp.npop*sizeof(double *) )) ;
 				pars.cp.mig_mat[0] = 
@@ -1028,7 +1026,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 				   (pars.cp.size)[i] = (pars.cp.size)[0]  ;
 				   (pars.cp.alphag)[i] = (pars.cp.alphag)[0] ;
 				   }
-			        }
+//			        }
 			     if( (arg <ms_argc) && ( ms_argv[arg][0] != '-' ) ) {
 				argcheck( arg, ms_argc, ms_argv);
 				migr = atof(  ms_argv[arg++] );
@@ -1214,12 +1212,12 @@ usage()
 fprintf(stderr,"usage: ms nsam howmany \n");
 fprintf(stderr,"  Options: \n"); 
 fprintf(stderr,"\t -t theta   (this option and/or the next must be used. Theta = 4*N0*u )\n");
-fprintf(stderr,"\t -s segsites   ( fixed number of segregating sites)\n");
+//fprintf(stderr,"\t -s segsites   ( fixed number of segregating sites)\n");
 fprintf(stderr,"\t -T          (Output gene tree.)\n");
-fprintf(stderr,"\t -F minfreq     Output only sites with freq of minor allele >= minfreq.\n");
+//fprintf(stderr,"\t -F minfreq     Output only sites with freq of minor allele >= minfreq.\n");
 fprintf(stderr,"\t -r rho nsites     (rho here is 4Nc)\n");
-fprintf(stderr,"\t\t -c f track_len   (f = ratio of conversion rate to rec rate. tracklen is mean length.) \n");
-fprintf(stderr,"\t\t\t if rho = 0.,  f = 4*N0*g, with g the gene conversion rate.\n"); 
+//fprintf(stderr,"\t\t -c f track_len   (f = ratio of conversion rate to rec rate. tracklen is mean length.) \n");
+//fprintf(stderr,"\t\t\t if rho = 0.,  f = 4*N0*g, with g the gene conversion rate.\n");
 fprintf(stderr,"\t -G alpha  ( N(t) = N0*exp(-alpha*t) .  alpha = -log(Np/Nr)/t\n");      
 fprintf(stderr,"\t -I npop n1 n2 ... [mig_rate] (all elements of mig matrix set to mig_rate/(npop-1) \n");    
 fprintf(stderr,"\t\t -m i j m_ij    (i,j-th element of mig matrix set to m_ij.)\n"); 
@@ -1239,8 +1237,8 @@ fprintf(stderr,"\t\t proportion is probability that each lineage stays in pop-i.
 fprintf(stderr,"\t\t Size of pop npop is set to N0 and alpha = 0.0 , size and alpha of pop i are unchanged.\n");
 fprintf(stderr,"\t -ej t i j   ( Join lineages in pop i and pop j into pop j\n");
 fprintf(stderr,"\t\t  size, alpha and M are unchanged.\n");  
-fprintf(stderr,"\t  -f filename     ( Read command line arguments from file filename.)\n"); 
-fprintf(stderr,"\t  -p n ( Specifies the precision of the position output.  n is the number of digits after the decimal.)\n");
+//fprintf(stderr,"\t  -f filename     ( Read command line arguments from file filename.)\n");
+//fprintf(stderr,"\t  -p n ( Specifies the precision of the position output.  n is the number of digits after the decimal.)\n");
 fprintf(stderr," See msdoc.pdf for explanation of these parameters.\n");
 
 exit(1);
