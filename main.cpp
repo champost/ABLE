@@ -297,62 +297,7 @@ void calcBSFSTable() {
 		stst >> ms_argv[2];
 	}
 
-	if (bSFS || (estimate == 2)) {
-
-//#pragma omp parallel for shared(ms_crash_flag)
-//		for (int trees = 0; trees < ms_trees; trees++) {
-//			if (!ms_crash_flag) {
-//				double **onetreePoisTable;
-//				onetreePoisTable = d2matrix(brClass, mutClass);
-//				// calling ms for sampling genealogies
-//				ms_crash_flag = main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
-//
-//				process_tree_1(onetreePoisTable);
-//
-//				freed2matrix(onetreePoisTable, brClass);
-//			}
-//		}
-
-		int sim_trees = ms_trees;
-		crash_counter = sampledTrees = 0;
-
-		do {
-
-#pragma omp parallel for shared(ms_crash_flag, crash_counter)
-		for (int trees = 0; trees < sim_trees; trees++) {
-			if (!ms_crash_flag) {
-				double **onetreePoisTable;
-				onetreePoisTable = d2matrix(brClass, mutClass);
-				// calling ms for sampling genealogies
-				int crash_flag = main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable);
-
-				if (crash_flag) {
-#pragma omp atomic
-					++crash_counter;
-				}
-				else {
-					process_tree_1(onetreePoisTable);
-#pragma omp atomic
-					++sampledTrees;
-				}
-
-				if (crash_counter == 10)
-					ms_crash_flag = 1;
-
-				freed2matrix(onetreePoisTable, brClass);
-			}
-		}
-
-		if (sampledTrees == ms_trees)
-			break;
-		else if ((sampledTrees < ms_trees) && !ms_crash_flag)
-			sim_trees = ms_trees - sampledTrees;
-
-		} while(!ms_crash_flag);
-
-
-	}
-	else if (estimate == 1) {
+	if (estimate == 1) {
 
 		int treesSampled = 0;
 #pragma omp parallel for
@@ -390,28 +335,48 @@ void calcBSFSTable() {
 	}
 	else {
 
-		allConfigs = vector<int>(finalTableSize,-1);
-		allConfigFreqs = vector<double>(finalTableSize,0.0);
-#pragma omp parallel for
-		for (int trees = 0; trees < ms_trees; trees++) {
-			if (!ms_crash_flag) {
-				int crash_counter = 0;
-
-				double **onetreePoisTable;
-				onetreePoisTable = d2matrix(brClass, mutClass);
-				// calling ms for sampling genealogies
-				while (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable) && (crash_counter <= 10)) {
-					++crash_counter;
-				}
-
-				if (crash_counter > 10)
-					ms_crash_flag = 1;
-				else
-					process_tree_3(onetreePoisTable);
-
-				freed2matrix(onetreePoisTable, brClass);
-			}
+		if (estimate == 0) {
+			allConfigs = vector<int>(finalTableSize,-1);
+			allConfigFreqs = vector<double>(finalTableSize,0.0);
 		}
+
+		int sim_trees = ms_trees;
+		crash_counter = sampledTrees = 0;
+
+		do {
+
+#pragma omp parallel for shared(ms_crash_flag, crash_counter, sampledTrees)
+			for (int trees = 0; trees < sim_trees; trees++) {
+				if (!ms_crash_flag) {
+					double **onetreePoisTable;
+					onetreePoisTable = d2matrix(brClass, mutClass);
+					// calling ms for sampling genealogies
+					if (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable)) {
+#pragma omp atomic
+						++crash_counter;
+					}
+					else {
+						if (estimate == 0)
+							process_tree_3(onetreePoisTable);
+						else
+							process_tree_1(onetreePoisTable);
+#pragma omp atomic
+						++sampledTrees;
+					}
+
+					if (crash_counter == 10)
+						ms_crash_flag = 1;
+
+					freed2matrix(onetreePoisTable, brClass);
+				}
+			}
+
+			if (sampledTrees == ms_trees)
+				break;
+			else if ((sampledTrees < ms_trees) && !ms_crash_flag)
+				sim_trees = ms_trees - sampledTrees;
+
+		} while(!ms_crash_flag);
 	}
 }
 
@@ -1171,6 +1136,11 @@ int main(int argc, char* argv[]) {
 		currState = OTHER;
 		double loglik;
 		if (!bSFS) {
+
+			//	temporary deactivation : need to review code in calcBSFSTable for this option
+			free_objects();
+			exit(-1);
+
 			testLik.open("logliks.txt",ios::out);
 			testConfig.open("propConfigs.txt",ios::out);
 			time(&likStartTime);
