@@ -71,7 +71,7 @@ map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds;
-map<int, int> trackSelectConfigs, parConstraints;
+map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 
 string dataConfigFile, configFile;
 ofstream testLik, testConfig;
@@ -459,7 +459,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	//	checking for simple non linear constraints between the free params
 	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
-		if (vars[it->first-1] >= vars[it->second-1]) {
+		if (vars[tbi2ParVec[it->first]] >= vars[tbi2ParVec[it->second]]) {
 			parConstraintPass = false;
 			break;
 		}
@@ -478,7 +478,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 			for (size_t i = 0; i < it->second.size(); i++) {
 				stringstream stst;
-				stst << vars[it->first-1];
+				stst << vars[tbi2ParVec[it->first]];
 				stst >> ms_argv[it->second[i]];
 			}
 		}
@@ -940,8 +940,11 @@ int main(int argc, char* argv[]) {
 
 		double maxLnL;
 		vector<double> parVec;
+		int count = 0;
 		for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
 			parVec.push_back(it->second);
+			tbi2ParVec[it->first] = count;
+			++count;
 
 			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
 				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
