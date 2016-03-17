@@ -1040,7 +1040,7 @@ int main(int argc, char* argv[]) {
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 					for (size_t i = 0; i < it->second.size(); i++) {
 						stringstream stst;
-						stst << parVec[it->first-1];
+						stst << parVec[tbi2ParVec[it->first]];
 						stst >> ms_argv[it->second[i]];
 					}
 				}
@@ -1091,7 +1091,7 @@ int main(int argc, char* argv[]) {
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 					for (size_t i = 0; i < it->second.size(); i++) {
 						stringstream stst;
-						stst << parVec[it->first-1];
+						stst << parVec[tbi2ParVec[it->first]];
 						stst >> ms_argv[it->second[i]];
 					}
 				}
