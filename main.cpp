@@ -979,7 +979,11 @@ int main(int argc, char* argv[]) {
 		else
 			local_opt.set_maxeval(10000);
 		local_opt.set_xtol_rel(1e-2);
-		local_opt.set_initial_step((globalUpper-globalLower)/5);
+
+		vector<double> localSearchPerturb;
+		for (size_t param = 0; param < lowerBounds.size(); param++)
+			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
+		local_opt.set_initial_step(localSearchPerturb);
 
 		if (!skipGlobal) {
 			printf("\nStarting global search: \n");
