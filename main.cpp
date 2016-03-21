@@ -91,7 +91,7 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, lastValidLnL;
+double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, lastValidLnL, userLnL = 0.0;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -822,6 +822,10 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> reportEveryEvals;
 			}
+			else if (tokens[0] == "start_likelihood") {
+				stringstream stst(tokens[1]);
+				stst >> userLnL;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -1039,7 +1043,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if ((globalTrees == localTrees) && (maxLnL < bestGlobalSlLnL)) {
+			if ((globalTrees == localTrees) && (maxLnL > bestGlobalSlLnL)) {
 				printf("Ignoring local search results as they did not improve on the global search optimum...\n");
 				parVec = bestGlobalSPars;
 				maxLnL = bestGlobalSlLnL;
@@ -1074,6 +1078,7 @@ int main(int argc, char* argv[]) {
 			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
 			time(&likStartTime);
 
+			vector<double> startVec = parVec;
 			ms_trees = localTrees;
 			evalCount = 0;
 			penLnL = 0;
@@ -1097,7 +1102,14 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			printf("Found the local maximum after %d evaluations\n", evalCount);
+			if ((userLnL != 0.0) && (maxLnL > userLnL)) {
+				printf("Ignoring local search results as they did not improve on the user-specified optimum...\n");
+				parVec = startVec;
+				maxLnL = userLnL;
+			}
+			else
+				printf("Found the local maximum after %d evaluations\n", evalCount);
+
 			if (refineLikTrees) {
 				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
