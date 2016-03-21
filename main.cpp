@@ -963,11 +963,12 @@ int main(int argc, char* argv[]) {
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		if (!skipGlobal && (globalEvals < 3000*(int)tbiMsCmdIdx.size())) {
+		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
+		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
 			else
-				globalEvals = 3000*tbiMsCmdIdx.size();
+				globalEvals = globalMaxEvals;
 		}
 
 		local_opt.set_stopval(7654321);
@@ -1038,7 +1039,14 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			printf("Found the local maximum after %d evaluations\n", evalCount);
+			if ((globalTrees == localTrees) && (maxLnL < bestGlobalSlLnL)) {
+				printf("Ignoring local search results as they did not improve on the global search optimum...\n");
+				parVec = bestGlobalSPars;
+				maxLnL = bestGlobalSlLnL;
+			}
+			else
+				printf("Found the local maximum after %d evaluations\n", evalCount);
+
 			if (refineLikTrees) {
 				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
