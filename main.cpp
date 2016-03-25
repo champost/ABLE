@@ -1043,7 +1043,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if ((globalTrees == localTrees) && (maxLnL > bestGlobalSlLnL)) {
+			if ((globalTrees == localTrees) && (maxLnL < bestGlobalSlLnL)) {
 				printf("Ignoring local search results as they did not improve on the global search optimum...\n");
 				parVec = bestGlobalSPars;
 				maxLnL = bestGlobalSlLnL;
@@ -1102,7 +1102,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if ((userLnL != 0.0) && (maxLnL > userLnL)) {
+			if ((userLnL != 0.0) && (maxLnL < userLnL)) {
 				printf("Ignoring local search results as they did not improve on the user-specified optimum...\n");
 				parVec = startVec;
 				maxLnL = userLnL;
