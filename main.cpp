@@ -73,7 +73,7 @@ map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 
-string dataConfigFile, configFile;
+string dataConfigFile, configFile, globalSearchAlg;
 ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
@@ -760,6 +760,8 @@ void readConfigFile(char* argv[]) {
 			}
 			else if (tokens[0] == "folded")
 				foldBrClass = 1;
+			else if (tokens[0] == "global_search")
+				globalSearchAlg = tokens[1];
 			else if (tokens[0] == "global_search_trees") {
 				stringstream stst(tokens[1]);
 				stst >> globalTrees;
@@ -960,7 +962,14 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
+		if (globalSearchAlg == "DIRECT") {
+			opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
+			printf("Using the DIRECT algortihm for the global search...\n");
+		}
+		else {
+			opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
+			printf("Using the DIRECT_NOSCAL algortihm (i.e. without scaling) for the global search...\n");
+		}
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
 		opt.set_stopval(1234567);
