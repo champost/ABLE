@@ -356,10 +356,10 @@ void calcBSFSTable() {
 						++crash_counter;
 					}
 					else {
-						if (estimate == 0)
-							process_tree_3(onetreePoisTable);
-						else
+						if (bSFS || (estimate > 0))
 							process_tree_1(onetreePoisTable);
+						else if (estimate == 0)
+							process_tree_3(onetreePoisTable);
 #pragma omp atomic
 						++sampledTrees;
 					}
@@ -964,11 +964,11 @@ int main(int argc, char* argv[]) {
 
 		if (globalSearchAlg == "DIRECT") {
 			opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
-			printf("Using the DIRECT algortihm for the global search...\n");
+			printf("Using the DIRECT algorithm for the global search...\n");
 		}
 		else {
 			opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
-			printf("Using the DIRECT_NOSCAL algortihm (i.e. without scaling) for the global search...\n");
+			printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
 		}
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
@@ -977,6 +977,7 @@ int main(int argc, char* argv[]) {
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
+//		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
 		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
@@ -1200,7 +1201,7 @@ int main(int argc, char* argv[]) {
 			exit(-1);
 		}
 		else {
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, ms_trees);
+			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
 			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 	}
