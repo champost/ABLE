@@ -364,7 +364,7 @@ void calcBSFSTable() {
 						++sampledTrees;
 					}
 
-					if (crash_counter == 10)
+					if (crash_counter >= (ms_trees/1000))
 						ms_crash_flag = 1;
 
 					freed2matrix(onetreePoisTable, brClass);
