@@ -81,8 +81,7 @@ vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, lastValidPars;
 vector<gsl_rng *> PRNGThreadVec;
 
-nlopt::opt opt;
-nlopt::opt local_opt;
+nlopt::opt opt, local_opt, AUGLAG;
 
 char **ms_argv;
 
@@ -987,10 +986,16 @@ int main(int argc, char* argv[]) {
 
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
-		opt.set_stopval(1234567);
-		opt.set_lower_bounds(lowerBounds);
-		opt.set_upper_bounds(upperBounds);
-		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+		AUGLAG.set_lower_bounds(lowerBounds);
+		AUGLAG.set_upper_bounds(upperBounds);
+		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
+		AUGLAG.set_local_optimizer(opt);
+		AUGLAG.set_stopval(1234567);
+
+//		opt.set_stopval(1234567);
+//		opt.set_lower_bounds(lowerBounds);
+//		opt.set_upper_bounds(upperBounds);
+//		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 //		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
 		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
 		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
@@ -1042,6 +1047,8 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
+//			TEMPORARY MEASURE : TO BE UNCOMMENTED AFTER SUCCESSFUL IMPLEMENTATION OF THE AUGLAG ALGORITHM
+/*
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
 
 			ms_trees = localTrees;
@@ -1089,6 +1096,7 @@ int main(int argc, char* argv[]) {
 				ms_trees = refineLikTrees;
 				maxLnL = computeLik();
 			}
+*/
 
 			printf("Found a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
