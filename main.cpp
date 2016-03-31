@@ -966,18 +966,33 @@ int main(int argc, char* argv[]) {
 			opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
 			printf("Using the DIRECT algorithm for the global search...\n");
 		}
+		else if (globalSearchAlg == "CRS") {
+			opt = nlopt::opt(nlopt::GN_CRS2_LM, tbiMsCmdIdx.size());
+			opt.set_population(20*(tbiMsCmdIdx.size()+1));
+			printf("Using the CONTROLLED RANDOM SEARCH algorithm for the global search...\n");
+		}
+		else if (globalSearchAlg == "ISRES") {
+			opt = nlopt::opt(nlopt::GN_ISRES, tbiMsCmdIdx.size());
+			opt.set_population(20*(tbiMsCmdIdx.size()+1));
+			printf("Using the IMPROVED STOCHASTIC RANKING EVOLUTION STRATEGY algorithm for the global search...\n");
+		}
+		else if (globalSearchAlg == "ESCH") {
+			opt = nlopt::opt(nlopt::GN_ESCH, tbiMsCmdIdx.size());
+			printf("Using Carlos Henrique da Silva Santos's EVOLUTIONARY algorithm for the global search...\n");
+		}
 		else {
 			opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
 			printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
 		}
+
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
 		opt.set_stopval(1234567);
 		opt.set_lower_bounds(lowerBounds);
 		opt.set_upper_bounds(upperBounds);
 		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
-//		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
+//		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
+		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
 		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
 			if (globalEvals)
 				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
