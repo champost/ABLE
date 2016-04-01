@@ -340,8 +340,12 @@ void calcBSFSTable() {
 			allConfigFreqs = vector<double>(finalTableSize,0.0);
 		}
 
-		int sim_trees = ms_trees;
+		int sim_trees = ms_trees, crashLimit;
 		crash_counter = sampledTrees = 0;
+		if (ms_trees < 2000)
+			crashLimit = 2;
+		else
+			crashLimit = ms_trees/1000;
 
 		do {
 
@@ -364,7 +368,7 @@ void calcBSFSTable() {
 						++sampledTrees;
 					}
 
-					if (crash_counter >= (ms_trees/1000))
+					if (crash_counter >= crashLimit)
 						ms_crash_flag = 1;
 
 					freed2matrix(onetreePoisTable, brClass);
