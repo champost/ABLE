@@ -78,7 +78,7 @@ ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, lastValidPars;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt, local_opt, AUGLAG;
@@ -90,7 +90,7 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, penLnL, dataLnL, bestGlobalSlLnL, lastValidLnL, userLnL = 0.0;
+double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, userLnL = 0.0;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -440,145 +440,6 @@ double computeLik() {
 }
 
 
-double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
-
-	bool parConstraintPass = true;
-	double loglik = 0.0;
-
-	if (!grad.empty()) {
-		cerr << "Cannot proceed with ABLE" << endl;
-		cerr << "Gradient based optimization not yet implemented..." << endl;
-		free_objects();
-		exit(-1);
-	}
-
-	//	global search exit status : 1234567
-	if ((currState == GLOBAL) && (evalCount > globalEvals))
-			return 1234567;
-
-	//	checking for simple non linear constraints between the free params
-	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
-		if (vars[tbi2ParVec[it->first]] >= vars[tbi2ParVec[it->second]]) {
-			parConstraintPass = false;
-			break;
-		}
-	}
-
-	//	adaptive penalization based on the difference from last sampled and valid parameter vector
-	//	in order to better explore non-linearly constrained space
-	double penFactor = 0.0;
-	if (lastValidPars.size() > 0) {
-		for (size_t i = 0; i < vars.size(); i++)
-			penFactor += fabs(vars[i] - lastValidPars[i]);
-	}
-
-	//	the standard global/local LnL search procedure (when all else is OK)
-	if (parConstraintPass) {
-		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
-			for (size_t i = 0; i < it->second.size(); i++) {
-				stringstream stst;
-				stst << vars[tbi2ParVec[it->first]];
-				stst >> ms_argv[it->second[i]];
-			}
-		}
-
-/*
-		for(int i = 1; i < ms_argc; i++)
-			printf("%s ",ms_argv[i]);
-		printf("\n");
-//		free_objects(); exit(-1);
-*/
-
-		loglik = computeLik();
-
-		if (ms_crash_flag) {
-/*
-			printf("%5d ", evalCount);
-			for (size_t i = 0; i < vars.size(); i++)
-				printf("%.6f ", vars[i]);
-*/
-
-			if (penLnL == 0)
-				penLnL = 100*dataLnL;
-			else {
-				if (lastValidPars.size() > 0)
-					penLnL = lastValidLnL + penFactor*dataLnL;
-				else
-					penLnL += dataLnL;
-			}
-
-/*
-			printf(" Trees: %d ", 0);
-			printf(" Penalised LnL: %.6f ", penLnL);
-			printf(" ms CRASH!\n");
-*/
-
-			return penLnL;
-		}
-
-		++evalCount;
-		printf("%5d ", evalCount);
-		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.6f ", vars[i]);
-		printf(" Trees: %d ", ms_trees);
-		printf(" Sampled: %d ", sampledTrees);
-		printf(" LnL: %.6f\n", loglik);
-
-		if (loglik == 0.0) {
-			//	global/local search exit status : 1234567
-			abortNLopt = true;
-			if (currState == GLOBAL)
-				return 1234567;
-			else if (currState == LOCAL)
-				return 7654321;
-		}
-
-		if ((currState == GLOBAL) && reportEveryEvals && !(evalCount % reportEveryEvals) && (evalCount < globalEvals)) {
-			printf("\nReporting the best MLE after %d evaluations\n", evalCount);
-			for (size_t i = 0; i < bestGlobalSPars.size(); i++)
-				printf("%.6f ", bestGlobalSPars[i]);
-			printf("LnL = %.6f\n\n", bestGlobalSlLnL);
-		}
-	}
-	//	penalising likelihood evaluation when searching outside the constrained zone
-	//	special case of first search point is in the forbidden zone : 100*dataLnL
-	else {
-/*
-		printf("%5d ", evalCount);
-		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.6f ", vars[i]);
-*/
-
-		if (penLnL == 0)
-			penLnL = 100*dataLnL;
-		else {
-			if (lastValidPars.size() > 0)
-				penLnL = lastValidLnL + penFactor*dataLnL;
-			else
-				penLnL += dataLnL;
-		}
-
-/*
-		printf(" Trees: %d ", 0);
-		printf(" Penalised LnL: %.6f\n", penLnL);
-*/
-
-		return penLnL;
-	}
-
-	//	side stepping nlopt by storing the best LnL and parameters
-	if ((currState == GLOBAL) && (loglik > bestGlobalSlLnL)) {
-			bestGlobalSlLnL = loglik;
-			bestGlobalSPars = vars;
-	}
-
-	lastValidLnL = loglik;
-	lastValidPars = vars;
-
-	return loglik;
-}
-
-
 void readDataConfigs() {
 	string line, del, keyVec;
 	vector<string> tokens;
@@ -905,7 +766,7 @@ void readConfigFile(char* argv[]) {
 }
 
 
-double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
+double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
 
 	bool parConstraintPass = true;
 	double loglik = 0.0;
@@ -1105,17 +966,12 @@ int main(int argc, char* argv[]) {
 		}
 		else if (globalSearchAlg == "ESCH") {
 			opt = nlopt::opt(nlopt::GN_ESCH, tbiMsCmdIdx.size());
-			printf("Using Carlos Henrique da Silva Santos's EVOLUTIONARY algorithm for the global search...\n");
+			printf("Using Carlos Henrique da Silva Santos' EVOLUTIONARY algorithm for the global search...\n");
 		}
 		else {
 			opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
 			printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
 		}
-
-//		opt.set_stopval(1234567);
-//		opt.set_lower_bounds(lowerBounds);
-//		opt.set_upper_bounds(upperBounds);
-//		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 
 //		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
 		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
@@ -1130,7 +986,7 @@ int main(int argc, char* argv[]) {
 		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
 		AUGLAG.set_lower_bounds(lowerBounds);
 		AUGLAG.set_upper_bounds(upperBounds);
-		AUGLAG.set_max_objective(tmp_optimize_wrapper_nlopt, NULL);
+		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
 		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-6);
 		AUGLAG.set_local_optimizer(opt);
 
@@ -1149,7 +1005,6 @@ int main(int argc, char* argv[]) {
 
 			ms_trees = globalTrees;
 			evalCount = 0;
-			penLnL = 0;
 			abortNLopt = false;
 			currState = GLOBAL;
 			time(&likStartTime);
@@ -1176,7 +1031,6 @@ int main(int argc, char* argv[]) {
 
 			ms_trees = localTrees;
 			evalCount = 0;
-			penLnL = 0;
 			abortNLopt = false;
 			currState = LOCAL;
 			parVec = bestGlobalSPars;
@@ -1239,7 +1093,6 @@ int main(int argc, char* argv[]) {
 			vector<double> startVec = parVec;
 			ms_trees = localTrees;
 			evalCount = 0;
-			penLnL = 0;
 			abortNLopt = false;
 			currState = LOCAL;
 
