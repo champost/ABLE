@@ -917,7 +917,8 @@ double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &gr
 		exit(-1);
 	}
 
-	if ((currState == GLOBAL) && (evalCount >= globalEvals)) {
+	if (((currState == GLOBAL) && (evalCount >= globalEvals))
+			|| ((currState == LOCAL) && localEvals && (evalCount >= localEvals))) {
 		AUGLAG.set_force_stop(2);
 		return 0.0;
 	}
@@ -1135,19 +1136,12 @@ int main(int argc, char* argv[]) {
 
 
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-		local_opt.set_stopval(7654321);
-		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
-		local_opt.set_lower_bounds(lowerBounds);
-		local_opt.set_upper_bounds(upperBounds);
-		if (localEvals)
-			local_opt.set_maxeval(localEvals);
-		else
-			local_opt.set_maxeval(10000);
-		local_opt.set_xtol_rel(1e-2);
-
+		if (!localEvals)
+			localEvals = 10000;
 		vector<double> localSearchPerturb;
 		for (size_t param = 0; param < lowerBounds.size(); param++)
 			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
+		local_opt.set_xtol_rel(1e-2);
 		local_opt.set_initial_step(localSearchPerturb);
 
 		if (!skipGlobal) {
@@ -1156,17 +1150,17 @@ int main(int argc, char* argv[]) {
 			ms_trees = globalTrees;
 			evalCount = 0;
 			penLnL = 0;
+			abortNLopt = false;
 			currState = GLOBAL;
 			time(&likStartTime);
 
 			try {
 				AUGLAG.optimize(parVec, maxLnL);
-//				opt.optimize(parVec, maxLnL);
 				throw abortNLopt;
 			}
 			catch (...) {
 				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Something went wrong in the calculation of the LnL during the global search!" << endl;
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
@@ -1178,23 +1172,24 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-//			TEMPORARY MEASURE : TO BE UNCOMMENTED AFTER SUCCESSFUL IMPLEMENTATION OF THE AUGLAG ALGORITHM
-/*
 			printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
 
 			ms_trees = localTrees;
 			evalCount = 0;
 			penLnL = 0;
+			abortNLopt = false;
 			currState = LOCAL;
 			parVec = bestGlobalSPars;
 
+			AUGLAG.set_local_optimizer(local_opt);
+
 			try {
-				local_opt.optimize(parVec, maxLnL);
+				AUGLAG.optimize(parVec, maxLnL);
 				throw abortNLopt;
 			}
 			catch (...) {
 				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Something went wrong in the calculation of the LnL during the local search!" << endl;
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
@@ -1227,13 +1222,6 @@ int main(int argc, char* argv[]) {
 				ms_trees = refineLikTrees;
 				maxLnL = computeLik();
 			}
-*/
-
-
-			parVec = bestGlobalSPars;
-			maxLnL = bestGlobalSlLnL;
-
-
 
 			printf("Found a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
@@ -1252,15 +1240,18 @@ int main(int argc, char* argv[]) {
 			ms_trees = localTrees;
 			evalCount = 0;
 			penLnL = 0;
+			abortNLopt = false;
 			currState = LOCAL;
 
+			AUGLAG.set_local_optimizer(local_opt);
+
 			try {
-				local_opt.optimize(parVec, maxLnL);
+				AUGLAG.optimize(parVec, maxLnL);
 				throw abortNLopt;
 			}
 			catch (...) {
 				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL!" << endl;
+					cerr << "Something went wrong in the calculation of the LnL during the local search!!" << endl;
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
