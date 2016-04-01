@@ -81,6 +81,8 @@ vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, lastValidPars;
 vector<gsl_rng *> PRNGThreadVec;
 
+nlopt::opt opt, local_opt, AUGLAG;
+
 char **ms_argv;
 
 int ms_argc = 0;
@@ -493,7 +495,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 /*
 			printf("%5d ", evalCount);
 			for (size_t i = 0; i < vars.size(); i++)
-				printf("%.5e ", vars[i]);
+				printf("%.6f ", vars[i]);
 */
 
 			if (penLnL == 0)
@@ -517,7 +519,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		++evalCount;
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.5e ", vars[i]);
+			printf("%.6f ", vars[i]);
 		printf(" Trees: %d ", ms_trees);
 		printf(" Sampled: %d ", sampledTrees);
 		printf(" LnL: %.6f\n", loglik);
@@ -544,7 +546,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 /*
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.5e ", vars[i]);
+			printf("%.6f ", vars[i]);
 */
 
 		if (penLnL == 0)
@@ -905,6 +907,7 @@ void readConfigFile(char* argv[]) {
 
 double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
 
+	bool parConstraintPass = true;
 	double loglik = 0.0;
 
 	if (!grad.empty()) {
@@ -914,11 +917,32 @@ double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &gr
 		exit(-1);
 	}
 
-	//	global search exit status : 1234567
-	if ((currState == GLOBAL) && (evalCount > globalEvals))
-		return 1234567;
+	if ((currState == GLOBAL) && (evalCount >= globalEvals)) {
+		AUGLAG.set_force_stop(2);
+		return 0.0;
+	}
 
-	//	the standard global/local LnL search procedure
+	//	checking for simple non linear constraints between the free params
+	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
+		if (vars[tbi2ParVec[it->first]] >= vars[tbi2ParVec[it->second]]) {
+			parConstraintPass = false;
+			break;
+		}
+	}
+
+	if (!parConstraintPass) {
+/*
+		printf("%5d ", evalCount);
+		for (size_t i = 0; i < vars.size(); i++)
+			printf("%.6f ", vars[i]);
+
+		printf(" Trees: %d ", 0);
+		printf(" Penalised LnL: %.6f\n", 10*dataLnL);
+*/
+		return 10*dataLnL;
+	}
+
+	//	constructing the ms command line
 	for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 		for (size_t i = 0; i < it->second.size(); i++) {
 			stringstream stst;
@@ -926,7 +950,6 @@ double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &gr
 			stst >> ms_argv[it->second[i]];
 		}
 	}
-
 /*
 	for(int i = 1; i < ms_argc; i++)
 		printf("%s ",ms_argv[i]);
@@ -934,36 +957,35 @@ double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &gr
 //		free_objects(); exit(-1);
 */
 
+	//	MAIN COMPOSITE LIKELIHOOD COMPUTATION
 	loglik = computeLik();
 
 	if (ms_crash_flag) {
 /*
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.5e ", vars[i]);
+			printf("%.6f ", vars[i]);
 
 		printf(" Trees: %d ", 0);
-		printf(" Penalised LnL: %.6f ", 100*dataLnL);
+		printf(" Penalised LnL: %.6f ", 10*dataLnL);
 		printf(" ms CRASH!\n");
 */
-		return 100*dataLnL;
+		return 10*dataLnL;
 	}
 
+	//	pretty output
 	++evalCount;
 	printf("%5d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf("%.5e ", vars[i]);
+		printf("%.6f ", vars[i]);
 	printf(" Trees: %d ", ms_trees);
 	printf(" Sampled: %d ", sampledTrees);
 	printf(" LnL: %.6f\n", loglik);
 
 	if (loglik == 0.0) {
-		//	global/local search exit status : 1234567
 		abortNLopt = true;
-		if (currState == GLOBAL)
-			return 1234567;
-		else if (currState == LOCAL)
-			return 7654321;
+		AUGLAG.set_force_stop(-5);
+		return 0.0;
 	}
 
 	if ((currState == GLOBAL) && reportEveryEvals && !(evalCount % reportEveryEvals) && (evalCount < globalEvals)) {
@@ -985,7 +1007,7 @@ double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &gr
 
 double check_constraints(const vector<double> &vars, vector<double> &grad, void *data) {
 
-	double diff = 1e-5;
+	double consDiff = 1e-7;
 
 	if (!grad.empty()) {
 		cerr << "Cannot proceed with ABLE" << endl;
@@ -996,17 +1018,17 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 
 	//	checking for simple non linear constraints between the free params
 	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++)
-		diff += (vars[tbi2ParVec[it->first]] - vars[tbi2ParVec[it->second]]);
+		consDiff += (vars[tbi2ParVec[it->first]] - vars[tbi2ParVec[it->second]]);
 
 /*
 	printf("%5d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf("%.5e ", vars[i]);
+		printf("%.6f ", vars[i]);
 
-	printf(" diff: %f\n", diff);
+	printf(" diff: %f\n", consDiff);
 */
 
-	return diff;
+	return consDiff;
 }
 
 
@@ -1043,8 +1065,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	evalBranchConfigs();
-
-	nlopt::opt opt, local_opt, AUGLAG;
 
 	if (estimate == 2) {
 
@@ -1091,12 +1111,11 @@ int main(int argc, char* argv[]) {
 			printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
 		}
 
-		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-
 //		opt.set_stopval(1234567);
 //		opt.set_lower_bounds(lowerBounds);
 //		opt.set_upper_bounds(upperBounds);
 //		opt.set_max_objective(optimize_wrapper_nlopt, NULL);
+
 //		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
 		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
 		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
@@ -1106,17 +1125,16 @@ int main(int argc, char* argv[]) {
 				globalEvals = globalMaxEvals;
 		}
 
-
 		void* data;
 		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
 		AUGLAG.set_lower_bounds(lowerBounds);
 		AUGLAG.set_upper_bounds(upperBounds);
 		AUGLAG.set_max_objective(tmp_optimize_wrapper_nlopt, NULL);
-		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-8);
-		AUGLAG.set_stopval(1234567);
+		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-6);
 		AUGLAG.set_local_optimizer(opt);
 
 
+		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		local_opt.set_stopval(7654321);
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
 		local_opt.set_lower_bounds(lowerBounds);
@@ -1210,6 +1228,12 @@ int main(int argc, char* argv[]) {
 				maxLnL = computeLik();
 			}
 */
+
+
+			parVec = bestGlobalSPars;
+			maxLnL = bestGlobalSlLnL;
+
+
 
 			printf("Found a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
