@@ -81,8 +81,6 @@ vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, lastValidPars;
 vector<gsl_rng *> PRNGThreadVec;
 
-nlopt::opt opt, local_opt, AUGLAG;
-
 char **ms_argv;
 
 int ms_argc = 0;
@@ -905,6 +903,113 @@ void readConfigFile(char* argv[]) {
 }
 
 
+double tmp_optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data) {
+
+	double loglik = 0.0;
+
+	if (!grad.empty()) {
+		cerr << "Cannot proceed with ABLE" << endl;
+		cerr << "Gradient based optimization not yet implemented..." << endl;
+		free_objects();
+		exit(-1);
+	}
+
+	//	global search exit status : 1234567
+	if ((currState == GLOBAL) && (evalCount > globalEvals))
+		return 1234567;
+
+	//	the standard global/local LnL search procedure
+	for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+		for (size_t i = 0; i < it->second.size(); i++) {
+			stringstream stst;
+			stst << vars[tbi2ParVec[it->first]];
+			stst >> ms_argv[it->second[i]];
+		}
+	}
+
+/*
+	for(int i = 1; i < ms_argc; i++)
+		printf("%s ",ms_argv[i]);
+	printf("\n");
+//		free_objects(); exit(-1);
+*/
+
+	loglik = computeLik();
+
+	if (ms_crash_flag) {
+/*
+		printf("%5d ", evalCount);
+		for (size_t i = 0; i < vars.size(); i++)
+			printf("%.5e ", vars[i]);
+
+		printf(" Trees: %d ", 0);
+		printf(" Penalised LnL: %.6f ", 100*dataLnL);
+		printf(" ms CRASH!\n");
+*/
+		return 100*dataLnL;
+	}
+
+	++evalCount;
+	printf("%5d ", evalCount);
+	for (size_t i = 0; i < vars.size(); i++)
+		printf("%.5e ", vars[i]);
+	printf(" Trees: %d ", ms_trees);
+	printf(" Sampled: %d ", sampledTrees);
+	printf(" LnL: %.6f\n", loglik);
+
+	if (loglik == 0.0) {
+		//	global/local search exit status : 1234567
+		abortNLopt = true;
+		if (currState == GLOBAL)
+			return 1234567;
+		else if (currState == LOCAL)
+			return 7654321;
+	}
+
+	if ((currState == GLOBAL) && reportEveryEvals && !(evalCount % reportEveryEvals) && (evalCount < globalEvals)) {
+		printf("\nReporting the best MLE after %d evaluations\n", evalCount);
+		for (size_t i = 0; i < bestGlobalSPars.size(); i++)
+			printf("%.6f ", bestGlobalSPars[i]);
+		printf("LnL = %.6f\n\n", bestGlobalSlLnL);
+	}
+
+	//	side stepping nlopt by storing the best LnL and parameters
+	if ((currState == GLOBAL) && (loglik > bestGlobalSlLnL)) {
+			bestGlobalSlLnL = loglik;
+			bestGlobalSPars = vars;
+	}
+
+	return loglik;
+}
+
+
+double check_constraints(const vector<double> &vars, vector<double> &grad, void *data) {
+
+	double diff = 1e-5;
+
+	if (!grad.empty()) {
+		cerr << "Cannot proceed with ABLE" << endl;
+		cerr << "Gradient based optimization not yet implemented..." << endl;
+		free_objects();
+		exit(-1);
+	}
+
+	//	checking for simple non linear constraints between the free params
+	for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++)
+		diff += (vars[tbi2ParVec[it->first]] - vars[tbi2ParVec[it->second]]);
+
+/*
+	printf("%5d ", evalCount);
+	for (size_t i = 0; i < vars.size(); i++)
+		printf("%.5e ", vars[i]);
+
+	printf(" diff: %f\n", diff);
+*/
+
+	return diff;
+}
+
+
 int main(int argc, char* argv[]) {
 
 	omp_set_num_threads(omp_get_num_procs());
@@ -938,6 +1043,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	evalBranchConfigs();
+
+	nlopt::opt opt, local_opt, AUGLAG;
 
 	if (estimate == 2) {
 
@@ -986,12 +1093,6 @@ int main(int argc, char* argv[]) {
 
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 
-		AUGLAG.set_lower_bounds(lowerBounds);
-		AUGLAG.set_upper_bounds(upperBounds);
-		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
-		AUGLAG.set_local_optimizer(opt);
-		AUGLAG.set_stopval(1234567);
-
 //		opt.set_stopval(1234567);
 //		opt.set_lower_bounds(lowerBounds);
 //		opt.set_upper_bounds(upperBounds);
@@ -1004,6 +1105,17 @@ int main(int argc, char* argv[]) {
 			else
 				globalEvals = globalMaxEvals;
 		}
+
+
+		void* data;
+		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
+		AUGLAG.set_lower_bounds(lowerBounds);
+		AUGLAG.set_upper_bounds(upperBounds);
+		AUGLAG.set_max_objective(tmp_optimize_wrapper_nlopt, NULL);
+		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-8);
+		AUGLAG.set_stopval(1234567);
+		AUGLAG.set_local_optimizer(opt);
+
 
 		local_opt.set_stopval(7654321);
 		local_opt.set_max_objective(optimize_wrapper_nlopt, NULL);
@@ -1030,7 +1142,8 @@ int main(int argc, char* argv[]) {
 			time(&likStartTime);
 
 			try {
-				opt.optimize(parVec, maxLnL);
+				AUGLAG.optimize(parVec, maxLnL);
+//				opt.optimize(parVec, maxLnL);
 				throw abortNLopt;
 			}
 			catch (...) {
