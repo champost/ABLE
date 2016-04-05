@@ -449,6 +449,7 @@ void readDataConfigs() {
 	vector<string> tokens;
 	vector<int> config;
 	double val;
+	int dataKmax = 0, blockKmax;
 
 	ifstream ifs(dataConfigFile.c_str(),ios::in);
 	while (getline(ifs,line)) {
@@ -471,6 +472,10 @@ void readDataConfigs() {
 		dataConfigs.push_back(config);
 		dataConfigFreqs.push_back(val);
 
+		blockKmax = *max_element(config.begin(),config.end());
+		if (blockKmax > dataKmax)
+			dataKmax = blockKmax;
+
 		config.clear();
 	}
 	ifs.close();
@@ -480,6 +485,8 @@ void readDataConfigs() {
 		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
 
 	bestGlobalSlLnL = 100000*dataLnL;
+	if (!kmax)
+		kmax = dataKmax;
 }
 
 
@@ -930,11 +937,12 @@ int main(int argc, char* argv[]) {
 			gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
 
+	if ((estimate > 1) || bSFS)
+		readDataConfigs();
+
 	evalBranchConfigs();
 
 	if (estimate == 2) {
-
-		readDataConfigs();
 
 		double maxLnL;
 		vector<double> parVec;
@@ -961,7 +969,7 @@ int main(int argc, char* argv[]) {
 		else if (globalSearchAlg == "CRS") {
 			opt = nlopt::opt(nlopt::GN_CRS2_LM, tbiMsCmdIdx.size());
 			opt.set_population(20*(tbiMsCmdIdx.size()+1));
-			printf("Using the CONTROLLED RANDOM SEARCH algorithm for the global search...\n");
+			printf("Using the CONTROLLED RANDOM SEARCH WITH LOCAL MUTATION algorithm for the global search...\n");
 		}
 		else if (globalSearchAlg == "ISRES") {
 			opt = nlopt::opt(nlopt::GN_ISRES, tbiMsCmdIdx.size());
@@ -1157,8 +1165,6 @@ int main(int argc, char* argv[]) {
 //			profileLik(parVec);
 	}
 	else if ((estimate == 1) || bSFS) {
-
-		readDataConfigs();
 
 		printf("Evaluating point likelihood at : \n");
 		if (!tbiUserVal.empty()) {
