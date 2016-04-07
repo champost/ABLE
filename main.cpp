@@ -78,7 +78,7 @@ ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
 vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt, local_opt, AUGLAG;
@@ -90,7 +90,7 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, userLnL = 0.0;
+double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -484,7 +484,7 @@ void readDataConfigs() {
 	for (size_t i = 0; i < dataConfigs.size(); i++)
 		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
 
-	bestGlobalSlLnL = 100000*dataLnL;
+	bestGlobalSlLnL = bestLocalSlLnL = 100000*dataLnL;
 	if (!kmax)
 		kmax = dataKmax;
 }
@@ -873,6 +873,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 			bestGlobalSlLnL = loglik;
 			bestGlobalSPars = vars;
 	}
+	else if ((currState == LOCAL) && (loglik > bestLocalSlLnL)) {
+			bestLocalSlLnL = loglik;
+			bestLocalSPars = vars;
+	}
 
 	return loglik;
 }
@@ -1005,7 +1009,7 @@ int main(int argc, char* argv[]) {
 
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		if (!localEvals)
-			localEvals = 10000;
+			localEvals = globalEvals/5;
 		vector<double> localSearchPerturb;
 		for (size_t param = 0; param < lowerBounds.size(); param++)
 			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
@@ -1039,44 +1043,55 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
+			printf("\nReporting the best MLE after %d evaluations\n", evalCount);
+			for (size_t i = 0; i < bestGlobalSPars.size(); i++)
+				printf("%.6f ", bestGlobalSPars[i]);
+			printf("LnL = %.6f\n\n", bestGlobalSlLnL);
 
 			ms_trees = localTrees;
 			evalCount = 0;
 			abortNLopt = false;
 			currState = LOCAL;
 			parVec = bestGlobalSPars;
+			bestLocalSlLnL = bestGlobalSlLnL;
 
-			AUGLAG.set_local_optimizer(local_opt);
+			if (globalTrees == localTrees) {
+				printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
 
-			try {
-				AUGLAG.optimize(parVec, maxLnL);
-				throw abortNLopt;
-			}
-			catch (...) {
-				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL during the local search!" << endl;
-					cerr << "Aborting ABLE..." << endl;
+				AUGLAG.set_local_optimizer(local_opt);
 
-					for (size_t i = 0; i < parVec.size(); i++)
-						printf("%.6f ", parVec[i]);
-					printf("LnL = %.6f\n\n", maxLnL);
+				try {
+					AUGLAG.optimize(parVec, maxLnL);
+					throw abortNLopt;
+				}
+				catch (...) {
+					if (abortNLopt) {
+						cerr << "Something went wrong in the calculation of the LnL during the local search!" << endl;
+						cerr << "Aborting ABLE..." << endl;
 
-					free_objects();
-					exit(-1);
+						for (size_t i = 0; i < parVec.size(); i++)
+							printf("%.6f ", parVec[i]);
+						printf("LnL = %.6f\n\n", maxLnL);
+
+						free_objects();
+						exit(-1);
+					}
+				}
+
+				if (bestLocalSlLnL <= bestGlobalSlLnL) {
+					printf("\nIgnoring local search results as they did not improve on the global search optimum...\n");
+					parVec = bestGlobalSPars;
+					maxLnL = bestGlobalSlLnL;
+				}
+				else {
+					printf("\nFound a better maximum locally after %d evaluations\n", evalCount);
+					parVec = bestLocalSPars;
+					maxLnL = bestLocalSlLnL;
 				}
 			}
 
-			if ((globalTrees == localTrees) && (maxLnL < bestGlobalSlLnL)) {
-				printf("Ignoring local search results as they did not improve on the global search optimum...\n");
-				parVec = bestGlobalSPars;
-				maxLnL = bestGlobalSlLnL;
-			}
-			else
-				printf("Found the local maximum after %d evaluations\n", evalCount);
-
 			if (refineLikTrees) {
-				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
+				printf("\nRefining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 					for (size_t i = 0; i < it->second.size(); i++) {
 						stringstream stst;
@@ -1128,16 +1143,16 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if ((userLnL != 0.0) && (maxLnL < userLnL)) {
-				printf("Ignoring local search results as they did not improve on the user-specified optimum...\n");
+			if ((userLnL != 0.0) && (maxLnL <= userLnL)) {
+				printf("\nIgnoring local search results as they did not improve on the user-specified optimum...\n");
 				parVec = startVec;
 				maxLnL = userLnL;
 			}
 			else
-				printf("Found the local maximum after %d evaluations\n", evalCount);
+				printf("\nFound the local maximum after %d evaluations\n", evalCount);
 
 			if (refineLikTrees) {
-				printf("Refining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
+				printf("\nRefining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 					for (size_t i = 0; i < it->second.size(); i++) {
 						stringstream stst;
