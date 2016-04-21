@@ -911,10 +911,13 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 
 int main(int argc, char* argv[]) {
 
-	omp_set_num_threads(omp_get_num_procs());
+	int procs = omp_get_num_procs();	
+
+	omp_set_num_threads(procs);
+	printf("Setting up %d threads...\n", procs);
 
 	seedPRNG = hash(time(NULL), clock());
-	for (int i = 0; i < omp_get_num_procs(); i++) {
+	for (int i = 0; i < procs; i++) {
 		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
 		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
