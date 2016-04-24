@@ -41,35 +41,34 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <vector>
 #include <string>
 #include <cmath>
+#include <algorithm>
 
 #include "utils.h"
 
 //	Linearly spaced points between [a,b]
 vector<double> linspaced(double a, double b, int n) {
     vector<double> array;
-    if (n > 0) {
-        double diff = b - a;
-        if ((a == b) || (n == 1))
-        	array.push_back(a);
-        else {
-            int count = 0;
-        	while(count < n) {
-        		array.push_back(a + count*diff);
-        		++count;
-        	}
-        }
+    if ((n == 0) || (n == 1) || (a == b))
+    	array.push_back(b);
+    else if (n > 1) {
+		double step = (b - a) / (n - 1);
+		int count = 0;
+		while(count < n) {
+			array.push_back(a + count*step);
+			++count;
+		}
     }
     return array;
 }
 
 
-//	Log-spaced points between [a,b] ONLY for (a,b > 0)
+//	Log-spaced points between [a,b] ONLY for (0 < a,b)
 vector<double> logspaced(double a, double b, int n) {
     vector<double> array;
-    if ((n > 0) && (a > 0) && (b > 0)) {
-        if ((a == b) || (n == 1))
-        	array.push_back(a);
-        else {
+    if ((a > 0) && (b > 0)) {
+        if ((n == 0) || (n == 1) || (a == b))
+        	array.push_back(b);
+        else if (n > 1) {
             double step = pow(b/a, 1.0/(n-1));
             int count = 0;
         	while(count < n) {
@@ -78,6 +77,27 @@ vector<double> logspaced(double a, double b, int n) {
         	}
         }
     }
+    return array;
+}
+
+
+//	Log-spaced points between [a,b] ONLY for (a,b < 0)
+vector<double> negLogspaced(double a, double b, int n) {
+    vector<double> array;
+    double posA = -a, posB = -b;
+    if ((posB > 0) && (posA > 0)) {
+        if ((n == 0) || (n == 1) || (posB == posA))
+        	array.push_back(b);
+        else if (n > 1) {
+            double step = pow(posA/posB, 1.0/(n-1));
+            int count = 0;
+        	while(count < n) {
+        		array.push_back(-posB * pow(step, count));
+        		++count;
+        	}
+        }
+    }
+    reverse(array.begin(),array.end());
     return array;
 }
 
