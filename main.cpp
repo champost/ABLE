@@ -117,20 +117,23 @@ void profileLik(vector<double> MLEparVec) {
 
 	double parLowerBound, parUpperBound, MLEparVal, MLEparLik;
 
-	stringstream ststTree;
-	ststTree << localTrees;
-	ststTree >> ms_argv[2];
-
 	size_t parIdx = 0;
 	//	Likelihood profiles for all parameters to be inferred (tbi)
 	for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 		stringstream tbiFileName;
-		double quarterGlobalRange = (upperBounds[parIdx] - lowerBounds[parIdx]) / 4;
-		MLEparVal = MLEparVec[it->first-1];
-		parUpperBound = MLEparVal + quarterGlobalRange;
-		parLowerBound = MLEparVal - quarterGlobalRange;
-		if (parLowerBound < 0)
-			parLowerBound = MLEparVal / 2;
+		MLEparVal = MLEparVec[tbi2ParVec[it->first]];
+
+		double quarterRange = (upperBounds[parIdx] - lowerBounds[parIdx]) / 4;
+		parUpperBound = MLEparVal + quarterRange;
+		parLowerBound = MLEparVal - quarterRange;
+		if (parLowerBound < lowerBounds[parIdx])
+			parLowerBound = lowerBounds[parIdx];
+		if (parUpperBound > upperBounds[parIdx])
+			parUpperBound = upperBounds[parIdx];
+/*
+		parUpperBound = upperBounds[parIdx];
+		parLowerBound = lowerBounds[parIdx];
+*/
 
 		tbiFileName << "tbi" << it->first;
 		printf("\nCalculating profiles of the likelihood surface for %s\n", tbiFileName.str().c_str());
@@ -146,21 +149,30 @@ void profileLik(vector<double> MLEparVec) {
 		}
 		MLEparLik = computeLik();
 		outFile << scientific << MLEparVal << "\t" << MLEparLik << endl;
-		bool insertMLEpar = true;
 
-		//	Likelihood profiles for this parameter
-		vector<double> parRange = logspaced(parLowerBound, parUpperBound, 10);
+		//	Likelihood profile intervals for this parameter
+		vector<double> parRange;
+		if (parLowerBound > 0)
+			parRange = logspaced(parLowerBound, parUpperBound, 10);
+		else if (parUpperBound < 0)
+			parRange = negLogspaced(parLowerBound, parUpperBound, 10);
+		else
+			parRange = linspaced(parLowerBound, parUpperBound, 10);
+
 		for (size_t j = 0; j < parRange.size(); j++) {
-			for (size_t i = 0; i < it->second.size(); i++) {
-				stringstream ststProfilePar;
-				ststProfilePar << parRange[j];
-				ststProfilePar >> ms_argv[it->second[i]];
-			}
-			if (insertMLEpar && (parRange[j] > MLEparVal)) {
+			if (parRange[j] == MLEparVal)
 				outFile << scientific << MLEparVal << "\t" << MLEparLik << endl;
-				insertMLEpar = false;
+			else {
+				for (size_t i = 0; i < it->second.size(); i++) {
+					stringstream ststProfilePar;
+					ststProfilePar << parRange[j];
+					ststProfilePar >> ms_argv[it->second[i]];
+				}
+				double loglik = computeLik();
+				if (ms_crash_flag)
+					loglik = 2*dataLnL;
+				outFile << scientific << parRange[j] << "\t" << loglik << endl;
 			}
-			outFile << scientific << parRange[j] << "\t" << computeLik() << endl;
 		}
 
 		outFile.close();
@@ -341,10 +353,10 @@ void calcBSFSTable() {
 
 		int sim_trees = ms_trees, crashLimit;
 		crash_counter = sampledTrees = 0;
-		if (ms_trees < 2000)
-			crashLimit = 2;
+		if (ms_trees < 100)
+			crashLimit = 1;
 		else
-			crashLimit = ms_trees/1000;
+			crashLimit = ms_trees/100;
 
 		do {
 
@@ -969,36 +981,38 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		if (globalSearchAlg == "DIRECT") {
-			opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
-			printf("Using the DIRECT algorithm for the global search...\n");
-		}
-		else if (globalSearchAlg == "CRS") {
-			opt = nlopt::opt(nlopt::GN_CRS2_LM, tbiMsCmdIdx.size());
-			opt.set_population(20*(tbiMsCmdIdx.size()+1));
-			printf("Using the CONTROLLED RANDOM SEARCH WITH LOCAL MUTATION algorithm for the global search...\n");
-		}
-		else if (globalSearchAlg == "ISRES") {
-			opt = nlopt::opt(nlopt::GN_ISRES, tbiMsCmdIdx.size());
-			opt.set_population(20*(tbiMsCmdIdx.size()+1));
-			printf("Using the IMPROVED STOCHASTIC RANKING EVOLUTION STRATEGY algorithm for the global search...\n");
-		}
-		else if (globalSearchAlg == "ESCH") {
-			opt = nlopt::opt(nlopt::GN_ESCH, tbiMsCmdIdx.size());
-			printf("Using Carlos Henrique da Silva Santos' EVOLUTIONARY algorithm for the global search...\n");
-		}
-		else {
-			opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
-			printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
-		}
+		if (!skipGlobal) {
+			if (globalSearchAlg == "DIRECT") {
+				opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
+				printf("Using the DIRECT algorithm for the global search...\n");
+			}
+			else if (globalSearchAlg == "CRS") {
+				opt = nlopt::opt(nlopt::GN_CRS2_LM, tbiMsCmdIdx.size());
+				opt.set_population(20*(tbiMsCmdIdx.size()+1));
+				printf("Using the CONTROLLED RANDOM SEARCH WITH LOCAL MUTATION algorithm for the global search...\n");
+			}
+			else if (globalSearchAlg == "ISRES") {
+				opt = nlopt::opt(nlopt::GN_ISRES, tbiMsCmdIdx.size());
+				opt.set_population(20*(tbiMsCmdIdx.size()+1));
+				printf("Using the IMPROVED STOCHASTIC RANKING EVOLUTION STRATEGY algorithm for the global search...\n");
+			}
+			else if (globalSearchAlg == "ESCH") {
+				opt = nlopt::opt(nlopt::GN_ESCH, tbiMsCmdIdx.size());
+				printf("Using Carlos Henrique da Silva Santos' EVOLUTIONARY algorithm for the global search...\n");
+			}
+			else {
+				opt = nlopt::opt(nlopt::GN_DIRECT_NOSCAL, tbiMsCmdIdx.size());
+				printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
+			}
 
-//		int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
-		int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
-		if (!skipGlobal && (globalEvals < globalMaxEvals)) {
-			if (globalEvals)
-				printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
-			else
-				globalEvals = globalMaxEvals;
+//			int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
+			int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
+			if (!skipGlobal && (globalEvals < globalMaxEvals)) {
+				if (globalEvals)
+					printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
+				else
+					globalEvals = globalMaxEvals;
+			}
 		}
 
 		void* data;
@@ -1177,10 +1191,10 @@ int main(int argc, char* argv[]) {
 			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 
-		// temporarily deactivated!
-//		currState = OTHER;
-//		if (onlyProfiles || profileLikBool)
-//			profileLik(parVec);
+		currState = OTHER;
+		ms_trees = refineLikTrees;
+		if (onlyProfiles || profileLikBool)
+			profileLik(parVec);
 	}
 	else if ((estimate == 1) || bSFS) {
 
