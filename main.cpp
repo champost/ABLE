@@ -123,6 +123,7 @@ void profileLik(vector<double> MLEparVec) {
 		stringstream tbiFileName;
 		MLEparVal = MLEparVec[tbi2ParVec[it->first]];
 
+/*
 		double quarterRange = (upperBounds[parIdx] - lowerBounds[parIdx]) / 4;
 		parUpperBound = MLEparVal + quarterRange;
 		parLowerBound = MLEparVal - quarterRange;
@@ -130,10 +131,9 @@ void profileLik(vector<double> MLEparVec) {
 			parLowerBound = lowerBounds[parIdx];
 		if (parUpperBound > upperBounds[parIdx])
 			parUpperBound = upperBounds[parIdx];
-/*
+*/
 		parUpperBound = upperBounds[parIdx];
 		parLowerBound = lowerBounds[parIdx];
-*/
 
 		tbiFileName << "tbi" << it->first;
 		printf("\nCalculating profiles of the likelihood surface for %s\n", tbiFileName.str().c_str());
@@ -988,12 +988,12 @@ int main(int argc, char* argv[]) {
 			}
 			else if (globalSearchAlg == "CRS") {
 				opt = nlopt::opt(nlopt::GN_CRS2_LM, tbiMsCmdIdx.size());
-				opt.set_population(20*(tbiMsCmdIdx.size()+1));
+				opt.set_population(30*(tbiMsCmdIdx.size()+1));
 				printf("Using the CONTROLLED RANDOM SEARCH WITH LOCAL MUTATION algorithm for the global search...\n");
 			}
 			else if (globalSearchAlg == "ISRES") {
 				opt = nlopt::opt(nlopt::GN_ISRES, tbiMsCmdIdx.size());
-				opt.set_population(20*(tbiMsCmdIdx.size()+1));
+				opt.set_population(30*(tbiMsCmdIdx.size()+1));
 				printf("Using the IMPROVED STOCHASTIC RANKING EVOLUTION STRATEGY algorithm for the global search...\n");
 			}
 			else if (globalSearchAlg == "ESCH") {
