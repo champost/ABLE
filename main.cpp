@@ -72,6 +72,7 @@ map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
+map<int, bool> setRandomPars;
 
 string dataConfigFile, configFile, globalSearchAlg;
 ofstream testLik, testConfig;
@@ -90,8 +91,8 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
 
-double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0;
-bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false;
+double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
+bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false;
 unsigned long int finalTableSize, seedPRNG;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -415,17 +416,30 @@ double computeLik() {
 			trackedConfigs = trackSelectConfigs.size();
 
 		if (bSFS) {
-			ofstream ofs("bSFS.txt",ios::out);
-			for (size_t i = 0; i < dataConfigs.size(); i++) {
-				if (selectConfigFreqs[i] != 0.0) {
-					ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / ms_trees << endl;
-					loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
+			if (nobSFSFile) {
+				for (size_t i = 0; i < dataConfigs.size(); i++) {
+					if (selectConfigFreqs[i] != 0.0)
+						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
 				}
 			}
-			ofs.close();
+			else {
+				ofstream ofs("bSFS.txt",ios::out);
+				double bSFSNorm = accumulate(selectConfigFreqs.begin(), selectConfigFreqs.end(),0.0);
+				for (size_t i = 0; i < dataConfigs.size(); i++) {
+					if (selectConfigFreqs[i] != 0.0) {
+						//	normalization of the bSFS to account for the fact that we approach a sum(bSFS)=1 only for an infinite number of genealogies!
+						ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / bSFSNorm << endl;
+						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
+					}
+				}
+				ofs.close();
+			}
 
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
+
+			if (printLikCorrFactor)
+				printf("Likelihood correction factor : %.6f\n", (double) dataConfigFreqs.size() / trackedConfigs);
 		}
 		else if (estimate > 0) {
 			for (size_t i = 0; i < dataConfigs.size(); i++) {
@@ -624,6 +638,9 @@ void readConfigFile(char* argv[]) {
 						tbiUserVal[j-1] = val;
 					}
 				}
+				else if (tokens[1] == "random") {
+					startRandom = true;
+				}
 				else {
 					stringstream stst(tokens[2]);
 					stst >> val;
@@ -711,6 +728,16 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> userLnL;
 			}
+			else if (tokens[0] == "no_bSFS_file") {
+				nobSFSFile = true;
+			}
+			else if (tokens[0] == "print_correction_factor") {
+				printLikCorrFactor = true;
+			}
+			else if (tokens[0] == "set_ftol_abs") {
+				stringstream stst(tokens[1]);
+				stst >> localSearchAbsTol;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -735,7 +762,7 @@ void readConfigFile(char* argv[]) {
 				stst >> ms_argv[i];
 			}
 			else {
-				if (estimate == 2 && (onlyProfiles || skipGlobal)) {
+				if (estimate == 2 && (onlyProfiles || skipGlobal) && !startRandom) {
 					if (onlyProfiles)
 						cerr << "\nCannot proceed with plotting only profiles" << endl;
 					else if (skipGlobal)
@@ -750,6 +777,9 @@ void readConfigFile(char* argv[]) {
 				tbiUserVal[paramID] = tmpPar;
 				stst << tmpPar;
 				stst >> ms_argv[i];
+
+				if (startRandom)
+					setRandomPars[paramID] = true;
 			}
 		}
 		else {
@@ -962,15 +992,12 @@ int main(int argc, char* argv[]) {
 	evalBranchConfigs();
 
 	if (estimate == 2) {
-
 		double maxLnL;
+
 		vector<double> parVec;
 		int count = 0;
-		for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++) {
-			parVec.push_back(it->second);
-			tbi2ParVec[it->first] = count;
-			++count;
-
+		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+			//	Customising search bounds based on user specifications
 			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
 				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
 				upperBounds.push_back(tbiSearchBounds[it->first][1]);
@@ -979,8 +1006,27 @@ int main(int argc, char* argv[]) {
 				lowerBounds.push_back(globalLower);
 				upperBounds.push_back(globalUpper);
 			}
+			tbi2ParVec[it->first] = count;
+
+			//	if random user values have been specified
+			double parVal;
+			if (setRandomPars[it->first])
+				parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+			else
+				parVal = tbiUserVal[it->first];
+
+			parVec.push_back(parVal);
+
+			//	constructing the ms command line
+			for (size_t i = 0; i < it->second.size(); i++) {
+				stringstream stst;
+				stst << parVec[tbi2ParVec[it->first]];
+				stst >> ms_argv[it->second[i]];
+			}
+			++count;
 		}
 
+		//	If global search is meant to be skipped... (more details the below here : http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Global_optimization)
 		if (!skipGlobal) {
 			if (globalSearchAlg == "DIRECT") {
 				opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
@@ -1015,6 +1061,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		//	Specifying the the Augmented Lagrangian algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Augmented_Lagrangian_algorithm)
 		void* data;
 		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
 		AUGLAG.set_lower_bounds(lowerBounds);
@@ -1024,13 +1071,15 @@ int main(int argc, char* argv[]) {
 		AUGLAG.set_local_optimizer(opt);
 
 
+		//	Specifying the the Subplex alogorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		if (!localEvals)
 			localEvals = globalEvals/5;
 		vector<double> localSearchPerturb;
 		for (size_t param = 0; param < lowerBounds.size(); param++)
 			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
-		local_opt.set_xtol_rel(1e-2);
+//		local_opt.set_xtol_rel(1e-2);
+		local_opt.set_ftol_abs(localSearchAbsTol);
 		local_opt.set_initial_step(localSearchPerturb);
 
 		if (!skipGlobal) {
@@ -1072,7 +1121,7 @@ int main(int argc, char* argv[]) {
 			parVec = bestGlobalSPars;
 			bestLocalSlLnL = bestGlobalSlLnL;
 
-			if (globalTrees == localTrees) {
+			if (localTrees >= globalTrees) {
 				printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
 
 				AUGLAG.set_local_optimizer(local_opt);
@@ -1106,7 +1155,14 @@ int main(int argc, char* argv[]) {
 					maxLnL = bestLocalSlLnL;
 				}
 			}
+			else {
+				cerr << "It is strongly advised to rerun the local search with a value of \"local trees\" >= \"global trees\"!" << endl;
+				cerr << "Aborting ABLE..." << endl;
+				free_objects();
+				exit(-1);
+			}
 
+			currState = OTHER;
 			if (refineLikTrees) {
 				printf("\nRefining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
