@@ -1010,8 +1010,16 @@ int main(int argc, char* argv[]) {
 
 			//	if random user values have been specified
 			double parVal;
-			if (setRandomPars[it->first])
-				parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+			if (setRandomPars[it->first]) {
+				//	breaks the PRNG dependence on the CPU clock in case of a simultaneous start of jobs e.g. on a cluster
+				if (seedPRNGBool) {
+					gsl_rng_set(PRNG, seedPRNG - 1);
+					double tmpPar = gsl_rng_uniform(PRNG);
+					parVal = tmpPar * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+				}
+				else
+					parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+			}
 			else
 				parVal = tbiUserVal[it->first];
 
@@ -1071,10 +1079,14 @@ int main(int argc, char* argv[]) {
 		AUGLAG.set_local_optimizer(opt);
 
 
-		//	Specifying the the Subplex alogorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
+		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-		if (!localEvals)
-			localEvals = globalEvals/5;
+		if (!localEvals) {
+			if (!skipGlobal)
+				localEvals = globalEvals/5;
+			else
+				localEvals = 1000 * tbiMsCmdIdx.size();
+		}
 		vector<double> localSearchPerturb;
 		for (size_t param = 0; param < lowerBounds.size(); param++)
 			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
