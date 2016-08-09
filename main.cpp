@@ -89,7 +89,7 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
-int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0;
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
 bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false;
@@ -741,6 +741,10 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> localSearchAbsTol;
 			}
+			else if (tokens[0] == "set_threads") {
+				stringstream stst(tokens[1]);
+				stst >> set_threads;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -956,17 +960,6 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 
 int main(int argc, char* argv[]) {
 
-	int procs = omp_get_num_procs();	
-
-	omp_set_num_threads(procs);
-	printf("Setting up %d threads...\n", procs);
-
-	seedPRNG = hash(time(NULL), clock());
-	for (int i = 0; i < procs; i++) {
-		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
-		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
-	}
-
 	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
 	gsl_rng_set(PRNG, hash(time(NULL), clock()));
 
@@ -984,9 +977,21 @@ int main(int argc, char* argv[]) {
 
 	readConfigFile(argv);
 
-	if (seedPRNGBool) {
-		for (size_t i = 0; i < PRNGThreadVec.size(); i++)
-			gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
+	int procs;
+	if (set_threads > 0)
+		procs = set_threads;
+	else
+		procs = omp_get_num_procs();
+
+	omp_set_num_threads(procs);
+	printf("Setting up %d threads...\n", procs);
+
+	if (!seedPRNGBool)
+		seedPRNG = hash(time(NULL), clock());
+
+	for (int i = 0; i < procs; i++) {
+		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
+		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
 
 	if ((estimate > 1) || bSFS)
@@ -1014,7 +1019,8 @@ int main(int argc, char* argv[]) {
 			//	if random user values have been specified
 			double parVal;
 			if (setRandomPars[it->first]) {
-				//	breaks the PRNG dependence on the CPU clock in case of a simultaneous start of jobs e.g. on a cluster
+				//	breaks the PRNG dependence on the CPU clock in the case of a simultaneous start of jobs (e.g. on a cluster)
+				//	and a random initialisation of the start values
 				if (seedPRNGBool) {
 					gsl_rng_set(PRNG, seedPRNG - 1);
 					double tmpPar = gsl_rng_uniform(PRNG);
