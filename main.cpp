@@ -74,7 +74,7 @@ map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
 
-string dataConfigFile, configFile, globalSearchAlg;
+string dataConfigFile, configFile, globalSearchAlg, bSFSFile;
 ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
@@ -423,7 +423,7 @@ double computeLik() {
 				}
 			}
 			else {
-				ofstream ofs("bSFS.txt",ios::out);
+				ofstream ofs(bSFSFile.c_str(),ios::out);
 				double bSFSNorm = accumulate(selectConfigFreqs.begin(), selectConfigFreqs.end(),0.0);
 				for (size_t i = 0; i < dataConfigs.size(); i++) {
 					if (selectConfigFreqs[i] != 0.0) {
@@ -654,6 +654,12 @@ void readConfigFile(char* argv[]) {
 				stringstream stst(tokens[1]);
 				stst >> estimate;
 			}
+			else if (tokens[0] == "bSFS") {
+				bSFS = true;
+				bSFSFile = "bSFS.txt";
+				if (tokens.size() > 1)
+					bSFSFile = tokens[1];
+			}
 			else if (tokens[0] == "kmax") {
 				stringstream stst(tokens[1]);
 				stst >> kmax;
@@ -701,9 +707,6 @@ void readConfigFile(char* argv[]) {
 			else if (tokens[0] == "constrain") {
 				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
 				parConstraints[paramID1] = paramID2;
-			}
-			else if (tokens[0] == "bSFS") {
-				bSFS = true;
 			}
 			else if (tokens[0] == "no_profiles") {
 				profileLikBool = false;
