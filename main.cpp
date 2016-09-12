@@ -74,7 +74,7 @@ map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
 
-string dataConfigFile, configFile, globalSearchAlg, bSFSFile;
+string dataFile, dataFileFormat = "bSFS", configFile, globalSearchAlg, bSFSFile;
 ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
@@ -266,6 +266,11 @@ int getBrConfigNum(int *brConfVec) {
 	}
 
 	return -1;
+}
+
+
+int getBrConfigNum(vector<int> brConfVec) {
+	return intVec2BrConfig[brConfVec];
 }
 
 
@@ -477,7 +482,7 @@ void readDataConfigs() {
 	double val;
 	int dataKmax = 0, blockKmax;
 
-	ifstream ifs(dataConfigFile.c_str(),ios::in);
+	ifstream ifs(dataFile.c_str(),ios::in);
 	while (getline(ifs,line)) {
 		del = ":";
 		tokens.clear();
@@ -600,7 +605,7 @@ void evalBranchConfigs() {
 }
 
 
-void readConfigFile(char* argv[]) {
+void readConfigFile() {
 
 	string line, del, keyWord;
 	vector<string> tokens;
@@ -648,7 +653,10 @@ void readConfigFile(char* argv[]) {
 				}
 			}
 			else if (tokens[0] == "datafile") {
-				dataConfigFile = tokens[1];
+				dataFile = tokens[1];
+			}
+			else if (tokens[0] == "datafile_format") {
+				dataFileFormat = tokens[1];
 			}
 			else if (tokens[0] == "estimate") {
 				stringstream stst(tokens[1]);
@@ -754,6 +762,11 @@ void readConfigFile(char* argv[]) {
 	}
 	ifs.close();
 
+}
+
+
+void parseCmdLine(char* argv[]) {
+
 	ms_argv = (char **)malloc( ms_argc*sizeof(char *) ) ;
 	for(int i =0; i < ms_argc; i++)
 		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
@@ -823,6 +836,7 @@ void readConfigFile(char* argv[]) {
 
 	if (onlyProfiles)
 		skipGlobal = true;
+
 }
 
 
@@ -975,7 +989,14 @@ int main(int argc, char* argv[]) {
 	else
 		ms_argc = argc - 1;
 
-	readConfigFile(argv);
+	readConfigFile();
+
+	evalBranchConfigs();
+
+	if ((estimate > 1) || bSFS)
+		readDataConfigs();
+
+	parseCmdLine(argv);
 
 	int procs;
 	if (set_threads > 0)
@@ -993,11 +1014,6 @@ int main(int argc, char* argv[]) {
 		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
 		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
-
-	if ((estimate > 1) || bSFS)
-		readDataConfigs();
-
-	evalBranchConfigs();
 
 	if (estimate == 2) {
 		double maxLnL;
