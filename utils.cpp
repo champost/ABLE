@@ -138,7 +138,7 @@ void TrimSpaces(string& str)  {
 }
 
 
-void readDataAsSeqBlocks(string outSNPsFile) {
+void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
 
 	string line;
 	ifstream ifs(dataFile.c_str(),ios::in);
@@ -151,11 +151,20 @@ void readDataAsSeqBlocks(string outSNPsFile) {
 			++nblocks;
 			vector<string> blockMat;
 
-			//	skip a line
-			getline(ifs,line);
-
-			while (getline(ifs,line) &&  !ifs.eof() && ((line[0] == 'A') or (line[0] == 'T') or (line[0] == 'G') or (line[0] == 'C') or (line[0] == 'N')))
-				blockMat.push_back(line);
+			//	skip header until the start of the block
+			bool startBlock = false;
+			while (getline(ifs,line) &&  !ifs.eof()) {
+				if ((alleleType == "genotype") && ((line[0] == 'A') or (line[0] == 'T') or (line[0] == 'G') or (line[0] == 'C') or (line[0] == 'N'))) {
+					startBlock = true;
+					blockMat.push_back(line);
+				}
+				else if ((alleleType == "binary") && ((line[0] == '0') or (line[0] == '1') or (line[0] == 'N'))) {
+					startBlock = true;
+					blockMat.push_back(line);
+				}
+				else if (startBlock or (line.length() == 0))
+					break;
+			}
 
 			int blockSize = 0, segSites = 0;
 			bool monoMorphicBlock = true;
@@ -175,7 +184,7 @@ void readDataAsSeqBlocks(string outSNPsFile) {
 					for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
 						if (blockMat[sample][nuc] == 'N') {
 							maskChar = true;
-							pop = sampledPops.size() +1;
+							pop = sampledPops.size() + 1;
 							break;
 						}
 						++popwiseAlleleCounts[pop][blockMat[sample][nuc]];
@@ -190,7 +199,10 @@ void readDataAsSeqBlocks(string outSNPsFile) {
 					for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
 						if (it->second) {
 							++alleleCount;
-							chooseAnAllele = it->first;
+							if (alleleType == "genotype")
+								chooseAnAllele = it->first;
+							else if ((alleleType == "binary") && it->first == '1')
+								chooseAnAllele = it->first;
 						}
 					}
 
@@ -199,7 +211,7 @@ void readDataAsSeqBlocks(string outSNPsFile) {
 							segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
 		                ++mutConfigVec[getBrConfigNum(segCountVec)];
 
-		                //	NB. Tri/Quadri-allelic loci are treated as monomorphic loci
+		                //	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
 		                monoMorphicBlock = false;
 					}
 

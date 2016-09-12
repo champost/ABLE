@@ -51,6 +51,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <algorithm>
 #include <numeric>
 #include <limits>
+#include <iomanip>
 
 #include <nlopt.hpp>
 #include <gsl/gsl_rng.h>
@@ -74,7 +75,7 @@ map<int, vector<double> > tbiSearchBounds;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
 
-string dataFile, dataFileFormat = "bSFS", configFile, globalSearchAlg, bSFSFile;
+string dataFile, dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile, data2bSFSFile;
 ofstream testLik, testConfig;
 
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
@@ -89,10 +90,12 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
-int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0, set_threads = 0;
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1,
+		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false;
+bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false,
+		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false;
 unsigned long int finalTableSize, seedPRNG;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -616,6 +619,15 @@ void readConfigFile() {
 			else if (tokens[0] == "datafile_format") {
 				dataFileFormat = tokens[1];
 			}
+			else if (tokens[0] == "convert_data_to_bSFS") {
+				dataConvert = true;
+				data2bSFSFile = "data2bSFS.txt";
+				if (tokens.size() > 1)
+					data2bSFSFile = tokens[1];
+			}
+			else if (tokens[0] == "allele_type") {
+				alleleType = tokens[1];
+			}
 			else if (tokens[0] == "estimate") {
 				stringstream stst(tokens[1]);
 				stst >> estimate;
@@ -951,9 +963,21 @@ int main(int argc, char* argv[]) {
 
 	evalBranchConfigs();
 
-	if ((estimate > 1) || bSFSmode) {
-		if (dataFileFormat == "pseudo_MS")
-			readDataAsSeqBlocks("block_SNPs.txt");
+	if ((estimate > 1) || bSFSmode || dataConvert) {
+		if (dataFileFormat == "pseudo_MS") {
+			readDataAsSeqBlocks("block_SNPs.txt", alleleType);
+
+			//	convert data into bSFS and quit ABLE
+			if (dataConvert) {
+				ofstream ofs(data2bSFSFile.c_str(),ios::out);
+				for (size_t i = 0; i < dataConfigs.size(); i++)
+					ofs << getMutConfigStr(dataConfigs[i]) << " : " << setprecision(5) << scientific << dataConfigFreqs[i] << endl;
+				ofs.close();
+
+				cout << "Finished converting the data into a bSFS format...\n" << endl;
+				return 0;
+			}
+		}
 		else
 			readDataAsbSFSConfigs();
 	}
