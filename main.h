@@ -53,7 +53,6 @@ void process_tree_1 (double **onetreePoisTable);
 void process_tree_3 (double **onetreePoisTable);
 void calcBSFSTable();
 double computeLik();
-void readDataConfigs();
 void evalBranchConfigs();
 void readConfigFile();
 void parseCmdLine(char* argv[]);

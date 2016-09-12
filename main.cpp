@@ -92,7 +92,7 @@ int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1, reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobal = false, bSFS = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false;
+bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false;
 unsigned long int finalTableSize, seedPRNG;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -377,7 +377,7 @@ void calcBSFSTable() {
 						++crash_counter;
 					}
 					else {
-						if (bSFS || (estimate > 0))
+						if (bSFSmode || (estimate > 0))
 							process_tree_1(onetreePoisTable);
 						else if (estimate == 0)
 							process_tree_3(onetreePoisTable);
@@ -415,12 +415,12 @@ double computeLik() {
 	if (!ms_crash_flag) {
 
 		int trackedConfigs = 0;
-		if (bSFS || (estimate > 1))
+		if (bSFSmode || (estimate > 1))
 			trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
 		else if (estimate == 1)
 			trackedConfigs = trackSelectConfigs.size();
 
-		if (bSFS) {
+		if (bSFSmode) {
 			if (nobSFSFile) {
 				for (size_t i = 0; i < dataConfigs.size(); i++) {
 					if (selectConfigFreqs[i] != 0.0)
@@ -475,52 +475,6 @@ double computeLik() {
 }
 
 
-void readDataConfigs() {
-	string line, del, keyVec;
-	vector<string> tokens;
-	vector<int> config;
-	double val;
-	int dataKmax = 0, blockKmax;
-
-	ifstream ifs(dataFile.c_str(),ios::in);
-	while (getline(ifs,line)) {
-		del = ":";
-		tokens.clear();
-		Tokenize(line, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
-		}
-		keyVec = tokens[0];
-		val = atof(tokens[1].c_str());
-
-		del = "(,)";
-		tokens.clear();
-		Tokenize(keyVec, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
-			config.push_back(atoi(tokens[j].c_str()));
-		}
-		dataConfigs.push_back(config);
-		dataConfigFreqs.push_back(val);
-
-		blockKmax = *max_element(config.begin(),config.end());
-		if (blockKmax > dataKmax)
-			dataKmax = blockKmax;
-
-		config.clear();
-	}
-	ifs.close();
-
-	dataLnL = 0.0;
-	for (size_t i = 0; i < dataConfigs.size(); i++)
-		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
-
-	bestGlobalSlLnL = bestLocalSlLnL = 100000*dataLnL;
-	if (!kmax)
-		kmax = dataKmax;
-}
-
-
 //	conversion from decimal to base-(maxPopSize+1)
 void evalBranchConfigs() {
 
@@ -528,7 +482,11 @@ void evalBranchConfigs() {
 	bool skipConfig;
 	maxPopSize = totPopSum = sampledPops[0];
 
-	mutClass = kmax+2;
+	if (kmax == 0)
+		mutClass = 0;
+	else
+		mutClass = kmax+2;
+
 	brClass = sampledPops[0]+1;
 	for (size_t i = 1; i < sampledPops.size(); i++)
 		brClass *= (sampledPops[i]+1);
@@ -663,7 +621,7 @@ void readConfigFile() {
 				stst >> estimate;
 			}
 			else if (tokens[0] == "bSFS") {
-				bSFS = true;
+				bSFSmode = true;
 				bSFSFile = "bSFS.txt";
 				if (tokens.size() > 1)
 					bSFSFile = tokens[1];
@@ -993,8 +951,12 @@ int main(int argc, char* argv[]) {
 
 	evalBranchConfigs();
 
-	if ((estimate > 1) || bSFS)
-		readDataConfigs();
+	if ((estimate > 1) || bSFSmode) {
+		if (dataFileFormat == "pseudo_MS")
+			readDataAsSeqBlocks("block_SNPs.txt");
+		else
+			readDataAsbSFSConfigs();
+	}
 
 	parseCmdLine(argv);
 
@@ -1289,7 +1251,7 @@ int main(int argc, char* argv[]) {
 		if (onlyProfiles || profileLikBool)
 			profileLik(parVec);
 	}
-	else if ((estimate == 1) || bSFS) {
+	else if ((estimate == 1) || bSFSmode) {
 
 		printf("Evaluating point likelihood at : \n");
 		if (!tbiUserVal.empty()) {
@@ -1311,7 +1273,7 @@ int main(int argc, char* argv[]) {
 
 		currState = OTHER;
 		double loglik;
-		if (!bSFS) {
+		if (!bSFSmode) {
 
 			//	temporary deactivation : need to review code in calcBSFSTable for this option
 			free_objects();
@@ -1345,6 +1307,13 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	else if (estimate == 0) {
+
+		if (!mutClass) {
+			cerr << "\nThe \"kmax\" option needs to be specified in the config file for calculating the expected bSFS!" << endl;
+			cerr << "Exiting ABLE...\n" << endl;
+			free_objects();
+			exit(-1);
+		}
 
 		finalTableSize = (long int) pow(mutClass, brClass);
 		if (finalTableSize > 1000000000) { //	1 billion

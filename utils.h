@@ -52,6 +52,19 @@ vector<double> logspaced(double a, double b, int n);
 vector<double> negLogspaced(double a, double b, int n);
 void Tokenize(const string& str, vector<string>& tokens, const string& delimiters);
 void TrimSpaces(string& str);
+void readDataAsSeqBlocks(string outSNPsFile);
+void readDataAsbSFSConfigs();
+
+extern string dataFile;
+extern int brClass, mutClass, foldBrClass, allBrClasses;
+extern double dataLnL, bestGlobalSlLnL, bestLocalSlLnL;
+extern vector<int> sampledPops;
+extern vector<double> dataConfigFreqs;
+extern vector<vector<int> > dataConfigs;
+
+extern int getBrConfigNum(vector<int> brConfVec);
+extern string getMutConfigStr(vector<int> configVec);
+
 
 inline uint32 hash( time_t t, clock_t c )
 {
