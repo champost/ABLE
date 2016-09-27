@@ -1,1 +1,50 @@
-# ABLE - Approximate "Blockwise" Likelihood Estimation
+##ABLE
+
+`ABLE` is a program written in C/C++ for the joint inference of arbitrary population histories and the genome-wide recombination rate using data from multiple whole genome sequences or fragmented assemblies (e.g. UCE's, RADSeq, and targeted exomes). It makes use of the distribution of blockwise SFS (bSFS) patterns which retain information on the variation in genealogies spanning short-range linkage blocks across the genome. `ABLE` does not require phased data as the bSFS does not distinguish the sampled lineage in which a mutation occurred and like with the SFS, outgroup information can be ignored by folding the bSFS. `ABLE` takes advantage of `openmp` parallelization and is tailored for studying the population histories of model as well as non-model species.
+
+`ABLE` stands for Approximate Blockwise Likelihood Estimation.
+
+##InstallABLE
+
+###Linux
+
+It is easiest to build an `ABLE` binary under all flavours of Linux. `ABLE` requires the GNU Compiler Collection ([`gcc`](https://gcc.gnu.org/)) 
+and GNU Make ([`make`](https://www.gnu.org/software/make/))
+for a smooth installation and has been tested using `gcc 4.8.4` and `make 3.81`. If you don't have `gcc` or `make`, you can use your OS specific package handling utlity. 
+
+Under Ubuntu this corresponds to the following in a terminal
+
+    sudo apt-get install build-essential
+
+
+Other dependencies such as the GNU Scientific Library ([GSL](http://www.gnu.org/software/gsl/)) and Non-Linear Optimization ([NLopt](http://ab-initio.mit.edu/wiki/index.php/NLopt)) library are automatically installed by following the instructions outlined below.
+
+* Download the `ABLE` repository
+
+        wget https://github.com/champost/ABLE/archive/master.tar.gz
+
+* Untar the archive and enter the directory
+
+        tar -xzf master.tar.gz && cd ABLE-master
+
+* If you are installing `ABLE` for the first time you might have to install the `GSL` and `NLopt` libraries. This can take some time as it performs a **static installation** of the libraries. If you know what this is all about, you can skip this step.
+
+        make deps
+
+* Finally build an `ABLE` binary
+
+        make clean && make all
+
+If you want to `ABLE` to be accessible from everywhere, such as your data folder, you might want to
+
+    cp ABLE ~/bin
+
+This ensures that you can execute the program with `ABLE ...` instead of `./ABLE ...` from the installation folder. This holds only if `~/bin` exists and part of your `$PATH` environment variable.
+
+##EnjoyABLE
+* `ABLE` documentation will be available shortly at : [https://github.com/champost/ABLE/tree/master/doc](https://github.com/champost/ABLE/tree/master/doc).
+* Please report bugs and feature requests at : [https://github.com/champost/ABLE/issues](https://github.com/champost/ABLE/issues).
+* General questions regarding `ABLE` and for the benefit of all can be posted here : [https://groups.google.com/forum/#!forum/groupable](https://groups.google.com/forum/#!forum/groupable).
+* A [bioRxiv](http://biorxiv.org/) draft illustrating the performance of `ABLE` will be referenced here shortly.
+
+
