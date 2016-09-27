@@ -35,16 +35,14 @@ Other dependencies such as the GNU Scientific Library ([GSL](http://www.gnu.org/
 
         make clean && make all
 
-If you want to `ABLE` to be accessible from everywhere, such as your data folder, you might want to
+If you want `ABLE` to be accessible from everywhere, such as your data folder, you might want to
 
     cp ABLE ~/bin
 
-This ensures that you can execute the program with `ABLE ...` instead of `./ABLE ...` from the installation folder. This holds only if `~/bin` exists and part of your `$PATH` environment variable.
+This ensures that you can execute the program with `ABLE ...` instead of `./ABLE ...` from the installation folder. This holds only if `~/bin` exists and is part of your `$PATH` environment variable.
 
 ##EnjoyABLE
-* `ABLE` documentation will be available shortly at : [https://github.com/champost/ABLE/tree/master/doc](https://github.com/champost/ABLE/tree/master/doc).
-* Please report bugs and feature requests at : [https://github.com/champost/ABLE/issues](https://github.com/champost/ABLE/issues).
-* General questions regarding `ABLE` and for the benefit of all can be posted here : [https://groups.google.com/forum/#!forum/groupable](https://groups.google.com/forum/#!forum/groupable).
+* `ABLE` documentation will be available shortly at : [https://github.com/champost/ABLE/tree/master/doc](https://github.com/champost/ABLE/tree/master/doc)
+* Please report bugs and feature requests at : [https://github.com/champost/ABLE/issues](https://github.com/champost/ABLE/issues)
+* General questions regarding `ABLE` and for the benefit of all can be posted to [groupABLE](https://groups.google.com/forum/#!forum/groupable).
 * A [bioRxiv](http://biorxiv.org/) draft illustrating the performance of `ABLE` will be referenced here shortly.
-
-
