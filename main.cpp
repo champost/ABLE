@@ -319,6 +319,7 @@ void calcBSFSTable() {
 
 	if (estimate == 1) {
 
+/*
 		int treesSampled = 0;
 #pragma omp parallel for
 		for (int trees = 0; trees < ms_trees; trees++) {
@@ -352,6 +353,7 @@ void calcBSFSTable() {
 				freed2matrix(onetreePoisTable, brClass);
 			}
 		}
+*/
 	}
 	else {
 
