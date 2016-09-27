@@ -631,9 +631,18 @@ void readConfigFile() {
 			else if (tokens[0] == "allele_type") {
 				alleleType = tokens[1];
 			}
+			//	this option has been deprecated
 			else if (tokens[0] == "estimate") {
 				stringstream stst(tokens[1]);
 				stst >> estimate;
+			}
+			else if (tokens[0] == "task") {
+				if (tokens[1] == "exact_bSFS")
+					estimate = 0;
+				else if (tokens[1] == "approximte_bSFS")
+					bSFSmode = true;
+				else if (tokens[1] == "infer")
+					estimate = 2;
 			}
 			else if (tokens[0] == "bSFS") {
 				bSFSmode = true;
