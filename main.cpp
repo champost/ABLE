@@ -94,7 +94,7 @@ int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikT
 		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false, bSFSNormBool = false,
+bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -433,24 +433,16 @@ double computeLik() {
 			else {
 				ofstream ofs(bSFSFile.c_str(),ios::out);
 
-				//	normalization of the bSFS to account for the fact that we approach a sum(bSFS)=1 only for an infinite number of genealogies!
-				double bSFSNorm = 1.0;
-				if (bSFSNormBool)
-					bSFSNorm = accumulate(selectConfigFreqs.begin(), selectConfigFreqs.end(),0.0);
-
 				for (size_t i = 0; i < dataConfigs.size(); i++) {
 					if (selectConfigFreqs[i] != 0.0) {
-
-						selectConfigFreqs[i] /= bSFSNorm;
-
-						ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] << endl;
+						ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / ms_trees << endl;
 						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
 					}
 				}
 				ofs.close();
 			}
 
-			//	correct for the LnL if there are any data bSFS which remain unvisited
+			//	correct for the LnL if there are any data bSFS configs are unvisited
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 
@@ -463,7 +455,7 @@ double computeLik() {
 					loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
 			}
 
-			//	correct for the LnL if there are any data bSFS which remain unvisited
+			//	correct for the LnL if there are any data bSFS configs are unvisited
 			if (trackedConfigs)
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 		}
@@ -646,9 +638,6 @@ void readConfigFile() {
 				bSFSFile = "bSFS.txt";
 				if (tokens.size() > 1)
 					bSFSFile = tokens[1];
-			}
-			else if (tokens[0] == "normalize_bSFS") {
-				bSFSNormBool = true;
 			}
 			else if (tokens[0] == "kmax") {
 				stringstream stst(tokens[1]);
