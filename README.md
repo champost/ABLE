@@ -10,14 +10,14 @@
 
 It is easiest to build an `ABLE` binary under all flavours of Linux. `ABLE` requires the GNU Compiler Collection ([`gcc`](https://gcc.gnu.org/)) 
 and GNU Make ([`make`](https://www.gnu.org/software/make/))
-for a smooth installation and has been tested using `gcc 4.8.4` and `make 3.81`. If you don't have `gcc` or `make`, you can use your OS specific package handling utlity. 
+for a smooth installation and has been tested using `gcc 4.8.4` and `make 3.81`. If you don't have `gcc` or `make`, you can use your OS specific package handling utility. 
 
 Under Ubuntu this corresponds to the following in a terminal
 
     sudo apt-get install build-essential
 
 
-Other dependencies such as the GNU Scientific Library ([GSL](http://www.gnu.org/software/gsl/)) and Non-Linear Optimization ([NLopt](http://ab-initio.mit.edu/wiki/index.php/NLopt)) library are automatically installed by following the instructions outlined below.
+Other dependencies such as the GNU Scientific Library ([GSL](http://www.gnu.org/software/gsl/)) and the Non-Linear Optimization ([NLopt](http://ab-initio.mit.edu/wiki/index.php/NLopt)) library are automatically installed by following the instructions outlined below.
 
 * Download the `ABLE` repository
 
