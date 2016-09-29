@@ -45,5 +45,5 @@ This ensures that you can execute the program by specifying `ABLE ...` instead o
 
 * `ABLE` documentation will be available shortly at : [https://github.com/champost/ABLE/tree/master/doc](https://github.com/champost/ABLE/tree/master/doc)
 * Please report bugs and feature requests at : [https://github.com/champost/ABLE/issues](https://github.com/champost/ABLE/issues)
-* General questions regarding `ABLE` and for the benefit of all can be posted to [groupABLE](https://groups.google.com/forum/#!forum/groupable).
-* A [bioRxiv](http://biorxiv.org/) draft illustrating the performance of `ABLE` will be referenced here shortly.
+* General questions/announcements regarding `ABLE` and for the benefit of all can be posted to [groupABLE](https://groups.google.com/forum/#!forum/groupable).
+* An accompanying draft illustrating the performance of `ABLE` can be found on [bioRxiv](http://dx.doi.org/10.1101/077958).
