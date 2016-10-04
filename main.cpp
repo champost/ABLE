@@ -94,7 +94,7 @@ int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikT
 		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobal = false, bSFSmode = false, profileLikBool = true, onlyProfiles = false, abortNLopt = false,
+bool skipGlobal = false, bSFSmode = false, profileLikBool = false, onlyProfiles = false, abortNLopt = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -639,7 +639,7 @@ void readConfigFile() {
 			else if (tokens[0] == "task") {
 				if (tokens[1] == "exact_bSFS")
 					estimate = 0;
-				else if (tokens[1] == "approximte_bSFS")
+				else if (tokens[1] == "conditional_bSFS")
 					bSFSmode = true;
 				else if (tokens[1] == "infer")
 					estimate = 2;
