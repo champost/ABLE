@@ -30,14 +30,19 @@
 
 
 % code block
-\newenvironment{boxcode}
-{\begin{tcolorbox}[colback=blue!10!gray!10,colframe=white, breakable]}
+\newenvironment{codebox}
+{\begin{tcolorbox}[colback=blue!10!gray!10, colframe=blue!10!gray!40, boxrule=0.5pt, breakable]}
+{\end{tcolorbox}}
+
+% note block
+\newenvironment{notebox}
+{\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=2cm, right skip=2cm, title=\textbf{Note}]}
 {\end{tcolorbox}}
 
 % inline code block : http://tex.stackexchange.com/questions/203848/problem-with-underscores-in-newcommand
-\newcommand{\incode}[1]{\tcbox[colback=blue!10!gray!10,colframe=white, on line, size=fbox]{\texttt{\detokenize{#1}}}}
+\newcommand{\incode}[1]{\tcbox[colback=blue!10!gray!10, colframe=blue!10!gray!40, boxrule=0.5pt, on line, size=fbox]{\texttt{\detokenize{#1}}}}
 % inline code block : a variant for environments such as section headers, math & more...
-\newcommand{\incodeEnv}[1]{\tcbox[colback=blue!10!gray!10,colframe=white, on line, size=fbox]{\texttt{#1}}}
+\newcommand{\incodeEnv}[1]{\tcbox[colback=blue!10!gray!10, colframe=blue!10!gray!40, boxrule=0.5pt, on line, size=fbox]{\texttt{#1}}}
 
 % verbatim styled index but underscore characters still need to be escaped!
 \newcommand{\Index}[1]{\index{#1@\texttt{#1}}}
@@ -55,7 +60,7 @@
 \newcommand{\TThree}{{\footnotesize (\hyperref[T1_T2_T3]{T3})}}		%	small T3
 
 % red coloured text
-\newcommand{\RED}[1]{\textcolor{red}{#1}}
+\newcommand{\RED}[1]{\textcolor{red}{\detokenize{#1}}}
 
 
 
@@ -90,7 +95,7 @@
 \vspace{1cm}
 
 Version \RED{xyz} \\
-Oct 3, 2016
+Oct 4, 2016
 
 \vspace*{\fill}
 \end{titlepage}
@@ -115,52 +120,52 @@ for a smooth installation and has been tested using \incode{gcc 4.8.4} and \inco
 
 Under Ubuntu this corresponds to the following in a terminal
 
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 sudo apt-get install build-essential
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 Other dependencies such as the \href{http://www.gnu.org/software/gsl/}{GNU Scientific Library} (\incode{GSL}) and the \href{http://ab-initio.mit.edu/wiki/index.php/NLopt}{Non-Linear Optimization} (\incode{NLopt}) library are automatically installed by following the instructions outlined below.
 
 \begin{itemize}
 	\item Download the \incode{ABLE} repository
 	
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		wget https://github.com/champost/ABLE/archive/master.tar.gz
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 	
 	\item Untar the archive and change directory
 	
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		tar -xzf master.tar.gz && cd ABLE-master
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 	
-	\item If you are installing \incode{ABLE} for the \underline{\textbf{first time}} you might have to install the \textbf{GSL} and \textbf{NLopt} libraries. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest update.
+	\item If you are installing \incode{ABLE} for the \underline{\textbf{first time}} you might have to install the \textbf{GSL} and \textbf{NLopt} libraries. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest version.
 	
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		make deps
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 	
 	\item Finally, build an \incode{ABLE} binary
 	
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		make clean && make all
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 \end{itemize}
 
 If you want \incode{ABLE} to be accessible from everywhere, such as your data folder, you might want to
 
-	\begin{boxcode}
+	\begin{codebox}
 		\texttt{cp ABLE $ \sim $/bin}
-	\end{boxcode}
+	\end{codebox}
 
 This ensures that you can execute the program by specifying \incode{ABLE ...} instead of \incode{./ABLE ...} from the installation folder. This holds only if \incodeEnv{$ \sim $/bin} exists and is part of your \incodeEnv{\$PATH} environment variable.
 
@@ -171,8 +176,8 @@ For \ABLE\ to execute correctly, you need to specify a command line, some option
 
 \subsection{Command line options} 
 \label{cmdline} 
-The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE\ supports only a subset (given below) of all the available \textbf{\textit{ms}} command line options. Please refer to the \href{http://home.uchicago.edu/rhudson1/source/mksamples.html}{full \textbf{\textit{ms}} documentation} for a better understanding of all these options.
-\begin{boxcode}%[colback=white,right=2cm]
+The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE\ supports only a subset (shown below) of all the available \textbf{\textit{ms}} command line options. Please refer to the \href{http://home.uchicago.edu/rhudson1/source/mksamples.html}{full \textbf{\textit{ms}} documentation} for a better understanding of these options.
+\begin{tcolorbox}[colback=white,colframe=black,boxrule=1pt]
 	\begin{multicols}{2}
 		\begin{itemize}
 			\item \verb|-t| $ \theta $
@@ -190,7 +195,7 @@ The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE
 			\item \verb|-ej| $ t\ i\ j $
 		\end{itemize}
 	\end{multicols}
-\end{boxcode}
+\end{tcolorbox}
 
 
 \subsubsection{The \incode{tbi} keyword} 
@@ -199,23 +204,23 @@ The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE
 While {\textbf{\textit{ms}}} provides for the \incode{tbs} option, we introduce the \incode{tbi} keyword which stands for "\textbf{to be inferred}" as part of the \ABLE\ command line. \incode{tbi} keywords are to be used instead of the values of the parameters of a demographic model (\textit{i.e.} some floating value) which need to be inferred. All \incode{tbi} keywords need to be suffixed by a number (\incode{tbi1, tbi2,...}). Thus, all occurrences on the command line of the same demographic parameter can be correctly identified. 
 
 Below is a typical example of an \ABLE\ command line for a simple history describing a single discrete change in population size defined by three parameters (current and ancestral population sizes and the time of size change) which are to be inferred (see \ref{sec:examples_exact_bSFS}):
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 ./ABLE 4 100000 -t tbi1 -eN tbi2 tbi3 -T config.txt
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 
 \ABLE\ also requires the user to specify a \incode{-T} towards the end of the command line indicating the start of the config filename (if any) specified by the user. If no filename is specified, by default \ABLE\ looks for a file called \incode{config.txt}.
 
 
 \subsection{Config file options} 
 \label{configfile}
-\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=2cm, right skip=2cm, title=\textbf{Note}]
+\begin{notebox}
 	\begin{itemize}
 		\item \textbf{All options} of the config file are \textbf{case sensitive}.
 		\item Successive options can undo previous ones.
 	\end{itemize}
-\end{tcolorbox}
+\end{notebox}
 
 
 \subsubsection{Syntax}
@@ -238,29 +243,33 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\Index{datafile}
 	Accepts a single value specifying the name and location (relative to the config file) of the file containing the data (see \ref{sec:data_format} for more on the data format).
 	
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		datafile filename
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 	
 	\item[\RIGHTarrow] \incode{datafile_format} \TTwo \\
  	\Index{datafile\_format}
 	\phantomsection
 	\label{key:data_format}
- 	Data can be specified in either of the two formats below.
+ 	Data can be specified in either of the two formats below. 
+ 	
+ 	\begin{notebox}
+ 		The \textbf{default} input file format is \incode{bSFS}.
+ 	\end{notebox}
 
 	\begin{itemize}
 	 	\item \incode{datafile_format bSFS} \\
 	 	\IndexSub{datafile\_format}{bSFS}
 	 	Each line in this format contains a tag describing the bSFS configuration (joint bSFS if multiple population samples) and its respective frequency of occurrence in the data. 
-		\begin{boxcode}
+		\begin{codebox}
 			\begin{verbatim}
 			(tag1) : prob1
 			(tag2) : prob2
 			...
 			\end{verbatim}
-		\end{boxcode}
+		\end{codebox}
 		For an example of this format please refer to the accompanying Orangutan dataset in the \incode{/data} folder. Further information on the general logic behind the bSFS/jbSFS tags will be provided here later.
 
 	 	\item \incode{datafile_format pseudo_MS} \\
@@ -306,11 +315,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\item[\RIGHTarrow] \incode{bSFS} \TOne/\TTwo \\
 	\Index{bSFS}
 	Accepts a single value specifying the name and location (relative to the config file) of the output file for the "pseudo-expected bSFS" of a given demographic model, at a point in parameter space and for a specified number of genealogies (see \incode{task conditional_bSFS} above).
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		bSFS filename
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	The default name of the output file is \incode{bSFS.txt} if no filename has been specified.
 	
 	\item[\RIGHTarrow] \incode{kmax} \TTwo \\
@@ -318,11 +327,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\phantomsection
 	\label{key:kmax}
 	A single argument following this keyword specifies the maximum number of mutation classes at single nucleotide sites (\textit{i.e.} singletons, doubletons, \textit{etc.}) to be explicitly accounted for in the bSFS. Mutations appearing more frequently in your data than the specified \incode{kmax} are not ignored but rather grouped into a marginal probability class. A maximum of 3 is specified as follows
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		kmax 3
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	Thus, when sampling genealogies/ARGs, \ABLE\ will account for 0, 1, 2 and 3 SNPs in all blocks and bundle the probability of observing more the 3 SNPs into a marginal probability.
 	
 	\item[\RIGHTarrow] \incode{folded} \TOne \\
@@ -334,35 +343,35 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\phantomsection
 	\label{key:pops}
 	This option takes as a first argument the number of population samples that will be analysed followed by the number of samples per population in the order that they have been specified on the \textbf{\textit{ms}} command line
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		pops npops n1 n2 n3 ...
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	For a single population example with 5 genomes it should be
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		pops 1 5
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	whereas for a 3 population example with 1, 4 and 2 genomes respectively it should be specified as
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		pops 3 1 4 2
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	
 	\item[\RIGHTarrow] \incode{convert_data_to_bSFS} \TTwo \\
 	\Index{convert\_data\_to\_bSFS}
 	With this option \ABLE\ simply converts a \incode{pseudo_MS} format file into the bSFS format. It is advised for users to store data in the bSFS format (especially for large samples) as it is quicker to load and because internally \ABLE\ works with the bSFS. When asked to convert data, \ABLE\ performs the task, creates a \incode{block_SNPs.txt} file like in the case of \incode{datafile_format pseudo_MS} (\pref{key:data_format}) and terminates. For the conversion you can run \incode{./ABLE config.txt} in the terminal with the contents of \incode{config.txt} as below
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		# (modify the "pops" option according to your sampling)
 		pops 2 4 4
 		datafile input_filename
 		convert_data_to_bSFS output_filename
 		\end{verbatim}
-	\end{boxcode}
+	\end{codebox}
 	
 	\item[\RIGHTarrow] \incode{start} \TTwo/\TThree \\
  	\Index{start}
@@ -373,11 +382,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\item \incode{start all val1 val2 ...} \\
 		\IndexSub{start}{all}
 		When all parameters need to be initialized at once with respect to the "\incode{tbi} order". Let us assume that your demographic model contains three free parameters, \incode{tbi2}, \incode{tbi3} and \incode{tbi7}. If you want to initialize these parameters with \incode{tbi7 = 10}, \incode{tbi2 = 5.2} and \incode{tbi3 = 1}, then
-		\begin{boxcode}
+		\begin{codebox}
 			\begin{verbatim}
 			start all 5.2 1 10
 			\end{verbatim}
-		\end{boxcode} 
+		\end{codebox} 
 		
 		\item \incode{start random} \\
 		\IndexSub{start}{random}
@@ -387,11 +396,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\item \incode{start tbi val} \\
 		\IndexSub{start}{tbi}
 		If a single \incode{tbi} parameter needs to be initialized (\textit{e.g.} \incode{tbi4 = 3}), then
-		\begin{boxcode}
+		\begin{codebox}
 			\begin{verbatim}
 			start tbi4 3
 			\end{verbatim}
-		\end{boxcode} 
+		\end{codebox} 
 	\end{itemize}
 	
 	\item[\RIGHTarrow] \incode{global_search} \TTwo \\
@@ -426,11 +435,15 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\item[\RIGHTarrow] \incode{global_search_evals} \TTwo \\
 	\Index{global\_search\_evals}
 	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{global search} for the MLE. The default number of evaluations is 5000 times the number of \incode{tbi} parameters.
+
+	\RED{Warning issued!}
 	
 	\item[\RIGHTarrow] \incode{local_search_evals} \TTwo \\
 	\Index{local\_search\_evals}
 	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{local search} for the MLE. The default number of evaluations is one fifth of the specified value for \incode{global_search_evals}. If this wasn't specified then it is set to 1000 times the number of \incode{tbi} parameters.
 	
+	\RED{Warning issued!}
+		
 	\item[\RIGHTarrow] \incode{global_upper_bound} \TTwo \\
 	\Index{global\_upper\_bound}
 	Accepts a single value which defines the \textbf{upper bound} for all \incode{tbi} parameters though this can be undone for certain by specifying individual bounds (see the \incode{bounds} keyword). The default upper bound for all parameters is~5.
@@ -446,21 +459,21 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\item[\RIGHTarrow] \incode{bounds} \TThree \\
 	\Index{bounds}
 	Individual parameter bounds during the MLE search can be set with this keyword. The \incode{tbi} parameter needs to be specified as the second keyword and followed by the minimum and maximum bounds respectively. So if you want to impose \incode{0.5 < tbi2 < 4.2}, then
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		bounds tbi2 0.5 4.2
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	The default lower and upper bounds for all parameters are $ 10^{-3} $ and 5 respectively.
 	
 	\item[\RIGHTarrow] \incode{constrain} \TTwo \\
 	\Index{constrain}
 	Presently in \ABLE, it is possible to specify simple parameter constraints to enforce biological coherence between two demographic events \textit{e.g.} gene flow is necessarily a more recent event than divergence in a two population model. Multiple constraints can be specified (each on a separate line) and each constraint only accepts two \incode{tbi} parameters. For example, in order to impose the constraint \incode{tbi4 < tbi2}, specify
-	\begin{boxcode}
+	\begin{codebox}
 		\begin{verbatim}
 		constrain tbi4 tbi2
 		\end{verbatim}
-	\end{boxcode} 
+	\end{codebox} 
 	and in this very order.
 	
 	%	\item \incode{no_profiles} \TOne \\
@@ -518,11 +531,11 @@ By default, the \incode{pseudo_MS} format expects sequence blocks using only the
 Each block begins with a \incode{//} followed by an optional header which can span any number of lines. Below is an example of three sequence blocks -- a Chr7 block, a fictional monomorphic block and from Chr4 respectively -- from the accompanying 2kb Orangutan dataset (\incode{/data} folder). The first four samples (2 diploids) are from the Bornean population and the rest are from Sumatran individuals. The corresponding population order is \incode{pops 2 4 4} (\pref{key:pops}).
 
 
-\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=2cm, right skip=2cm, title=\textbf{Note}]
+\begin{notebox}
 	Headers \textbf{may not begin} with either of \incode{A}, \incode{T}, \incode{G}, \incode{C} or \incode{N} characters! Use a \incodeEnv{\#} to start a line if necessary.
-\end{tcolorbox}
+\end{notebox}
 
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	//
 	7_41030400-41032000
@@ -549,7 +562,7 @@ Each block begins with a \incode{//} followed by an optional header which can sp
 	ATGAGGT
 	ATGAGGT
 	\end{verbatim}
-\end{boxcode} 
+\end{codebox} 
 
 
 \subsubsection{The \incodeEnv{pseudo\_MS} binary format}
@@ -558,11 +571,11 @@ Each block begins with a \incode{//} followed by an optional header which can sp
 \label{sec:data_binary}
 Now assume that the ancestral states in the previous example (\ref{sec:data_genotype}) were given by the genotypes of the first sequence of each block. The binary equivalent is obtained by replacing the ancestral allele with \incode{0} and derived allele with \incode{1} and should look like the following.
 
-\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=2cm, right skip=2cm, title=\textbf{Note}]
+\begin{notebox}
 	Headers \textbf{may not begin} with either of \incode{0}, \incode{1} or \incode{N} characters! Use a \incodeEnv{\#} to start a line if necessary.
-\end{tcolorbox}
+\end{notebox}
 
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	//
 	7_41030400-41032000
@@ -589,7 +602,7 @@ Now assume that the ancestral states in the previous example (\ref{sec:data_geno
 	0001100
 	0001100
 	\end{verbatim}
-\end{boxcode} 
+\end{codebox} 
 
 
 \subsection{Examples} 
@@ -610,14 +623,14 @@ In this section we shall refer to three demographic models (Fig.~\ref{fig:models
 \label{sec:examples_exact_bSFS}
 \IndexSub{task}{exact\_bSFS}
 Let us consider a single population sample of size 4 which doubled its effective population size at scaled time $ T = 0.2 $ in the past with $ \theta_{c} = 1 $ and $ \theta_{a} = 2 $ (\textit{see} Fig.~\ref{fig:models}a). We would like to calculate the exact \textit{folded} bSFS (\pref{key:task}) using 100K genealogies. The corresponding command line would look like 
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	./ABLE 4 100000 -t 1 -eN 0.2 2 -T config_1pop_exact.txt
 	\end{verbatim}
-\end{boxcode} 
+\end{codebox} 
 
 along with the contents of \incode{config_1pop_exact.txt} as below
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	pops 1 4
 
@@ -628,7 +641,10 @@ along with the contents of \incode{config_1pop_exact.txt} as below
 
 	seed_PRNG 98368183
 	\end{verbatim}
-\end{boxcode}
+\end{codebox}
+
+output file = \RED{expected_bSFS.txt!!}
+
 The \incode{kmax 4} (\pref{key:kmax}) is not a necessary option here and only serves to restrict the size of the bSFS by accounting explicitly for up to 3 SNPs per genealogy/block.
 
 
@@ -636,14 +652,14 @@ The \incode{kmax 4} (\pref{key:kmax}) is not a necessary option here and only se
 \label{sec:examples_conditional_bSFS}
 \IndexSub{task}{conditional\_bSFS}
 This example calculates the probabilities of observing only the bSFS configurations present in the data for a three population model. The parameter values used here are $ f_{A\rightarrow B} = 0.04 $, scaled population size $ \theta = 2.432 $, scaled times $ T_{3} = 0.0625 $, $ T_{2} = 0.075 $ and $ T_{1} = 0.3 $ (\textit{see} Fig.~\ref{fig:models}c).
-\begin{boxcode}
+\begin{codebox}
 	\begin{lstlisting}[basicstyle=\ttfamily,breaklines=true,columns=fullflexible]
-	./ABLE 3 1000000 -t 2.432 -I 3 1 1 1 -es 0.0625 1 0.96 -ej 0.0625 4 3 -ej 0.075 1 2 -ej 0.3 2 3 -T config_3pop_conditional.txt
+./ABLE 3 1000000 -t 2.432 -I 3 1 1 1 -es 0.0625 1 0.96 -ej 0.0625 4 3 -ej 0.075 1 2 -ej 0.3 2 3 -T config_3pop_conditional.txt
 	\end{lstlisting}
-\end{boxcode}
+\end{codebox}
 
 And \incode{config_3pop_conditional.txt} contains :
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	pops 3 1 1 1
 	
@@ -653,7 +669,7 @@ And \incode{config_3pop_conditional.txt} contains :
 	
 	seed_PRNG 12468192
 	\end{verbatim}
-\end{boxcode}
+\end{codebox}
 Alternatively, in the \incode{conditional_bSFS} mode you can make use of \incode{tbi} keywords in the command line and respectively specify the parameter values in the config file using the \incode{start tbi ...} options.
 
 
@@ -661,14 +677,14 @@ Alternatively, in the \incode{conditional_bSFS} mode you can make use of \incode
 \label{sec:examples_inference}
 \IndexSub{task}{infer}
 We now consider a two population example with 3 genomes in population A and 2 genomes in B (\textit{see} Fig.~\ref{fig:models}b) and blocks of size 500bp. This is a four parameter model with unidirectional gene flow at rate $ m $ after a split at time $ T $, with all scaled populations size parameters equal to $ \theta $ and scaled intra-block recombination rate $ \rho $. The parameters "\textit{to be inferred} $" : \theta $, $ \rho $, $ m $ and $ T $ have been respectively specified as \incode{tbi1}, \incode{tbi2}, \incode{tbi3} and \incode{tbi4} in the command line below. Note that the position corresponding to the number of genealogies to be sampled during inference (\incode{xxx} below) is entirely ignored by \ABLE\ and should only be specified in the config file.
-\begin{boxcode}
+\begin{codebox}
 \begin{lstlisting}[basicstyle=\ttfamily,breaklines=true,columns=fullflexible]
 ./ABLE 5 xxx -t tbi1 -r tbi2 501 -I 2 3 2 -m 1 2 tbi3 -ej tbi4 1 2 -T config_2pop_infer.txt
 \end{lstlisting}
-\end{boxcode}
+\end{codebox}
 
 The contents of \incode{config_2pop_infer.txt} below starts a global search immediately followed by a local search with the resulting MLE form the former.
-\begin{boxcode}
+\begin{codebox}
 	\begin{verbatim}
 	# general options
 	# -----------------------
@@ -696,7 +712,7 @@ The contents of \incode{config_2pop_infer.txt} below starts a global search imme
 	local_search_trees 50000
 	refine_likelihoods 1000000
 	\end{verbatim}
-\end{boxcode}
+\end{codebox}
 
 \printindex
 
