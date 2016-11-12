@@ -72,7 +72,6 @@
 \vspace*{\fill}
 
 \begin{center}
-%	\begin{flushleft}
 \begin{adjustwidth}{2.3in}{0in}
 	\begin{itemize}
 		\item [{\Huge \textbf{A}}] pproximate
@@ -83,19 +82,17 @@
 \end{adjustwidth}
 \end{center}
 
+\vspace{1cm}
+
+Version \RED{xyz} \\
+\today
+%Oct 4, 2016
+
 \vspace{2cm}
 
 {\large Champak Beeravolu Reddy}
 
-\vspace{0.5cm}
-
-{\small The City College of New York} \\
-{\small \texttt{champak.br@gmail.com}} \
-
-\vspace{1cm}
-
-Version \RED{xyz} \\
-Oct 4, 2016
+\href{mailto:champak.br@gmail.com}{champak.br@gmail.com}
 
 \vspace*{\fill}
 \end{titlepage}
@@ -237,7 +234,12 @@ Any line in the config file beginning with the hash symbol \incodeEnv{\#} will b
 Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively represents a binary true/false option whereas it is possible to specify a lot more with a \textcolor{blue}{T2}/\textcolor{blue}{T3} keyword. 
 
 
-\subsubsection{Keywords} 
+\subsubsection{Keywords}
+
+ 	\begin{notebox}
+ 		\ABLE\ expects entire lines to be commented. So, \textbf{unexpected behaviour} can result if you specify keywords and/or options along with a comment on the same line \textit{e.g.} \incodeEnv{Key val \# \textit{comment after keyword}}
+ 	\end{notebox}
+
 \begin{itemize}
 	\item[\RIGHTarrow] \incode{datafile} \TTwo \\
 	\Index{datafile}
