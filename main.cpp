@@ -462,7 +462,7 @@ double computeLik() {
 				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 		}
 		else if (estimate == 0) {
-			ofstream ofs("expected_bSFS.txt",ios::out);
+			ofstream ofs(bSFSFile.c_str(),ios::out);
 			for (size_t i = 0; i < allConfigs.size(); i++)
 				if (allConfigs[i] >= 0)
 					ofs << getMutConfigStr(allConfigs[i]) << " : " << scientific << allConfigFreqs[allConfigs[i]] / ms_trees << endl;
@@ -645,7 +645,6 @@ void readConfigFile() {
 					estimate = 2;
 			}
 			else if (tokens[0] == "bSFS") {
-				bSFSmode = true;
 				bSFSFile = "bSFS.txt";
 				if (tokens.size() > 1)
 					bSFSFile = tokens[1];
