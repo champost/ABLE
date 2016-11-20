@@ -70,7 +70,7 @@
 \vspace*{\fill}
 
 \begin{center}
-\begin{adjustwidth}{2.3in}{0in}
+\begin{adjustwidth}{2.4in}{0in}
 	\begin{itemize}
 		\item [{\Huge \textbf{A}}] pproximate
 		\item [{\Huge \textbf{B}}] lockwise
@@ -82,7 +82,7 @@
 
 \vspace{1cm}
 
-Version \RED{xyz} \\
+Version 0.1 \\
 \today
 %Oct 4, 2016
 
@@ -95,7 +95,7 @@ Version \RED{xyz} \\
 \vspace*{\fill}
 \end{titlepage}
 
-\vspace*{5cm}
+\vspace*{3cm}
 \tableofcontents
 \vspace*{\fill}
 
@@ -109,37 +109,56 @@ This is the documentation accompanying \ABLE\ and the current version of the pro
 
 
 \section{Installation}
-It is easiest to build an \incode{ABLE} binary under all flavours of Linux. \incode{ABLE} requires the \href{https://gcc.gnu.org/}{GNU Compiler Collection} (\incode{gcc}) 
-and \href{https://www.gnu.org/software/make/}{GNU Make} (\incode{make})
-for a smooth installation and has been tested using \incode{gcc 4.8.4} and \incode{make 3.81}. If you don't have \incode{gcc} or \incode{make}, you can use your OS specific package handling utility. 
+\subsection{Linux}
+It is easiest to build an \incode{ABLE} binary under all flavours of Linux. \incode{ABLE} requires the GNU Compiler Collection (\incodeEnv{\href{https://gcc.gnu.org/}{gcc}}) 
+and GNU Make (\incodeEnv{\href{https://www.gnu.org/software/make/}{make}})
+for a smooth installation and has been tested using \incode{gcc 4.8.4} and \incode{make 3.81}. It is also useful to have \incodeEnv{\href{https://git-scm.com/}{git}} installed for seamless updates of the latest version of \incode{ABLE}. If you do not have \incode{gcc}, \incode{make} or \incode{git}, you can use your OS specific package handling utility. 
 
 Under Ubuntu this corresponds to the following in a terminal
 
 	\begin{codebox}
 		\begin{verbatim}
-sudo apt-get install build-essential
+sudo apt-get install build-essential git
 		\end{verbatim}
 	\end{codebox}
-Other dependencies such as the \href{http://www.gnu.org/software/gsl/}{GNU Scientific Library} (\incode{GSL}) and the \href{http://ab-initio.mit.edu/wiki/index.php/NLopt}{Non-Linear Optimization} (\incode{NLopt}) library are automatically installed by following the instructions outlined below.
+Other dependencies such as the GNU Scientific Library (\incodeEnv{\href{http://www.gnu.org/software/gsl/}{GSL}}) and the Non-Linear Optimization (\incodeEnv{\href{http://ab-initio.mit.edu/wiki/index.php/NLopt}{NLopt}}) library are automatically installed by following the instructions outlined below.
 
-\begin{itemize}
-	\item Download the \incode{ABLE} repository
+\begin{enumerate}
+%1. Clone the `ABLE` repository. If `git` is not available see the next section (or [here](https://git-scm.com/downloads)).
+%
+%git clone https://github.com/champost/ABLE.git
+%
+%2. Change directory
+%
+%cd ABLE
+%
+%3. If you are installing `ABLE` for the **first time** you might have to compile the `GSL` and `NLopt` libraries from source. This can take some time as the command below performs a **static installation** of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating `ABLE` to the latest version (see next section).
+%
+%make deps
+%
+%4. Finally, build an `ABLE` binary
+%
+%make clean && make all
+	
+	
+	
+	\item Clone the \incode{ABLE} repository. If \incode{git} is not available see the next section (or \href{https://git-scm.com/downloads}{here}).
 	
 	\begin{codebox}
 		\begin{verbatim}
-		wget https://github.com/champost/ABLE/archive/master.tar.gz
+		git clone https://github.com/champost/ABLE.git
 		\end{verbatim}
 	\end{codebox}
 	
-	\item Untar the archive and change directory
+	\item Change directory
 	
 	\begin{codebox}
 		\begin{verbatim}
-		tar -xzf master.tar.gz && cd ABLE-master
+		cd ABLE
 		\end{verbatim}
 	\end{codebox}
 	
-	\item If you are installing \incode{ABLE} for the \underline{\textbf{first time}} you might have to install the \textbf{GSL} and \textbf{NLopt} libraries. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest version.
+	\item If you are installing \incode{ABLE} for the \underline{\textbf{first time}} you might have to compile the \textbf{GSL} and \textbf{NLopt} from source. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest version (see next section).
 	
 	\begin{codebox}
 		\begin{verbatim}
@@ -154,8 +173,7 @@ Other dependencies such as the \href{http://www.gnu.org/software/gsl/}{GNU Scien
 		make clean && make all
 		\end{verbatim}
 	\end{codebox}
-\end{itemize}
-
+\end{enumerate}
 If you want \incode{ABLE} to be accessible from everywhere, such as your data folder, you might want to
 
 	\begin{codebox}
@@ -163,6 +181,40 @@ If you want \incode{ABLE} to be accessible from everywhere, such as your data fo
 	\end{codebox}
 
 This ensures that you can execute the program by specifying \incode{ABLE ...} instead of \incode{./ABLE ...} from the installation folder. This holds only if \incodeEnv{$ \sim $/bin} exists and is part of your \incodeEnv{\$PATH} environment variable.
+
+
+\section{Updates}
+\subsection{With Git}
+As mentioned above, \incode{git} considerably simplifies the process (or headache) of updating \incode{ABLE}. You simply have to change your current working directory to that of \incode{ABLE} and execute the following
+
+\begin{codebox}
+	\begin{verbatim}
+	git pull
+	make clean && make all
+	\end{verbatim}
+\end{codebox}
+
+
+\subsection{Without Git}
+If \incode{git} is not available on your machine you can try looking for solutions \href{https://git-scm.com/downloads}{here}. Alternatively, you can download the \incode{ABLE} repository somewhere on your computer as shown below.
+
+\begin{codebox}
+	\begin{verbatim}
+	wget https://github.com/champost/ABLE/archive/master.tar.gz
+	\end{verbatim}
+\end{codebox}
+
+Untar the archive using
+\begin{codebox}
+	\begin{verbatim}
+	tar -xzf master.tar.gz
+	\end{verbatim}
+\end{codebox}
+and manually compare the contents of the \incode{ABLE-master} directory with your \incode{ABLE} installation and replace the files that have changed in size.
+	
+\subsection{Updating dependencies}
+With or without \incode{git}, you will seldom need to recompile the libraries that \incode{ABLE} depends upon and in which case you will have to run the \incode{make deps} command before compiling an \incode{ABLE} binary with \incode{make clean && make all}. This information will be clearly stated in the \href{https://github.com/champost/ABLE/releases}{Release notes} and/or the \incode{ABLE} \href{https://github.com/champost/ABLE/blob/master/doc/helpABLE.pdf}{documentation}.
+
 
 
 \section{Configuration}
@@ -235,7 +287,7 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 \subsubsection{Keywords}
 
  	\begin{notebox}
- 		\ABLE\ expects entire lines to be commented. So, \textbf{unexpected behaviour} can result if you specify keywords and/or options along with a comment on the same line \textit{e.g.} \incodeEnv{Key val \# \textit{comment after keyword}}
+ 		Comments need to be specified as an entire line in \ABLE . \textbf{Unexpected behaviour} can result if you specify keywords/options and a comment on the \textbf{same line} \textit{e.g.} \incodeEnv{Key val \# \textit{comment after keyword}}
  	\end{notebox}
 
 \begin{itemize}
