@@ -506,7 +506,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	
 	\item[\RIGHTarrow] \incode{skip_global_search} \TOne \\
 	\Index{skip\_global\_search}
-	This keyword skips the global search and starts the local search with the user-specified start point in parameter space with the help of the \incode{start} keyword (\pref{key:start}).
+	This keyword skips the global search and starts the local search directly with the user-specified start point in parameter space with the help of the \incode{start} keyword (\pref{key:start}).
+	
+	\item[\RIGHTarrow] \incode{skip_local_search} \TOne \\
+	\Index{skip\_local\_search}
+	This keyword modifies the default behaviour of \incode{ABLE} and skips the local search after the global search.
 	
 	\item[\RIGHTarrow] \incode{bounds} \TThree \\
 	\Index{bounds}
@@ -548,7 +552,7 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	
 	\item[\RIGHTarrow] \incode{start_likelihood} \TTwo \\
 	\Index{start\_likelihood}
-	Accepts  single value which is a user-specified \textit{lnL} and \ABLE\ is asked to check if it can improve over this value. This option applies only when the global search is skipped altogether.
+	Accepts a single value which is a user-specified \textit{lnL} and \ABLE\ is asked to check if it can improve over this value during a local search. This option applies only when the \incode{skip_global_search} keyword has been specified.
 	
 	\item[\RIGHTarrow] \incode{no_bSFS_file} \TOne \\
 	\Index{no\_bSFS\_file}
