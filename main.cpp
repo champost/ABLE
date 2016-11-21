@@ -1065,7 +1065,16 @@ int main(int argc, char* argv[]) {
 			++count;
 		}
 
-		//	If global search is meant to be skipped... (more details the below here : http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Global_optimization)
+		//	Specifying the the Augmented Lagrangian algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Augmented_Lagrangian_algorithm)
+		void* data;
+		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
+		AUGLAG.set_lower_bounds(lowerBounds);
+		AUGLAG.set_upper_bounds(upperBounds);
+		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
+		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-6);
+		AUGLAG.set_local_optimizer(opt);
+
+		//	If global search is not meant to be skipped... (more details the below here : http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Global_optimization)
 		if (!skipGlobalSearch) {
 			if (globalSearchAlg == "DIRECT") {
 				opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
@@ -1100,30 +1109,26 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		//	Specifying the the Augmented Lagrangian algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Augmented_Lagrangian_algorithm)
-		void* data;
-		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
-		AUGLAG.set_lower_bounds(lowerBounds);
-		AUGLAG.set_upper_bounds(upperBounds);
-		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
-		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-6);
-		AUGLAG.set_local_optimizer(opt);
 
-
+	    //	If local search is not meant to be skipped
 		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
-		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-		if (!localEvals) {
-			if (!skipGlobalSearch)
-				localEvals = globalEvals/5;
-			else
-				localEvals = 1000 * tbiMsCmdIdx.size();
+		if (!skipLocalSearch) {
+			local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
+			if (!localEvals) {
+				if (!skipGlobalSearch)
+					localEvals = globalEvals/5;
+				else
+					localEvals = 1000 * tbiMsCmdIdx.size();
+			}
+			vector<double> localSearchPerturb;
+			for (size_t param = 0; param < lowerBounds.size(); param++)
+				localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
+//			local_opt.set_xtol_rel(1e-2);
+			local_opt.set_ftol_abs(localSearchAbsTol);
+			local_opt.set_initial_step(localSearchPerturb);
+			AUGLAG.set_local_optimizer(local_opt);
 		}
-		vector<double> localSearchPerturb;
-		for (size_t param = 0; param < lowerBounds.size(); param++)
-			localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
-//		local_opt.set_xtol_rel(1e-2);
-		local_opt.set_ftol_abs(localSearchAbsTol);
-		local_opt.set_initial_step(localSearchPerturb);
+
 
 		if (!skipGlobalSearch) {
 			printf("\nStarting global search: \n");
