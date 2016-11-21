@@ -697,9 +697,11 @@ void readConfigFile() {
 				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
 				parConstraints[paramID1] = paramID2;
 			}
+			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 			else if (tokens[0] == "no_profiles") {
 				profileLikBool = false;
 			}
+			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 			else if (tokens[0] == "only_profiles") {
 				onlyProfiles = true;
 			}
@@ -763,6 +765,8 @@ void parseCmdLine(char* argv[]) {
 				stst >> ms_argv[i];
 			}
 			else {
+				//	check for tbi start values which are needed for a local search
+				//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 				if (estimate == 2 && (onlyProfiles || skipGlobal) && !startRandom) {
 					if (onlyProfiles)
 						cerr << "\nCannot proceed with plotting only profiles" << endl;
@@ -815,6 +819,7 @@ void parseCmdLine(char* argv[]) {
 		}
 	}
 
+	//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 	if (onlyProfiles)
 		skipGlobal = true;
 
@@ -1012,6 +1017,7 @@ int main(int argc, char* argv[]) {
 		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
 
+	//	i.e. task infer
 	if (estimate == 2) {
 		double maxLnL;
 
@@ -1219,6 +1225,7 @@ int main(int argc, char* argv[]) {
 			time(&likEndTime);
 			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
+		//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 		else if (!onlyProfiles) {
 			printf("Skipping global search!\n");
 			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
@@ -1283,9 +1290,11 @@ int main(int argc, char* argv[]) {
 
 		currState = OTHER;
 		ms_trees = refineLikTrees;
+		//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 		if (onlyProfiles || profileLikBool)
 			profileLik(parVec);
 	}
+	//	i.e. task conditional_bSFS
 	else if ((estimate == 1) || bSFSmode) {
 
 		printf("Evaluating point likelihood at : \n");
@@ -1341,6 +1350,7 @@ int main(int argc, char* argv[]) {
 			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 	}
+	//	i.e. task exact_bSFS
 	else if (estimate == 0) {
 
 		if (!mutClass) {
