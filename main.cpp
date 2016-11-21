@@ -1113,7 +1113,7 @@ int main(int argc, char* argv[]) {
 		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
 		local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 		if (!localEvals) {
-			if (!skipGlobal)
+			if (!skipGlobalSearch)
 				localEvals = globalEvals/5;
 			else
 				localEvals = 1000 * tbiMsCmdIdx.size();
