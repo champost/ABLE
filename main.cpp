@@ -1020,9 +1020,12 @@ int main(int argc, char* argv[]) {
 		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
 
+
+//*********************************************************************************************************************************************
 	//	i.e. task infer
 	if (estimate == 2) {
 		double maxLnL;
+		bool endTaskInfer = false;
 
 		vector<double> parVec;
 		int count = 0;
@@ -1072,7 +1075,8 @@ int main(int argc, char* argv[]) {
 		AUGLAG.set_upper_bounds(upperBounds);
 		AUGLAG.set_max_objective(optimize_wrapper_nlopt, NULL);
 		AUGLAG.add_inequality_constraint(check_constraints, data, 1e-6);
-		AUGLAG.set_local_optimizer(opt);
+
+		time(&likStartTime);
 
 		//	If global search is not meant to be skipped... (more details the below here : http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Global_optimization)
 		if (!skipGlobalSearch) {
@@ -1107,37 +1111,16 @@ int main(int argc, char* argv[]) {
 				else
 					globalEvals = globalMaxEvals;
 			}
-		}
 
-
-	    //	If local search is not meant to be skipped
-		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
-		if (!skipLocalSearch) {
-			local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-			if (!localEvals) {
-				if (!skipGlobalSearch)
-					localEvals = globalEvals/5;
-				else
-					localEvals = 1000 * tbiMsCmdIdx.size();
-			}
-			vector<double> localSearchPerturb;
-			for (size_t param = 0; param < lowerBounds.size(); param++)
-				localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
-//			local_opt.set_xtol_rel(1e-2);
-			local_opt.set_ftol_abs(localSearchAbsTol);
-			local_opt.set_initial_step(localSearchPerturb);
-			AUGLAG.set_local_optimizer(local_opt);
-		}
-
-
-		if (!skipGlobalSearch) {
-			printf("\nStarting global search: \n");
+			printf("\nStarting global search...\n");
 
 			ms_trees = globalTrees;
 			evalCount = 0;
 			abortNLopt = false;
 			currState = GLOBAL;
-			time(&likStartTime);
+
+			//	Global search with AUGLAG
+			AUGLAG.set_local_optimizer(opt);
 
 			try {
 				AUGLAG.optimize(parVec, maxLnL);
@@ -1156,95 +1139,55 @@ int main(int argc, char* argv[]) {
 					exit(-1);
 				}
 			}
-
-			printf("\nReporting the best MLE after %d evaluations\n", evalCount);
-			for (size_t i = 0; i < bestGlobalSPars.size(); i++)
-				printf("%.6f ", bestGlobalSPars[i]);
-			printf("LnL = %.6f\n\n", bestGlobalSlLnL);
-
-			ms_trees = localTrees;
-			evalCount = 0;
-			abortNLopt = false;
-			currState = LOCAL;
-			parVec = bestGlobalSPars;
-			bestLocalSlLnL = bestGlobalSlLnL;
-
-			if (localTrees >= globalTrees) {
-				printf("\nUsing the global search result(s) after %d evaluations as the starting point for a refined local search...\n\n", evalCount);
-
-				AUGLAG.set_local_optimizer(local_opt);
-
-				try {
-					AUGLAG.optimize(parVec, maxLnL);
-					throw abortNLopt;
-				}
-				catch (...) {
-					if (abortNLopt) {
-						cerr << "Something went wrong in the calculation of the LnL during the local search!" << endl;
-						cerr << "Aborting ABLE..." << endl;
-
-						for (size_t i = 0; i < parVec.size(); i++)
-							printf("%.6f ", parVec[i]);
-						printf("LnL = %.6f\n\n", maxLnL);
-
-						free_objects();
-						exit(-1);
-					}
-				}
-
-				if (bestLocalSlLnL <= bestGlobalSlLnL) {
-					printf("\nIgnoring local search results as they did not improve on the global search optimum...\n");
-					parVec = bestGlobalSPars;
-					maxLnL = bestGlobalSlLnL;
-				}
-				else {
-					printf("\nFound a better maximum locally after %d evaluations\n", evalCount);
-					parVec = bestLocalSPars;
-					maxLnL = bestLocalSlLnL;
-				}
-			}
-			else {
-				cerr << "It is strongly advised to rerun the local search with a value of \"local trees\" >= \"global trees\"!" << endl;
-				cerr << "Aborting ABLE..." << endl;
-				free_objects();
-				exit(-1);
-			}
-
-			currState = OTHER;
-			if (refineLikTrees) {
-				printf("\nRefining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
-				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
-					for (size_t i = 0; i < it->second.size(); i++) {
-						stringstream stst;
-						stst << parVec[tbi2ParVec[it->first]];
-						stst >> ms_argv[it->second[i]];
-					}
-				}
-
-				ms_trees = refineLikTrees;
-				maxLnL = computeLik();
-			}
-
-			printf("Found a maximum at ");
-			for (size_t i = 0; i < parVec.size(); i++)
-				printf("%.6f ", parVec[i]);
-			printf("LnL = %.6f\n\n", maxLnL);
-
-			time(&likEndTime);
-			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
-		//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-		else if (!onlyProfiles) {
-			printf("Skipping global search!\n");
-			printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
-			time(&likStartTime);
 
-			vector<double> startVec = parVec;
+	    //	If local search is not meant to be skipped
+		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
+		if (!skipLocalSearch) {
+			if (!skipGlobalSearch) {
+				printf("\nReporting the global search MLE after %d evaluations\n", evalCount);
+				for (size_t i = 0; i < bestGlobalSPars.size(); i++)
+					printf("%.6f ", bestGlobalSPars[i]);
+				printf("LnL = %.6f\n\n", bestGlobalSlLnL);
+
+				if (localTrees < globalTrees) {
+					cerr << "It is strongly advised to rerun the local search with a value of \"local trees\" >= \"global trees\"!" << endl;
+					cerr << "Aborting ABLE..." << endl;
+					free_objects();
+					exit(-1);
+				}
+
+				parVec = bestGlobalSPars;
+				bestLocalSlLnL = bestGlobalSlLnL;
+				printf("\nUsing the the global search MLE as the starting point for a refined local search...\n\n");
+			}
+			//	Local search without a prior global search
+			else {
+				printf("Skipping global search!\n");
+				printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
+			}
+
+			//	setting up local search params
 			ms_trees = localTrees;
 			evalCount = 0;
 			abortNLopt = false;
 			currState = LOCAL;
 
+			local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
+			if (!localEvals) {
+				if (!skipGlobalSearch)
+					localEvals = globalEvals/5;
+				else
+					localEvals = 1000 * tbiMsCmdIdx.size();
+			}
+			vector<double> localSearchPerturb;
+			for (size_t param = 0; param < lowerBounds.size(); param++)
+				localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
+//			local_opt.set_xtol_rel(1e-2);
+			local_opt.set_ftol_abs(localSearchAbsTol);
+			local_opt.set_initial_step(localSearchPerturb);
+
+			//	Local search with AUGLAG
 			AUGLAG.set_local_optimizer(local_opt);
 
 			try {
@@ -1253,7 +1196,7 @@ int main(int argc, char* argv[]) {
 			}
 			catch (...) {
 				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL during the local search!!" << endl;
+					cerr << "Something went wrong in the calculation of the LnL during the local search!" << endl;
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
@@ -1265,15 +1208,34 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if ((userLnL != 0.0) && (maxLnL <= userLnL)) {
-				printf("\nIgnoring local search results as they did not improve on the user-specified optimum...\n");
-				parVec = startVec;
-				maxLnL = userLnL;
+			//	IF the local search started with global search results
+			if (!skipGlobalSearch) {
+				if (bestLocalSlLnL <= bestGlobalSlLnL) {
+					printf("\nIgnoring local search results as they did not improve over the global search MLE...\n");
+					parVec = bestGlobalSPars;
+					maxLnL = bestGlobalSlLnL;
+				}
+				else {
+					printf("\nFound a better local search MLE after %d evaluations\n", evalCount);
+					parVec = bestLocalSPars;
+					maxLnL = bestLocalSlLnL;
+				}
 			}
-			else
-				printf("\nFound the local maximum after %d evaluations\n", evalCount);
+			//	IF user specified a cutoff LnL and no global search
+			else {
+				if ((userLnL != 0.0) && (maxLnL <= userLnL)) {
+					printf("\nIgnoring local search results as they did not improve on the user-specified LnL after %d evaluations\n", evalCount);
+					endTaskInfer = true;
+				}
+				else
+					printf("\nFound the local search MLE after %d evaluations\n", evalCount);
+			}
+		}
 
-			if (refineLikTrees) {
+		//	Prematurely end task infer if user specified LnL cutoff was not met during local search
+		if (!endTaskInfer) {
+			//	Refining MLE after global/local search
+			if ((!skipGlobalSearch || !skipLocalSearch) && refineLikTrees) {
 				printf("\nRefining the likelihood at the MLE using %d genealogies...\n", refineLikTrees);
 				for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 					for (size_t i = 0; i < it->second.size(); i++) {
@@ -1283,26 +1245,33 @@ int main(int argc, char* argv[]) {
 					}
 				}
 
+				currState = OTHER;
 				ms_trees = refineLikTrees;
 				maxLnL = computeLik();
 			}
 
-			printf("Found a maximum at ");
+			//	Final MLE output after global/local search and followed by LnL refinement (if specified)
+			printf("\n\nFound a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
 				printf("%.6f ", parVec[i]);
 			printf("LnL = %.6f\n\n", maxLnL);
 
-			time(&likEndTime);
-			printf("\nOverall time taken for optimization : %.5f s\n\n", float(likEndTime - likStartTime));
+			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
+			if (skipGlobalSearch && skipLocalSearch) {
+				currState = OTHER;
+				ms_trees = refineLikTrees;
+				//	N.B. Likelihood profile code needs to re reviewed when activated in the future
+//				if (onlyProfiles || profileLikBool)
+//					profileLik(parVec);
+
+			}
 		}
 
-		currState = OTHER;
-		ms_trees = refineLikTrees;
-		//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-		if (onlyProfiles || profileLikBool)
-			profileLik(parVec);
+		time(&likEndTime);
+		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 	}
 
+//*********************************************************************************************************************************************
 	//	i.e. task conditional_bSFS
 	else if ((estimate == 1) || bSFSmode) {
 
@@ -1360,6 +1329,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+//*********************************************************************************************************************************************
 	//	i.e. task exact_bSFS
 	else if (estimate == 0) {
 
