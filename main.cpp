@@ -94,8 +94,8 @@ int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikT
 		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobal = false, bSFSmode = false, profileLikBool = false, onlyProfiles = false, abortNLopt = false,
-		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false;
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, onlyProfiles = false, abortNLopt = false,
+		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize, seedPRNG;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -682,7 +682,10 @@ void readConfigFile() {
 				stst >> globalLower;
 			}
 			else if (tokens[0] == "skip_global_search") {
-				skipGlobal = true;
+				skipGlobalSearch = true;
+			}
+			else if (tokens[0] == "skip_local_search") {
+				skipLocalSearch = true;
 			}
 			else if (tokens[0] == "bounds") {
 				int paramID = atoi(tokens[1].substr(3).c_str());
@@ -767,10 +770,10 @@ void parseCmdLine(char* argv[]) {
 			else {
 				//	check for tbi start values which are needed for a local search
 				//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-				if (estimate == 2 && (onlyProfiles || skipGlobal) && !startRandom) {
+				if (estimate == 2 && (onlyProfiles || skipGlobalSearch) && !startRandom) {
 					if (onlyProfiles)
 						cerr << "\nCannot proceed with plotting only profiles" << endl;
-					else if (skipGlobal)
+					else if (skipGlobalSearch)
 						cerr << "\nCannot proceed with local search" << endl;
 					cerr << "You need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
 					cerr << "Exiting ABLE...\n" << endl;
@@ -821,7 +824,7 @@ void parseCmdLine(char* argv[]) {
 
 	//	N.B. Likelihood profile code needs to re reviewed when activated in the future
 	if (onlyProfiles)
-		skipGlobal = true;
+		skipGlobalSearch = skipLocalSearch = true;
 
 }
 
@@ -1063,7 +1066,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		//	If global search is meant to be skipped... (more details the below here : http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Global_optimization)
-		if (!skipGlobal) {
+		if (!skipGlobalSearch) {
 			if (globalSearchAlg == "DIRECT") {
 				opt = nlopt::opt(nlopt::GN_DIRECT, tbiMsCmdIdx.size());
 				printf("Using the DIRECT algorithm for the global search...\n");
@@ -1089,7 +1092,7 @@ int main(int argc, char* argv[]) {
 
 //			int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
 			int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
-			if (!skipGlobal && (globalEvals < globalMaxEvals)) {
+			if (!skipGlobalSearch && (globalEvals < globalMaxEvals)) {
 				if (globalEvals)
 					printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
 				else
@@ -1122,7 +1125,7 @@ int main(int argc, char* argv[]) {
 		local_opt.set_ftol_abs(localSearchAbsTol);
 		local_opt.set_initial_step(localSearchPerturb);
 
-		if (!skipGlobal) {
+		if (!skipGlobalSearch) {
 			printf("\nStarting global search: \n");
 
 			ms_trees = globalTrees;
@@ -1294,6 +1297,7 @@ int main(int argc, char* argv[]) {
 		if (onlyProfiles || profileLikBool)
 			profileLik(parVec);
 	}
+
 	//	i.e. task conditional_bSFS
 	else if ((estimate == 1) || bSFSmode) {
 
@@ -1350,6 +1354,7 @@ int main(int argc, char* argv[]) {
 			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
 		}
 	}
+
 	//	i.e. task exact_bSFS
 	else if (estimate == 0) {
 
