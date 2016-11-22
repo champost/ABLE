@@ -815,10 +815,10 @@ void parseCmdLine(char* argv[]) {
 		else {
 			stringstream stst;
 			if (globalTrees == 0)
-				globalTrees = 1000*tbiMsCmdIdx.size();
+				globalTrees = 10000;
 
 			if (localTrees == 0)
-				localTrees = 1000*tbiMsCmdIdx.size();
+				localTrees = 15000;
 		}
 	}
 
