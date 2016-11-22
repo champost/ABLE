@@ -900,7 +900,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	//	pretty output
 	++evalCount;
-	printf("%5d ", evalCount);
+	printf("%6d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
 		printf("%.6f ", vars[i]);
 //	printf(" Trees: %d ", ms_trees);
