@@ -900,11 +900,11 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 
 	//	pretty output
 	++evalCount;
-	printf("%5d ", evalCount);
+	printf("%6d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
 		printf("%.6f ", vars[i]);
-	printf(" Trees: %d ", ms_trees);
-	printf(" Sampled: %d ", sampledTrees);
+//	printf(" Trees: %d ", ms_trees);
+//	printf(" Sampled: %d ", sampledTrees);
 	printf(" LnL: %.6f\n", loglik);
 
 	if (loglik == 0.0) {
@@ -962,6 +962,17 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 
 
 int main(int argc, char* argv[]) {
+
+	string version = "0.1 (Built on " + datestring + " at " + timestring + ")";
+
+	cout << endl << endl;
+	cout << "******************************************************************" << endl;
+	cout << "*  This is ABLE version " << version << ".  *" << endl;
+	cout << "*  ABLE is distributed under the CeCILL licence. See             *" << endl;
+	cout << "*  http://www.cecill.info/index.en.html for more information.    *" << endl;
+	cout << "*  © Champak Beeravolu Reddy 2015-now (champak.br@gmail.com)     *" << endl;
+	cout << "******************************************************************" << endl;
+	cout << endl << endl;
 
 	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
 	gsl_rng_set(PRNG, hash(time(NULL), clock()));
@@ -1103,13 +1114,12 @@ int main(int argc, char* argv[]) {
 				printf("Using the DIRECT_NOSCAL algorithm (i.e. without scaling) for the global search...\n");
 			}
 
-//			int globalMaxEvals = 1000 * tbiMsCmdIdx.size() * tbiMsCmdIdx.size();
-			int globalMaxEvals = 5000 * tbiMsCmdIdx.size();
-			if (!skipGlobalSearch && (globalEvals < globalMaxEvals)) {
+			int globalRecEvals = 2000 * tbiMsCmdIdx.size();
+			if (globalEvals < globalRecEvals) {
 				if (globalEvals)
-					printf("\nToo few global_search_points for the specified number of free parameters\nPlease consider increasing \"global_search_evals\"...\n");
+					printf("\nThe specified number of GLOBAL search points with respect to the number of \"tbi\" parameters is below the recommended value.\nPlease consider increasing \"global_search_evals\"...\n");
 				else
-					globalEvals = globalMaxEvals;
+					globalEvals = globalRecEvals;
 			}
 
 			printf("\nStarting global search...\n");
@@ -1167,22 +1177,27 @@ int main(int argc, char* argv[]) {
 				printf("\nUsing the user-specified/default values as a starting point for a local search...\n\n");
 			}
 
+			int localRecEvals = 1000 * tbiMsCmdIdx.size();
+			if (localEvals < localRecEvals) {
+				if (localEvals)
+					printf("\nThe specified number of LOCAL search points with respect to the number of \"tbi\" parameters is below the recommended value.\nPlease consider increasing \"local_search_evals\"...\n");
+				else
+					localEvals = localRecEvals;
+			}
+
+			printf("\nStarting local search...\n");
+
 			//	setting up local search params
 			ms_trees = localTrees;
 			evalCount = 0;
 			abortNLopt = false;
 			currState = LOCAL;
 
-			local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
-			if (!localEvals) {
-				if (!skipGlobalSearch)
-					localEvals = globalEvals/5;
-				else
-					localEvals = 1000 * tbiMsCmdIdx.size();
-			}
 			vector<double> localSearchPerturb;
 			for (size_t param = 0; param < lowerBounds.size(); param++)
 				localSearchPerturb.push_back((upperBounds[param]-lowerBounds[param])/4);
+
+			local_opt = nlopt::opt(nlopt::LN_SBPLX, tbiMsCmdIdx.size());
 //			local_opt.set_xtol_rel(1e-2);
 			local_opt.set_ftol_abs(localSearchAbsTol);
 			local_opt.set_initial_step(localSearchPerturb);
@@ -1268,7 +1283,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		time(&likEndTime);
-		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+		printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 	}
 
 //*********************************************************************************************************************************************
@@ -1325,7 +1340,7 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
-			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+			printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 		}
 	}
 
@@ -1370,7 +1385,7 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			printf("Trees sampled : %d\n", ms_trees);
-			printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
+			printf("\nTime taken for computation : %.0f seconds\n", float(likEndTime - likStartTime));
 		}
 	}
 
