@@ -1268,7 +1268,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		time(&likEndTime);
-		printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+		printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 	}
 
 //*********************************************************************************************************************************************
@@ -1325,7 +1325,7 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
-			printf("Time taken for computation : %.5f s\n\n", float(likEndTime - likStartTime));
+			printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 		}
 	}
 
@@ -1370,7 +1370,7 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			printf("Trees sampled : %d\n", ms_trees);
-			printf("\nTime taken for computation : %.5f s\n", float(likEndTime - likStartTime));
+			printf("\nTime taken for computation : %.0f seconds\n", float(likEndTime - likStartTime));
 		}
 	}
 
