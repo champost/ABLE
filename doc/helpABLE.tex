@@ -478,23 +478,19 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	
 	\item[\RIGHTarrow] \incode{global_search_trees} \TTwo \\
 	\Index{global\_search\_trees}
-	Accepts a single value which specifies the number of genealogies/ARGs to be sampled during the \textbf{global search} of the MLE. The default number of genealogies is 1000 times the number of \incode{tbi} parameters.
+	Accepts a single value which specifies the number of genealogies/ARGs to be sampled during the \textbf{global search} of the MLE. The default number of genealogies is 10,000. This corresponds to the precision of the likelihood to be used during this search.
 	
 	\item[\RIGHTarrow] \incode{local_search_trees} \TTwo \\
 	\Index{local\_search\_trees}
-	Accepts a single value which specifies the number of genealogies/ARGs to be sampled during the \textbf{local search} of the MLE. The default number of genealogies is 1000 times the number of \incode{tbi} parameters.
+	Accepts a single value which specifies the number of genealogies/ARGs to be sampled during the \textbf{local search} of the MLE. The default number of genealogies is 15,000. This corresponds to the precision of the likelihood to be used during this search.
 	
 	\item[\RIGHTarrow] \incode{global_search_evals} \TTwo \\
 	\Index{global\_search\_evals}
-	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{global search} for the MLE. The default number of evaluations is 5000 times the number of \incode{tbi} parameters.
-
-	\RED{Warning issued!}
+	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{global search} for the MLE. The default number of evaluations is \textbf{2,000} times the number of \incode{tbi} parameters. A warning is issued if the user specifies a number below the default value.
 	
 	\item[\RIGHTarrow] \incode{local_search_evals} \TTwo \\
 	\Index{local\_search\_evals}
-	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{local search} for the MLE. The default number of evaluations is one fifth of the specified value for \incode{global_search_evals}. If this wasn't specified then it is set to 1000 times the number of \incode{tbi} parameters.
-	
-	\RED{Warning issued!}
+	Accepts a single value which specifies the number of points in parameter space that should be explored before concluding the \textbf{local search} for the MLE. The default number of evaluations is \textbf{1,000} times the number of \incode{tbi} parameters. A warning is issued if the user specifies a number below the default value.
 		
 	\item[\RIGHTarrow] \incode{global_upper_bound} \TTwo \\
 	\Index{global\_upper\_bound}
