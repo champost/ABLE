@@ -71,16 +71,16 @@ gsl_rng * PRNG;
 map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
-map<int, vector<double> > tbiSearchBounds;
+map<int, vector<double> > tbiSearchBounds, tbiProfilesGrid;
 map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
 
 string dataFile, dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile, data2bSFSFile;
 ofstream testLik, testConfig;
 
-vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops;
+vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops, profileVarKey;
 vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars;
+vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt, local_opt, AUGLAG;
@@ -90,11 +90,11 @@ char **ms_argv;
 int ms_argc = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
-int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, ms_trees = 1,
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
 		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, onlyProfiles = false, abortNLopt = false,
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -117,6 +117,7 @@ void free_objects() {
 		gsl_rng_free(PRNGThreadVec[i]);
 }
 
+//	Temporarily deactivated code for likelihood profiles (not to confused with profile likelihoods!)
 void profileLik(vector<double> MLEparVec) {
 
 	double parLowerBound, parUpperBound, MLEparVal, MLEparLik;
@@ -426,7 +427,7 @@ double computeLik() {
 			trackedConfigs = trackSelectConfigs.size();
 
 		if (bSFSmode) {
-			if (nobSFSFile) {
+			if (nobSFSFile || profileLikBool) {
 				for (size_t i = 0; i < dataConfigs.size(); i++) {
 					if (selectConfigFreqs[i] != 0.0)
 						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
@@ -700,22 +701,23 @@ void readConfigFile() {
 				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
 				parConstraints[paramID1] = paramID2;
 			}
-			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-			else if (tokens[0] == "no_profiles") {
-				profileLikBool = false;
-			}
-			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-			else if (tokens[0] == "only_profiles") {
-				onlyProfiles = true;
-			}
 			else if (tokens[0] == "seed_PRNG") {
 				stringstream stst(tokens[1]);
 				stst >> seedPRNG;
 				seedPRNGBool = true;
 			}
 			else if (tokens[0] == "refine_likelihoods") {
-				stringstream stst(tokens[1]);
-				stst >> refineLikTrees;
+				if (tokens.size() > 1) {
+					stringstream stst(tokens[1]);
+					stst >> refineLikTrees;
+				}
+			}
+			else if (tokens[0] == "profile_likelihoods") {
+				bSFSmode = profileLikBool = true;
+				if (tokens.size() > 1) {
+					stringstream stst(tokens[1]);
+					stst >> profileLikTrees;
+				}
 			}
 			else if (tokens[0] == "report_likelihoods") {
 				stringstream stst(tokens[1]);
@@ -739,6 +741,15 @@ void readConfigFile() {
 				stringstream stst(tokens[1]);
 				stst >> set_threads;
 			}
+			else if (tokens[0] == "profile") {
+				int paramID = atoi(tokens[1].substr(3).c_str());
+				for(unsigned int j = 2; j < tokens.size(); j++) {
+					double val;
+					stringstream stst(tokens[j]);
+					stst >> val;
+					tbiProfilesGrid[paramID].push_back(val);
+				}
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -761,33 +772,37 @@ void parseCmdLine(char* argv[]) {
 		string param(argv[i]);
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
-			int paramID = atoi(param.substr(3).c_str());
-			tbiMsCmdIdx[paramID].push_back(i);
-			if (tbiUserVal.find(paramID) != tbiUserVal.end()) {
-				stst << tbiUserVal[paramID];
-				stst >> ms_argv[i];
+			if ((estimate == 2) || profileLikBool) {
+				int paramID = atoi(param.substr(3).c_str());
+				tbiMsCmdIdx[paramID].push_back(i);
+				if (tbiUserVal.find(paramID) != tbiUserVal.end()) {
+					stst << tbiUserVal[paramID];
+					stst >> ms_argv[i];
+				}
+				else {
+					//	check for tbi start values which are needed for a local search
+					//	N.B. Likelihood profile code needs to re reviewed when activated in the future
+					if (skipGlobalSearch && !startRandom) {
+						cerr << "For this task you need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
+						cerr << "Exiting ABLE...\n" << endl;
+						free_objects();
+						exit(-1);
+					}
+
+					double tmpPar = gsl_rng_uniform(PRNG);
+					tbiUserVal[paramID] = tmpPar;
+					stst << tmpPar;
+					stst >> ms_argv[i];
+
+					if (startRandom)
+						setRandomPars[paramID] = true;
+				}
 			}
 			else {
-				//	check for tbi start values which are needed for a local search
-				//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-				if (estimate == 2 && (onlyProfiles || skipGlobalSearch) && !startRandom) {
-					if (onlyProfiles)
-						cerr << "\nCannot proceed with plotting only profiles" << endl;
-					else if (skipGlobalSearch)
-						cerr << "\nCannot proceed with local search" << endl;
-					cerr << "You need to specify values for the \"tbi\" keywords using the \"start\" keyword" << endl;
-					cerr << "Exiting ABLE...\n" << endl;
-					free_objects();
-					exit(-1);
-				}
-
-				double tmpPar = gsl_rng_uniform(PRNG);
-				tbiUserVal[paramID] = tmpPar;
-				stst << tmpPar;
-				stst >> ms_argv[i];
-
-				if (startRandom)
-					setRandomPars[paramID] = true;
+				cerr << "You cannot use \"tbi\" keywords for this task!" << endl;
+				cerr << "Exiting ABLE...\n" << endl;
+				free_objects();
+				exit(-1);
 			}
 		}
 		else {
@@ -821,11 +836,6 @@ void parseCmdLine(char* argv[]) {
 				localTrees = 15000;
 		}
 	}
-
-	//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-	if (onlyProfiles)
-		skipGlobalSearch = skipLocalSearch = true;
-
 }
 
 
@@ -917,7 +927,7 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 		printf("\nReporting the best MLE after %d evaluations\n", evalCount);
 		for (size_t i = 0; i < bestGlobalSPars.size(); i++)
 			printf("%.6f ", bestGlobalSPars[i]);
-		printf("LnL = %.6f\n\n", bestGlobalSlLnL);
+		printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
 	}
 
 	//	side stepping nlopt by storing the best LnL and parameters
@@ -958,6 +968,51 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 */
 
 	return consDiff;
+}
+
+
+//	recursive exploration of user-specified parameter profiles
+void exploreProfiles (size_t &varIdx) {
+	for(unsigned int i = 0; i < tbiProfilesGrid[profileVarKey[varIdx]].size(); i++) {
+		//	recursively constructing the parameter profile combination to be evaluated
+		profileVars[varIdx] = tbiProfilesGrid[profileVarKey[varIdx]][i];
+		if (varIdx+1 < profileVarKey.size())
+			exploreProfiles(++varIdx);
+
+		//	finished constructing the parameter profile combination to be evaluated
+		else if (varIdx+1 == profileVarKey.size()) {
+			//	constructing the ms command line
+			for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+				for (size_t i = 0; i < it->second.size(); i++) {
+					stringstream stst;
+					stst << profileVars[tbi2ParVec[it->first]];
+					stst >> ms_argv[it->second[i]];
+				}
+			}
+
+			bool parConstraintPass = true;
+			//	checking for simple non linear constraints between the free params
+			for (map<int , int>::iterator it = parConstraints.begin(); it != parConstraints.end(); it++) {
+				if (profileVars[tbi2ParVec[it->first]] >= profileVars[tbi2ParVec[it->second]]) {
+					parConstraintPass = false;
+					break;
+				}
+			}
+
+			//	pretty printing parameter profile combinations
+			++evalCount;
+			printf("%6d ", evalCount);
+			for (size_t j = 0; j < profileVars.size(); j++)
+				printf("%.6f ", profileVars[j]);
+
+			//	IF parameter combination satisfies user-specified constraints
+			if (parConstraintPass)
+				printf(" LnL: %.6f\n", computeLik());
+			else
+				printf(" Point does not pass user-specified constraint...skipping!\n");
+		}
+	}
+	--varIdx;
 }
 
 
@@ -1021,7 +1076,7 @@ int main(int argc, char* argv[]) {
 		procs = omp_get_num_procs();
 
 	omp_set_num_threads(procs);
-	printf("Setting up %d threads...\n", procs);
+	printf("Setting up %d threads...\n\n", procs);
 
 	if (!seedPRNGBool)
 		seedPRNG = hash(time(NULL), clock());
@@ -1143,7 +1198,7 @@ int main(int argc, char* argv[]) {
 
 					for (size_t i = 0; i < parVec.size(); i++)
 						printf("%.6f ", parVec[i]);
-					printf("LnL = %.6f\n\n", maxLnL);
+					printf(" LnL: %.6f\n\n", maxLnL);
 
 					free_objects();
 					exit(-1);
@@ -1158,7 +1213,7 @@ int main(int argc, char* argv[]) {
 				printf("\nReporting the global search MLE after %d evaluations\n", evalCount);
 				for (size_t i = 0; i < bestGlobalSPars.size(); i++)
 					printf("%.6f ", bestGlobalSPars[i]);
-				printf("LnL = %.6f\n\n", bestGlobalSlLnL);
+				printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
 
 				if (localTrees < globalTrees) {
 					cerr << "It is strongly advised to rerun the local search with a value of \"local trees\" >= \"global trees\"!" << endl;
@@ -1216,7 +1271,7 @@ int main(int argc, char* argv[]) {
 
 					for (size_t i = 0; i < parVec.size(); i++)
 						printf("%.6f ", parVec[i]);
-					printf("LnL = %.6f\n\n", maxLnL);
+					printf(" LnL: %.6f\n\n", maxLnL);
 
 					free_objects();
 					exit(-1);
@@ -1269,79 +1324,98 @@ int main(int argc, char* argv[]) {
 			printf("\n\nFound a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
 				printf("%.6f ", parVec[i]);
-			printf("LnL = %.6f\n\n", maxLnL);
-
-			//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-			if (skipGlobalSearch && skipLocalSearch) {
-				currState = OTHER;
-				ms_trees = refineLikTrees;
-				//	N.B. Likelihood profile code needs to re reviewed when activated in the future
-//				if (onlyProfiles || profileLikBool)
-//					profileLik(parVec);
-
-			}
+			printf(" LnL: %.6f\n\n", maxLnL);
 		}
 
 		time(&likEndTime);
-		printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
+		printf("\nTime taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 	}
 
 //*********************************************************************************************************************************************
-	//	i.e. task conditional_bSFS
+	//	i.e. task conditional_bSFS or for profile_likelihoods
 	else if ((estimate == 1) || bSFSmode) {
-
-		printf("Evaluating point likelihood at : \n");
-		if (!tbiUserVal.empty()) {
-			for (map<int, double>::iterator it = tbiUserVal.begin(); it != tbiUserVal.end(); it++)
-				printf("%.6f ", it->second);
-			printf("\n");
-		}
-		else {
-			for (int i = 0; i < ms_argc; i++)
-				cout << argv[i] << " ";
-			cout << endl;
-		}
-
-		{
-			stringstream stst;
-			stst << ms_argv[2];
-			stst >> ms_trees;
-		}
-
 		currState = OTHER;
 		double loglik;
-		if (!bSFSmode) {
 
-			//	temporary deactivation : need to review code in calcBSFSTable for this option
-			free_objects();
-			exit(-1);
-
-			testLik.open("logliks.txt",ios::out);
-			testConfig.open("propConfigs.txt",ios::out);
+		if (bSFSmode) {
 			time(&likStartTime);
-			loglik = computeLik();
-			time(&likEndTime);
-			testLik.close();
-			testConfig.close();
-		}
-		else {
-			time(&likStartTime);
-			loglik = computeLik();
-			time(&likEndTime);
-		}
+			bool zeroTrees = false;
 
-		if (ms_crash_flag) {
-			cerr << "\nABLE failed to simulate genealogies with the demographic parameters that have been specified!" << endl;
-			cerr << "Please consider changing them or contact the author Champak B. Reddy (champak.br@gmail.com)" << endl;
-			cerr << "Exiting ABLE...\n" << endl;
+			if (profileLikBool) {
+				if (!profileLikTrees) {
+					cerr << "\nPlease specify a non-zero number of trees/genealogies (to be used for computing the profile likelihoods) on the command line!" << endl;
+					zeroTrees = true;
+				}
+				else {
+					ms_trees = profileLikTrees;
 
-			free_objects();
-			exit(-1);
+					int count = 0;
+					profileVars = vector<double>(tbiMsCmdIdx.size(),0.0);
+					for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+						tbi2ParVec[it->first] = count;
+						profileVarKey.push_back(it->first);
+						++count;
+					}
+
+					evalCount = 0;
+					size_t varIdx = 0;
+					printf("\nEvaluating profile likelihood combinations...\n");
+					exploreProfiles(varIdx);
+				}
+			}
+			else {
+				if (!ms_trees) {
+					cerr << "\nPlease specify non-zero number of trees/genealogies (to be used for computing the conditional_bSFS) on the command line!" << endl;
+					zeroTrees = true;
+				}
+				else {
+					printf("Evaluating point likelihood at : \n");
+					for (int i = 0; i < ms_argc; i++)
+						cout << argv[i] << " ";
+					cout << endl;
+
+					{
+						stringstream stst;
+						stst << ms_argv[2];
+						stst >> ms_trees;
+					}
+
+					loglik = computeLik();
+				}
+			}
+
+			time(&likEndTime);
+
+			if (zeroTrees) {
+				cerr << "Exiting ABLE...\n" << endl;
+				free_objects();
+				exit(-1);
+			}
+			else {
+				if (ms_crash_flag) {
+					cerr << "\nABLE failed to simulate genealogies with the demographic parameters that have been specified!" << endl;
+					cerr << "Please consider changing them or contact the author Champak B. Reddy (champak.br@gmail.com)" << endl;
+					cerr << "Exiting ABLE...\n" << endl;
+
+					free_objects();
+					exit(-1);
+				}
+				else if (!profileLikBool)
+					printf(" LnL: %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
+
+				printf("\nTime taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
+			}
 		}
-		else {
-			printf("LnL : %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
-			printf("Time taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
-		}
+//		temporary deactivation : need to review code in calcBSFSTable for this option
+//		else {
+//			testLik.open("logliks.txt",ios::out);
+//			testConfig.open("propConfigs.txt",ios::out);
+//			time(&likStartTime);
+//			loglik = computeLik();
+//			time(&likEndTime);
+//			testLik.close();
+//			testConfig.close();
+//		}
 	}
 
 //*********************************************************************************************************************************************
