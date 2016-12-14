@@ -82,9 +82,8 @@
 
 \vspace{1cm}
 
-Version 0.1 \\
+Version 0.1.1 \\
 \today
-%Oct 4, 2016
 
 \vspace{2cm}
 
@@ -364,6 +363,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	 	This is the standard mode for inferring demographic parameters and will be the most used feature of \ABLE. This mode typically consists of a global search followed by a local search and finally a refined log-likelihood (\textit{lnL}) at the MLE (see \ref{sec:examples_inference}).
 	\end{itemize}
 	
+	
+ 	\begin{notebox}
+ 		\ABLE\ expects \incode{tbi} keywords as part of the \incode{ms} command-line \textbf{only for} the \incode{task infer} mode. (See also \incode{profile_likelihoods} on pg.~\pageref{key:profile_likelihoods}). 
+	\end{notebox}
+	
 	\item[\RIGHTarrow] \incode{bSFS} \TTwo \\
 	\Index{bSFS}
 	Accepts a single value specifying the name and location (relative to the config file) of the bSFS output file for the \incode{exact_bSFS} and \incode{conditional_bSFS} cases (see above). The bSFS output is thus for a given demographic model, at a point in parameter space and for a specified number of genealogies.
@@ -455,6 +459,26 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\end{codebox} 
 	\end{itemize}
 	
+	\item[\RIGHTarrow] \incode{profile} \TThree \\
+	\Index{profile}
+	\IndexSub{profile}{tbi}
+	\phantomsection
+	\label{key:profile}
+	This applies only when the \incode{profile_likelihoods} keyword has been specified (\pref{key:profile_likelihoods}) in the config file and \incode{tbi} keywords as part of the command line (see \ref{cmdline}). It enables the user to explore a grid in \textit{n} dimensions (i.e. number of \incode{tbi} params) for which \ABLE\ outputs a list of likelihoods making it easy to plot the discretized profile likelihood. For each parameter the discrete exploration of likelihoods can be specified as follows \incode{profile tbi val1 val2 ...}
+	
+	Below is an example for four \incode{tbi} parameters which tells \ABLE\ to explore all combinations starting with \incode{(0.1,0.1,0.6,0.1)} to \incode{(0.5,0.3,0.7,0.3)}.
+	\begin{codebox}
+	\begin{verbatim}
+		profile_likelihoods 500
+		
+		profile tbi2 0.1 0.3 0.5
+		profile tbi4 0.1 0.2 0.3
+		profile tbi5 0.6 0.7
+		profile tbi7 0.1 0.2 0.3
+	\end{verbatim}
+	\end{codebox}
+	Note that unexpected behaviour may result if the \incode{start} keyword (\pref{key:start}) is used in conjunction with this option.
+
 	\item[\RIGHTarrow] \incode{global_search} \TTwo \\
  	\Index{global\_search}
 	This option sets the global search strategy for the MLE and makes use of the algorithms implemented in the \href{http://ab-initio.mit.edu/wiki/index.php/NLopt}{NLopt library}.
@@ -542,6 +566,12 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\Index{refine\_likelihoods}
 	Accepts a single value which specifies the number of genealogies to be sampled for a further refinement of the Monte Carlo \textit{lnL} at the MLE found after a global/local search.
 	
+	\item[\RIGHTarrow] \incode{profile_likelihoods} \TTwo \\
+	\Index{profile\_likelihoods}
+	\phantomsection
+	\label{key:profile_likelihoods}
+	Accepts a single value which specifies the number of genealogies to be sampled for calculating the Monte Carlo \textit{lnL} at the user-specified discrete parameter combinations. This is equivalent to specifying \incode{task conditional_bSFS} (\pref{key:task}) but differs in that it needs \incode{tbi} keywords and makes use of the \incode{profile} keyword (\pref{key:profile}) for specifying the grid.
+
 	\item[\RIGHTarrow] \incode{report_likelihoods} \TTwo \\
 	\Index{report\_likelihoods}
 	Accepts a single value which asks \ABLE\ to report the parameter point with the best MLE during the (global or local) search after the specified number of likelihood evaluations.
@@ -720,7 +750,6 @@ And \incode{config_3pop_conditional.txt} contains :
 	seed_PRNG 12468192
 	\end{verbatim}
 \end{codebox}
-Alternatively, in the \incode{conditional_bSFS} mode you can make use of \incode{tbi} keywords in the command line and respectively specify the parameter values in the config file using the \incode{start tbi ...} options.
 
 
 \subsubsection{Inference with the bSFS}
