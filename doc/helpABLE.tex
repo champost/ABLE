@@ -82,7 +82,7 @@
 
 \vspace{1cm}
 
-Version 0.1.1 \\
+Version \RED{0.1.x} \\
 \today
 
 \vspace{2cm}
@@ -459,26 +459,6 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\end{codebox} 
 	\end{itemize}
 	
-	\phantomsection
-	\label{key:profile}
-	\item[\RIGHTarrow] \incode{profile} \TThree \\
-	\Index{profile}
-	\IndexSub{profile}{tbi}
-	This applies only when the \incode{profile_likelihoods} keyword has been specified (\pref{key:profile_likelihoods}) in the config file and \incode{tbi} keywords as part of the command line (see \ref{cmdline}). It enables the user to explore a grid in \textit{n} dimensions (i.e. number of \incode{tbi} params) for which \ABLE\ outputs a list of likelihoods making it easy to plot the discretized profile likelihood. For each parameter the discrete exploration of likelihoods can be specified as follows \incode{profile tbi val1 val2 ...}
-	
-	Below is an example for four \incode{tbi} parameters which tells \ABLE\ to explore all combinations starting with \incode{(0.1,0.1,0.6,0.1)} to \incode{(0.5,0.3,0.7,0.3)}.
-	\begin{codebox}
-	\begin{verbatim}
-		profile_likelihoods 500
-		
-		profile tbi2 0.1 0.3 0.5
-		profile tbi4 0.1 0.2 0.3
-		profile tbi5 0.6 0.7
-		profile tbi7 0.1 0.2 0.3
-	\end{verbatim}
-	\end{codebox}
-	Note that unexpected behaviour may result if the \incode{start} keyword (\pref{key:start}) is used in conjunction with this option.
-
 	\item[\RIGHTarrow] \incode{global_search} \TTwo \\
  	\Index{global\_search}
 	This option sets the global search strategy for the MLE and makes use of the algorithms implemented in the \href{http://ab-initio.mit.edu/wiki/index.php/NLopt}{NLopt library}.
@@ -542,6 +522,8 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\end{codebox} 
 	The default lower and upper bounds for all parameters are $ 10^{-3} $ and 5 respectively.
 	
+	\phantomsection
+	\label{key:constrain}
 	\item[\RIGHTarrow] \incode{constrain} \TTwo \\
 	\Index{constrain}
 	Presently in \ABLE, it is possible to specify simple parameter constraints to enforce biological coherence between two demographic events \textit{e.g.} gene flow is necessarily a more recent event than divergence in a two population model. Multiple constraints can be specified (each on a separate line) and each constraint only accepts two \incode{tbi} parameters. For example, in order to impose the constraint \incode{tbi4 < tbi2}, specify
@@ -564,8 +546,28 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\label{key:profile_likelihoods}
 	\item[\RIGHTarrow] \incode{profile_likelihoods} \TTwo \\
 	\Index{profile\_likelihoods}
-	Accepts a single value which specifies the number of genealogies to be sampled for calculating the Monte Carlo \textit{lnL} at the user-specified discrete parameter combinations. This is equivalent to specifying \incode{task conditional_bSFS} (\pref{key:task}) but differs in that it needs \incode{tbi} keywords and makes use of the \incode{profile} keyword (\pref{key:profile}) for specifying the grid.
+	Accepts a single value which specifies the number of genealogies to be sampled for calculating the Monte Carlo \textit{lnL} at the user-specified discrete parameter combinations. This is equivalent to specifying \incode{task conditional_bSFS} (\pref{key:task}) but differs in that it needs \incode{tbi} keywords and makes use of the \incode{profile} keyword below for specifying the grid.
 
+	\phantomsection
+	\label{key:profile}
+	\item[\RIGHTarrow] \incode{profile} \TThree \\
+	\Index{profile}
+	\IndexSub{profile}{tbi}
+	This applies only when the \incode{profile_likelihoods} keyword above has been specified in the config file and \incode{tbi} keywords as part of the command line (see \ref{cmdline}). It enables the user to explore a grid in \textit{n} dimensions (i.e. number of \incode{tbi} params) for which \ABLE\ outputs a list of likelihoods making it easy to plot the discretized profile likelihood. For each parameter the discrete exploration of likelihoods can be specified as follows \incode{profile tbi val1 val2 ...}
+	
+	Below is an example for four \incode{tbi} parameters which tells \ABLE\ to explore all combinations starting with \incode{(0.1,0.1,0.6,0.1)} up to \incode{(0.5,0.3,0.7,0.3)}.
+	\begin{codebox}
+		\begin{verbatim}
+		profile_likelihoods 500
+		
+		profile tbi2 0.1 0.3 0.5
+		profile tbi4 0.1 0.2 0.3
+		profile tbi5 0.6 0.7
+		profile tbi7 0.1 0.2 0.3
+		\end{verbatim}
+	\end{codebox}
+	Note that unexpected behaviour may result if the \incode{start} keyword (\pref{key:start}) is used in conjunction with this option. Additionally, the user can enforce biological constraints on the grid of points using the \incode{constrain} keyword (\pref{key:constrain}).
+	
 	\item[\RIGHTarrow] \incode{report_likelihoods} \TTwo \\
 	\Index{report\_likelihoods}
 	Accepts a single value which asks \ABLE\ to report the parameter point with the best MLE during the (global or local) search after the specified number of likelihood evaluations.
