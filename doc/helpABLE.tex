@@ -82,9 +82,8 @@
 
 \vspace{1cm}
 
-Version 0.1 \\
+Version \RED{0.1.x} \\
 \today
-%Oct 4, 2016
 
 \vspace{2cm}
 
@@ -246,8 +245,8 @@ The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE
 
 
 \subsubsection{The \incode{tbi} keyword} 
-\label{key:tbi} 
 \Index{tbi}
+\label{key:tbi} 
 While {\textbf{\textit{ms}}} provides for the \incode{tbs} option, we introduce the \incode{tbi} keyword which stands for "\textbf{to be inferred}" as part of the \ABLE\ command line. \incode{tbi} keywords are to be used instead of the values of the parameters of a demographic model (\textit{i.e.} some floating value) which need to be inferred. All \incode{tbi} keywords need to be suffixed by a number (\incode{tbi1, tbi2,...}). Thus, all occurrences on the command line of the same demographic parameter can be correctly identified. 
 
 Below is a typical example of an \ABLE\ command line for a simple history describing a single discrete change in population size defined by three parameters (current and ancestral population sizes and the time of size change) which are to be inferred (see \ref{sec:examples_exact_bSFS}):
@@ -274,12 +273,12 @@ Below is a typical example of an \ABLE\ command line for a simple history descri
 \Index{\#~(commented line)}
 Any line in the config file beginning with the hash symbol \incodeEnv{\#} will be considered as a comment by \ABLE\ and ignored. Every keyword along with its corresponding options are to be specified on a separate line. Also, keywords and options are to be separated by a single space. All config file keywords introduced here will be of one or more of these types :
 
+\phantomsection
+\label{T1_T2_T3}
 \begin{itemize}
 \item [\textcolor{blue}{T1} : ] \incode{Key} 
 \item [\textcolor{blue}{T2} : ] \incode{Key val} \textit{or} \incode{Key val1 val2 val3 ...}
 \item [\textcolor{blue}{T3} : ] \incode{Key SubKey val} \textit{or} \incode{Key SubKey val1 val2 val3...}
-\phantomsection
-\label{T1_T2_T3}
 \end{itemize}
 Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively represents a binary true/false option whereas it is possible to specify a lot more with a \textcolor{blue}{T2}/\textcolor{blue}{T3} keyword. 
 
@@ -301,10 +300,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\end{verbatim}
 	\end{codebox}
 	
-	\item[\RIGHTarrow] \incode{datafile_format} \TTwo \\
- 	\Index{datafile\_format}
 	\phantomsection
 	\label{key:data_format}
+	\item[\RIGHTarrow] \incode{datafile_format} \TTwo \\
+ 	\Index{datafile\_format}
  	Data can be specified in either of the two formats below. 
  	
  	\begin{notebox}
@@ -329,10 +328,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	 	This format closely resembles that of simulated samples output by the \href{http://home.uchicago.edu/rhudson1/source/mksamples.html}{\textbf{\textit{ms}}} software and will be the easiest for all users of \ABLE\ to provide. A more detailed description of this format can be found in \ref{sec:data_format}. A file named \incode{block_SNPs.txt} is created with the number of SNPs per sequence block providing for a manual cross-check that \ABLE\ has correctly accounted for available polymorphism. While tri/quadri-allelic nucleotide positions are ignored they are however listed in \incode{block_SNPs.txt}.
 	\end{itemize}
 	
-	\item[\RIGHTarrow] \incode{allele_type} \TTwo \\
- 	\Index{allele\_type}
 	\phantomsection
 	\label{key:allele_type}
+	\item[\RIGHTarrow] \incode{allele_type} \TTwo \\
+ 	\Index{allele\_type}
 	This option provides additional information to \ABLE\ on how to read in the data when it is already in a \incode{pseudo_MS} format. See \ref{sec:data_format} for full examples of both the formats below.
 	
 	\begin{itemize}
@@ -345,10 +344,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		Valid characters are \incode{0} or \incode{1} and missing information is specified by using \incode{N}  (see \ref{sec:data_binary}).
 	\end{itemize}
 	
+	\phantomsection
+	\label{key:task}
 	\item[\RIGHTarrow] \incode{task} \TTwo\ \\
  	\Index{task}
-	\phantomsection
- 	\label{key:task}
 	This option defines any one of the three principal tasks (or modes) that \ABLE\ is meant to undertake. More information can be found in the examples section (\ref{sec:examples}).
 	\begin{itemize}
 	 	\item \incode{task exact_bSFS} \\
@@ -364,6 +363,11 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	 	This is the standard mode for inferring demographic parameters and will be the most used feature of \ABLE. This mode typically consists of a global search followed by a local search and finally a refined log-likelihood (\textit{lnL}) at the MLE (see \ref{sec:examples_inference}).
 	\end{itemize}
 	
+	
+ 	\begin{notebox}
+ 		\ABLE\ expects \incode{tbi} keywords as part of the \incode{ms} command-line \textbf{only for} the \incode{task infer} mode. (See also \incode{profile_likelihoods} on pg.~\pageref{key:profile_likelihoods}). 
+	\end{notebox}
+	
 	\item[\RIGHTarrow] \incode{bSFS} \TTwo \\
 	\Index{bSFS}
 	Accepts a single value specifying the name and location (relative to the config file) of the bSFS output file for the \incode{exact_bSFS} and \incode{conditional_bSFS} cases (see above). The bSFS output is thus for a given demographic model, at a point in parameter space and for a specified number of genealogies.
@@ -374,10 +378,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\end{codebox} 
 	The default name of the output file is \incode{bSFS.txt}.
 	
-	\item[\RIGHTarrow] \incode{kmax} \TTwo \\
-	\Index{kmax}
 	\phantomsection
 	\label{key:kmax}
+	\item[\RIGHTarrow] \incode{kmax} \TTwo \\
+	\Index{kmax}
 	A single argument following this keyword specifies the maximum number of mutation classes at single nucleotide sites (\textit{i.e.} singletons, doubletons, \textit{etc.}) to be explicitly accounted for in the bSFS. Mutations appearing more frequently in your data than the specified \incode{kmax} are not ignored but rather grouped into a marginal probability class. A maximum of 3 is specified as follows
 	\begin{codebox}
 		\begin{verbatim}
@@ -390,10 +394,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\Index{folded}
 	The presence of this keyword instructs \ABLE\ to consider the "polarity" \textit{i.e.} account for the ancestral/derived states of alleles with respect to an outgroup and thus use the folded bSFS. If the data is not in a binary format (\pref{sec:data_genotype}) then the first allele at every nucleotide position in the first population is taken to be of the ancestral type.
 	
-	\item[\RIGHTarrow] \incode{pops} \TThree \\
-	\Index{pops}
 	\phantomsection
 	\label{key:pops}
+	\item[\RIGHTarrow] \incode{pops} \TThree \\
+	\Index{pops}
 	This option takes as a first argument the number of population samples that will be analysed followed by the number of samples per population in the order that they have been specified on the \textbf{\textit{ms}} command line
 	\begin{codebox}
 		\begin{verbatim}
@@ -425,10 +429,10 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\end{verbatim}
 	\end{codebox}
 	
-	\item[\RIGHTarrow] \incode{start} \TTwo/\TThree \\
- 	\Index{start}
 	\phantomsection
 	\label{key:start}
+	\item[\RIGHTarrow] \incode{start} \TTwo/\TThree \\
+ 	\Index{start}
 	This applies only when \incode{tbi} keywords have been specified as part of the command line (see \ref{cmdline}) and need to be initialized with numeric values from within the config file.
 	\begin{itemize}
 		\item \incode{start all val1 val2 ...} \\
@@ -518,6 +522,8 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\end{codebox} 
 	The default lower and upper bounds for all parameters are $ 10^{-3} $ and 5 respectively.
 	
+	\phantomsection
+	\label{key:constrain}
 	\item[\RIGHTarrow] \incode{constrain} \TTwo \\
 	\Index{constrain}
 	Presently in \ABLE, it is possible to specify simple parameter constraints to enforce biological coherence between two demographic events \textit{e.g.} gene flow is necessarily a more recent event than divergence in a two population model. Multiple constraints can be specified (each on a separate line) and each constraint only accepts two \incode{tbi} parameters. For example, in order to impose the constraint \incode{tbi4 < tbi2}, specify
@@ -528,12 +534,6 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\end{codebox} 
 	and in this very order.
 	
-	%	\item \incode{no_profiles} \TOne \\
-	%	Code in development...to be written.
-	
-	%	\item \incode{only_profiles} \TOne \\
-	%	Code in development...to be written.
-	
 	\item[\RIGHTarrow] \incode{seed_PRNG} \TTwo \\
 	\Index{seed\_PRNG}
 	Accepts a single value which acts as the starting seed for the Pseudo random Number Generator (PRNG) which follows the Mersenne Twister algortihm (as implemented in the \href{http://www.gnu.org/software/gsl/}{GNU Scientific Library}). By default, \ABLE\ uses all available threads on a system for computation (see also \incode{set_threads} option), and automatically attributes a different seed to each thread by successively incrementing the user-specified start value by 1. If no value was specified, \ABLE\ uses the state of the system clock to generate a seed and then attributes a seed by successive incrementation to each thread.
@@ -541,6 +541,32 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	\item[\RIGHTarrow] \incode{refine_likelihoods} \TTwo \\
 	\Index{refine\_likelihoods}
 	Accepts a single value which specifies the number of genealogies to be sampled for a further refinement of the Monte Carlo \textit{lnL} at the MLE found after a global/local search.
+	
+	\phantomsection
+	\label{key:profile_likelihoods}
+	\item[\RIGHTarrow] \incode{profile_likelihoods} \TTwo \\
+	\Index{profile\_likelihoods}
+	Accepts a single value which specifies the number of genealogies to be sampled for calculating the Monte Carlo \textit{lnL} at the user-specified discrete parameter combinations. This is equivalent to specifying \incode{task conditional_bSFS} (\pref{key:task}) but differs in that it needs \incode{tbi} keywords and makes use of the \incode{profile} keyword below for specifying the grid.
+
+	\phantomsection
+	\label{key:profile}
+	\item[\RIGHTarrow] \incode{profile} \TThree \\
+	\Index{profile}
+	\IndexSub{profile}{tbi}
+	This applies only when the \incode{profile_likelihoods} keyword above has been specified in the config file and \incode{tbi} keywords as part of the command line (see \ref{cmdline}). It enables the user to explore a grid in \textit{n} dimensions (i.e. number of \incode{tbi} params) for which \ABLE\ outputs a list of likelihoods making it easy to plot the discretized profile likelihood. For each parameter the discrete exploration of likelihoods can be specified as follows \incode{profile tbi val1 val2 ...}
+	
+	Below is an example for four \incode{tbi} parameters which tells \ABLE\ to explore all combinations starting with \incode{(0.1,0.1,0.6,0.1)} up to \incode{(0.5,0.3,0.7,0.3)}.
+	\begin{codebox}
+		\begin{verbatim}
+		profile_likelihoods 500
+		
+		profile tbi2 0.1 0.3 0.5
+		profile tbi4 0.1 0.2 0.3
+		profile tbi5 0.6 0.7
+		profile tbi7 0.1 0.2 0.3
+		\end{verbatim}
+	\end{codebox}
+	Note that unexpected behaviour may result if the \incode{start} keyword (\pref{key:start}) is used in conjunction with this option. Additionally, the user can enforce biological constraints on the grid of points using the \incode{constrain} keyword (\pref{key:constrain}).
 	
 	\item[\RIGHTarrow] \incode{report_likelihoods} \TTwo \\
 	\Index{report\_likelihoods}
@@ -720,7 +746,6 @@ And \incode{config_3pop_conditional.txt} contains :
 	seed_PRNG 12468192
 	\end{verbatim}
 \end{codebox}
-Alternatively, in the \incode{conditional_bSFS} mode you can make use of \incode{tbi} keywords in the command line and respectively specify the parameter values in the config file using the \incode{start tbi ...} options.
 
 
 \subsubsection{Inference with the bSFS}
