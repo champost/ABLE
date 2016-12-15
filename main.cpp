@@ -819,15 +819,15 @@ void parseCmdLine(char* argv[]) {
 	exit(-1);
 */
 
-	if (estimate == 2) {
+	if ((estimate == 2) || profileLikBool) {
 		if (!tbiMsCmdIdx.size()) {
 			cerr << "\nCannot proceed with inference" << endl;
-			cerr << "\"tbi\" (To be Inferred) keywords need to be specified when \"estimate = 2\"" << endl;
+			cerr << "\"tbi\" (To be Inferred) keywords are expected in the \"task infer\" mode" << endl;
 			cerr << "Exiting ABLE...\n" << endl;
 			free_objects();
 			exit(-1);
 		}
-		else {
+		else if (estimate == 2) {
 			stringstream stst;
 			if (globalTrees == 0)
 				globalTrees = 10000;
@@ -1346,6 +1346,8 @@ int main(int argc, char* argv[]) {
 					cerr << "\nPlease specify a non-zero number of trees/genealogies (to be used for computing the profile likelihoods) on the command line!" << endl;
 					zeroTrees = true;
 				}
+				else if (tbiMsCmdIdx.size() != tbiProfilesGrid.size())
+					zeroTrees = true; // using it as a flag for a premature exit
 				else {
 					ms_trees = profileLikTrees;
 
