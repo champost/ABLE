@@ -81,6 +81,7 @@ ofstream testLik, testConfig;
 vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops, profileVarKey;
 vector<vector<int> > dataConfigs;
 vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
+vector<string> cmdLine;
 vector<gsl_rng *> PRNGThreadVec;
 
 nlopt::opt opt, local_opt, AUGLAG;
@@ -94,7 +95,7 @@ int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikT
 		reportEveryEvals = 0, set_threads = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false,
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize, seedPRNG;
 
@@ -583,7 +584,11 @@ void readConfigFile() {
 			TrimSpaces(tokens[j]);
 
 		if ((tokens[0][0] != '#') && (line.size() > 0)) {
-			if (tokens[0] == "pops") {
+			if (tokens[0] == "ABLE") {
+				cmdLineInConfigFile = true;
+				cmdLine = tokens;
+			}
+			else if (tokens[0] == "pops") {
 				stringstream stst1(tokens[1]);
 				stst1 >> npops;
 				for (int i = 0; i < npops; i++) {
@@ -764,12 +769,20 @@ void readConfigFile() {
 
 void parseCmdLine(char* argv[]) {
 
+	if (cmdLineInConfigFile)
+		ms_argc = cmdLine.size();
+
 	ms_argv = (char **)malloc( ms_argc*sizeof(char *) ) ;
 	for(int i =0; i < ms_argc; i++)
 		ms_argv[i] = (char *)malloc(30*sizeof(char) ) ;
 
 	for (int i = 0; i < ms_argc; i++) {
-		string param(argv[i]);
+		string param;
+		if (cmdLineInConfigFile)
+			param = cmdLine[i];
+		else
+			param = string(argv[i]);
+
 		stringstream stst;
 		if (param.substr(0,3) == "tbi") {
 			if ((estimate == 2) || profileLikBool) {
@@ -806,7 +819,11 @@ void parseCmdLine(char* argv[]) {
 			}
 		}
 		else {
-			stst << argv[i];
+			if (cmdLineInConfigFile)
+				stst << cmdLine[i];
+			else
+				stst << argv[i];
+
 			stst >> ms_argv[i];
 		}
 	}
@@ -1373,7 +1390,7 @@ int main(int argc, char* argv[]) {
 				else {
 					printf("Evaluating point likelihood at : \n");
 					for (int i = 0; i < ms_argc; i++)
-						cout << argv[i] << " ";
+						cout << ms_argv[i] << " ";
 					cout << endl;
 
 					{
