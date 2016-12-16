@@ -34,7 +34,7 @@
 
 % note block
 \newenvironment{notebox}
-{\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=2cm, right skip=2cm, title=\textbf{Note}]}
+{\begin{tcolorbox}[colback=white,colframe=red!55!black,boxrule=1pt, left skip=1.5cm, right skip=1.5cm, title=\textbf{Note}]}
 {\end{tcolorbox}}
 
 % inline code block : http://tex.stackexchange.com/questions/203848/problem-with-underscores-in-newcommand
@@ -217,7 +217,7 @@ With or without \incode{git}, you will seldom need to recompile the libraries th
 
 
 \section{Configuration}
-For \ABLE\ to execute correctly, you need to specify a command line, some options in a config file and provide a data file.
+For \ABLE\ to execute correctly, you need to specify a command line, some options in a config file and provide a data file. For very long command lines it might be preferable to specify it from within the config file (see \ref{key:ABLE}).
 
 
 \subsection{Command line options} 
@@ -249,14 +249,14 @@ The command line needs to be in the \textbf{\textit{ms}} format. Note that \ABLE
 \label{key:tbi} 
 While {\textbf{\textit{ms}}} provides for the \incode{tbs} option, we introduce the \incode{tbi} keyword which stands for "\textbf{to be inferred}" as part of the \ABLE\ command line. \incode{tbi} keywords are to be used instead of the values of the parameters of a demographic model (\textit{i.e.} some floating value) which need to be inferred. All \incode{tbi} keywords need to be suffixed by a number (\incode{tbi1, tbi2,...}). Thus, all occurrences on the command line of the same demographic parameter can be correctly identified. 
 
-Below is a typical example of an \ABLE\ command line for a simple history describing a single discrete change in population size defined by three parameters (current and ancestral population sizes and the time of size change) which are to be inferred (see \ref{sec:examples_exact_bSFS}):
+Below is a typical example of an \ABLE\ command line for a simple history describing a single discrete change in population size defined by three parameters (current and ancestral population sizes and the time of size change) which are \textit{to be inferred} (see \ref{sec:examples_exact_bSFS}):
 	\begin{codebox}
 		\begin{verbatim}
-./ABLE 4 100000 -t tbi1 -eN tbi2 tbi3 -T config.txt
+			./ABLE 4 100000 -t tbi1 -eN tbi2 tbi3 -T config.txt
 		\end{verbatim}
 	\end{codebox}
 
-\ABLE\ also requires the user to specify a \incode{-T} towards the end of the command line indicating the start of the config filename (if any) specified by the user. If no filename is specified, by default \ABLE\ looks for a file called \incode{config.txt}.
+\ABLE\ also requires the user to specify a \incode{-T} towards the end of the command line indicating the start of the config filename (if any) specified by the user. If no filename is specified, by default \ABLE\ looks for a file named \incode{config.txt}. See also \ref{key:ABLE} for specifying the command line directly inside \incode{config.txt}.
 
 
 \subsection{Config file options} 
@@ -265,6 +265,8 @@ Below is a typical example of an \ABLE\ command line for a simple history descri
 	\begin{itemize}
 		\item \textbf{All options} of the config file are \textbf{case sensitive}.
 		\item Successive options can undo previous ones.
+		\item Comments need to be specified as an entire line in \ABLE . \textbf{Unexpected behaviour} can result if you specify keywords/options and a comment on the \textbf{same line} \textit{e.g.} \incodeEnv{Key val \# \textit{comment after keyword}}
+		
 	\end{itemize}
 \end{notebox}
 
@@ -283,12 +285,20 @@ Any line in the config file beginning with the hash symbol \incodeEnv{\#} will b
 Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively represents a binary true/false option whereas it is possible to specify a lot more with a \textcolor{blue}{T2}/\textcolor{blue}{T3} keyword. 
 
 
+\subsubsection{Command line within the config file}
+	\label{key:ABLE}
+	\incode{ABLE} {\footnotesize (\textcolor{blue}{command line})} \\
+	\Index{ABLE}
+	This is a special keyword which allows the user to specify the \incode{ms} styled command line from within the config file instead of the console/terminal. For instance, the command from section \ref{key:tbi} can be specified anywhere in \incode{config.txt} as follows
+	\begin{codebox}
+	\begin{verbatim}
+		ABLE 4 100000 -t tbi1 -eN tbi2 tbi3
+	\end{verbatim}
+	\end{codebox}
+	The corresponding command line would then be \incode{./ABLE config.txt}
+
+
 \subsubsection{Keywords}
-
- 	\begin{notebox}
- 		Comments need to be specified as an entire line in \ABLE . \textbf{Unexpected behaviour} can result if you specify keywords/options and a comment on the \textbf{same line} \textit{e.g.} \incodeEnv{Key val \# \textit{comment after keyword}}
- 	\end{notebox}
-
 \begin{itemize}
 	\item[\RIGHTarrow] \incode{datafile} \TTwo \\
 	\Index{datafile}
