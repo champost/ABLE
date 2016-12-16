@@ -109,9 +109,9 @@ This is the documentation accompanying \ABLE\ and the current version of the pro
 
 \section{Installation}
 \subsection{Linux}
-It is easiest to build an \incode{ABLE} binary under all flavours of Linux. \incode{ABLE} requires the GNU Compiler Collection (\incodeEnv{\href{https://gcc.gnu.org/}{gcc}}) 
+It is easiest to build an \ABLE\ binary under all flavours of Linux. \ABLE\ requires the GNU Compiler Collection (\incodeEnv{\href{https://gcc.gnu.org/}{gcc}}) 
 and GNU Make (\incodeEnv{\href{https://www.gnu.org/software/make/}{make}})
-for a smooth installation and has been tested using \incode{gcc 4.8.4} and \incode{make 3.81}. It is also useful to have \incodeEnv{\href{https://git-scm.com/}{git}} installed for seamless updates of the latest version of \incode{ABLE}. If you do not have \incode{gcc}, \incode{make} or \incode{git}, you can use your OS specific package handling utility. 
+for a smooth installation and has been tested using \incode{gcc 4.8.4} and \incode{make 3.81}. It is also useful to have \incodeEnv{\href{https://git-scm.com/}{git}} installed for seamless updates of the latest version of \ABLE. If you do not have \incode{gcc}, \incode{make} or \incode{git}, you can use your OS specific package handling utility. 
 
 Under Ubuntu this corresponds to the following in a terminal
 
@@ -141,7 +141,7 @@ Other dependencies such as the GNU Scientific Library (\incodeEnv{\href{http://w
 	
 	
 	
-	\item Clone the \incode{ABLE} repository. If \incode{git} is not available see the next section (or \href{https://git-scm.com/downloads}{here}).
+	\item Clone the \ABLE\ repository. If \incode{git} is not available see the next section (or \href{https://git-scm.com/downloads}{here}).
 	
 	\begin{codebox}
 		\begin{verbatim}
@@ -157,7 +157,7 @@ Other dependencies such as the GNU Scientific Library (\incodeEnv{\href{http://w
 		\end{verbatim}
 	\end{codebox}
 	
-	\item If you are installing \incode{ABLE} for the \underline{\textbf{first time}} you might have to compile the \textbf{GSL} and \textbf{NLopt} from source. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest version (see next section).
+	\item If you are installing \ABLE\ for the \underline{\textbf{first time}} you might have to compile the \textbf{GSL} and \textbf{NLopt} from source. This can take some time as the command below performs a \textbf{static installation} of the libraries. You can skip this step if you already have these libraries installed system-wide or if you are simply updating \ABLE\ to the latest version (see next section).
 	
 	\begin{codebox}
 		\begin{verbatim}
@@ -165,7 +165,7 @@ Other dependencies such as the GNU Scientific Library (\incodeEnv{\href{http://w
 		\end{verbatim}
 	\end{codebox}
 	
-	\item Finally, build an \incode{ABLE} binary
+	\item Finally, build an \ABLE\ binary
 	
 	\begin{codebox}
 		\begin{verbatim}
@@ -173,7 +173,7 @@ Other dependencies such as the GNU Scientific Library (\incodeEnv{\href{http://w
 		\end{verbatim}
 	\end{codebox}
 \end{enumerate}
-If you want \incode{ABLE} to be accessible from everywhere, such as your data folder, you might want to
+If you want \ABLE\ to be accessible from everywhere, such as your data folder, you might want to
 
 	\begin{codebox}
 		\texttt{cp ABLE $ \sim $/bin}
@@ -184,7 +184,7 @@ This ensures that you can execute the program by specifying \incode{ABLE ...} in
 
 \section{Updates}
 \subsection{With Git}
-As mentioned above, \incode{git} considerably simplifies the process (or headache) of updating \incode{ABLE}. You simply have to change your current working directory to that of \incode{ABLE} and execute the following
+As mentioned above, \incode{git} considerably simplifies the process (or headache) of updating \ABLE. You simply have to change your current working directory to that of \ABLE\ and execute the following
 
 \begin{codebox}
 	\begin{verbatim}
@@ -195,7 +195,7 @@ As mentioned above, \incode{git} considerably simplifies the process (or headach
 
 
 \subsection{Without Git}
-If \incode{git} is not available on your machine you can try looking for solutions \href{https://git-scm.com/downloads}{here}. Alternatively, you can download the \incode{ABLE} repository somewhere on your computer as shown below.
+If \incode{git} is not available on your machine you can try looking for solutions \href{https://git-scm.com/downloads}{here}. Alternatively, you can download the \ABLE\ repository somewhere on your computer as shown below.
 
 \begin{codebox}
 	\begin{verbatim}
@@ -209,10 +209,10 @@ Untar the archive using
 	tar -xzf master.tar.gz
 	\end{verbatim}
 \end{codebox}
-and manually compare the contents of the \incode{ABLE-master} directory with your \incode{ABLE} installation and replace the files that have changed in size.
+and manually compare the contents of the \incode{ABLE-master} directory with your \ABLE\ installation and replace the files that have changed in size.
 	
 \subsection{Updating dependencies}
-With or without \incode{git}, you will seldom need to recompile the libraries that \incode{ABLE} depends upon and in which case you will have to run the \incode{make deps} command before compiling an \incode{ABLE} binary with \incode{make clean && make all}. This information will be clearly stated in the \href{https://github.com/champost/ABLE/releases}{Release notes} and/or the \incode{ABLE} \href{https://github.com/champost/ABLE/blob/master/doc/helpABLE.pdf}{documentation}.
+With or without \incode{git}, you will seldom need to recompile the libraries that \ABLE\ depends upon and in which case you will have to run the \incode{make deps} command before compiling an \ABLE\ binary with \incode{make clean && make all}. This information will be clearly stated in the \href{https://github.com/champost/ABLE/releases}{Release notes} and/or the \ABLE\ \href{https://github.com/champost/ABLE/blob/master/doc/helpABLE.pdf}{documentation}.
 
 
 
@@ -287,7 +287,7 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 
 \subsubsection{Command line within the config file}
 	\label{key:ABLE}
-	\incode{ABLE} {\footnotesize (\textcolor{blue}{command line})} \\
+	\ABLE\ {\footnotesize (\textcolor{blue}{command line})} \\
 	\Index{ABLE}
 	This is a special keyword which allows the user to specify the \incode{ms} styled command line from within the config file instead of the console/terminal. For instance, the command from section \ref{key:tbi} can be specified anywhere in \incode{config.txt} as follows
 	\begin{codebox}
@@ -425,7 +425,15 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 		\begin{verbatim}
 		pops 3 1 4 2
 		\end{verbatim}
-	\end{codebox} 
+	\end{codebox}
+	\IndexSub{pops}{ghost/unsampled}
+	It is very easy to account for ghost/unsampled populations in \ABLE using the \incode{pops} keyword. Lets assume that the third population in the example above was unsampled. In this case, we need to adjust the datafile accordingly (\textit{i.e.} remove the last two sequences from every block) and specify
+	\begin{codebox}
+	\begin{verbatim}
+		pops 3 1 4 u
+	\end{verbatim}
+	\end{codebox}
+	
 	
 	\item[\RIGHTarrow] \incode{convert_data_to_bSFS} \TTwo \\
 	\Index{convert\_data\_to\_bSFS}
@@ -520,7 +528,7 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	
 	\item[\RIGHTarrow] \incode{skip_local_search} \TOne \\
 	\Index{skip\_local\_search}
-	This keyword modifies the default behaviour of \incode{ABLE} and skips the local search after the global search.
+	This keyword modifies the default behaviour of \ABLE\ and skips the local search after the global search.
 	
 	\item[\RIGHTarrow] \incode{bounds} \TThree \\
 	\Index{bounds}
