@@ -255,10 +255,10 @@ int gensam_ABLE(double **onetreePoisTable, int *crash_flag)
 		if (totBrLen[i - 1] > 0.0) {
 //			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
 			for (j = 0; j < mutClass - 1; j++) {
-//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
-				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen[i - 1] * pars.mp.theta);
+//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*theta));
+				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen[i - 1] * theta);
 			}
-			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen[i - 1] * pars.mp.theta);
+			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen[i - 1] * theta);
 
 //			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
 //			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);

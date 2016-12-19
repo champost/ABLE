@@ -279,7 +279,7 @@ int getBrConfigNum(vector<int> brConfVec) {
 }
 
 
-void process_tree_1 (double **onetreePoisTable) {
+void process_tree_cond_bSFS (double **onetreePoisTable) {
 	for (size_t i = 0; i < dataConfigs.size(); i++) {
 		double jointPoisson = 1.0;
 
@@ -294,7 +294,7 @@ void process_tree_1 (double **onetreePoisTable) {
 }
 
 
-void process_tree_3 (double **onetreePoisTable) {
+void process_tree_exact_bSFS (double **onetreePoisTable) {
 	for (unsigned long int i = 0; i < finalTableSize; i++) {
 	    double jointPoisson = 1.0;
 
@@ -385,9 +385,9 @@ void calcBSFSTable() {
 					}
 					else {
 						if (bSFSmode || (estimate > 0))
-							process_tree_1(onetreePoisTable);
+							process_tree_cond_bSFS(onetreePoisTable);
 						else if (estimate == 0)
-							process_tree_3(onetreePoisTable);
+							process_tree_exact_bSFS(onetreePoisTable);
 #pragma omp atomic
 						++sampledTrees;
 					}
