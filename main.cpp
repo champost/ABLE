@@ -279,12 +279,12 @@ int getBrConfigNum(vector<int> brConfVec) {
 }
 
 
-void process_tree_cond_bSFS (double **onetreePoisTable) {
+void process_tree_cond_bSFS (double ***onetreePoisTable) {
 	for (size_t i = 0; i < dataConfigs.size(); i++) {
 		double jointPoisson = 1.0;
 
 		for (int j = 0; j < brClass; j++)
-			jointPoisson *= onetreePoisTable[j][dataConfigs[i][j]];
+			jointPoisson *= onetreePoisTable[0][j][dataConfigs[i][j]];
 
 		if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
 			selectConfigFreqs[i] += jointPoisson;
@@ -294,13 +294,13 @@ void process_tree_cond_bSFS (double **onetreePoisTable) {
 }
 
 
-void process_tree_exact_bSFS (double **onetreePoisTable) {
+void process_tree_exact_bSFS (double ***onetreePoisTable) {
 	for (unsigned long int i = 0; i < finalTableSize; i++) {
 	    double jointPoisson = 1.0;
 
 	    vector<int> vec = getMutConfigVec(i);
 		for (int j = 0; j < brClass; j++)
-			jointPoisson *= onetreePoisTable[j][vec[j]];
+			jointPoisson *= onetreePoisTable[0][j][vec[j]];
 
 		if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
 			allConfigs[i] = i;
@@ -376,8 +376,8 @@ void calcBSFSTable() {
 #pragma omp parallel for shared(ms_crash_flag, crash_counter, sampledTrees)
 			for (int trees = 0; trees < sim_trees; trees++) {
 				if (!ms_crash_flag) {
-					double **onetreePoisTable;
-					onetreePoisTable = d2matrix(brClass, mutClass);
+					double ***onetreePoisTable;
+					onetreePoisTable = d3matrix(1,brClass, mutClass);
 					// calling ms for sampling genealogies
 					if (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable)) {
 #pragma omp atomic
@@ -395,7 +395,7 @@ void calcBSFSTable() {
 					if (crash_counter >= crashLimit)
 						ms_crash_flag = 1;
 
-					freed2matrix(onetreePoisTable, brClass);
+					freed3matrix(onetreePoisTable, 1, brClass);
 				}
 			}
 
