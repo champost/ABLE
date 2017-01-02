@@ -103,6 +103,7 @@ struct chromo{
 
 struct segl {
         int beg;
+        int end;
         struct node *ptree;
         int next;
         };
@@ -122,6 +123,8 @@ int pick2(int n, int *i, int *j);
 int xover(int nsam,int ic, int is);
 int links(int c);
 
-extern int brClass, mutClass, foldBrClass, allBrClasses, sampledPopsSize;
+extern int brClass, mutClass, foldBrClass, allBrClasses, sampledPopsSize, poisTableSize;
+extern int *poisTableScaleOrder;
+extern int **blockLengthsMat;
 
 #endif /* MS_NEW_H_ */

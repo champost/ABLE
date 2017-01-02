@@ -59,6 +59,7 @@ double computeLik();
 void evalBranchConfigs();
 void readConfigFile();
 void parseCmdLine(char* argv[]);
+void checkConfigOptions();
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data);
 double check_constraints(const vector<double> &vars, vector<double> &grad, void *data);
 
@@ -69,8 +70,8 @@ double *** d3matrix(int x, int y, int z);
 void freed3matrix(double ***m, int x, int y);
 double ** d2matrix(int x, int y);
 void freed2matrix(double **m, int x);
-//int ** d2int_matrix(int x, int y);
-//void freed2int_matrix(int **m, int x);
+int ** d2int_matrix(int x, int y);
+void freed2int_matrix(int **m, int x);
 
 double ran1();
 int getPopSampleStatus(int pop);

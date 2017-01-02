@@ -55,12 +55,12 @@ void TrimSpaces(string& str);
 void readDataAsSeqBlocks(string outSNPsFile, string alleleType);
 void readDataAsbSFSConfigs();
 
-extern string dataFile;
-extern int brClass, mutClass, foldBrClass, allBrClasses;
+extern vector<string> dataFile;
+extern int brClass, mutClass, foldBrClass, allBrClasses, mbSFSLen;
 extern double dataLnL, bestGlobalSlLnL, bestLocalSlLnL;
 extern vector<int> sampledPops;
-extern vector<double> dataConfigFreqs;
-extern vector<vector<int> > dataConfigs;
+extern vector<vector<double> > dataConfigFreqs;
+extern vector<vector<vector<int> > > dataConfigs;
 
 extern int getBrConfigNum(vector<int> brConfVec);
 extern string getMutConfigStr(vector<int> configVec);

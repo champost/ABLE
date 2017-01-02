@@ -52,6 +52,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <numeric>
 #include <limits>
 #include <iomanip>
+#include <set>
 
 #include <nlopt.hpp>
 #include <gsl/gsl_rng.h>
@@ -63,7 +64,9 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass, mutClass, foldBrClass = 0, allBrClasses, sampledPopsSize, ms_crash_flag;
+int brClass = 0, mutClass = 0, foldBrClass = 0, allBrClasses = 0, sampledPopsSize = 0, poisTableSize = 0;
+int *poisTableScaleOrder;
+int **blockLengthsMat;
 //**********************************
 
 gsl_rng * PRNG;
@@ -72,15 +75,33 @@ map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds, tbiProfilesGrid;
-map<int, int> trackSelectConfigs, parConstraints, tbi2ParVec;
+map<int, int> parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
+//map<int, int> trackSelectConfigs;
 
-string dataFile, dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile, data2bSFSFile;
-ofstream testLik, testConfig;
 
-vector<int> allConfigs, trackSelectConfigsForInf, sampledPops, allPops, profileVarKey;
-vector<vector<int> > dataConfigs;
-vector<double> dataConfigFreqs, selectConfigFreqs, allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
+
+//------------------------------------------------------
+vector<string> dataFile;
+int mbSFSLen = 0;
+vector<int> dataScales;
+set<int> uniqueScales;
+vector<vector<int> > data2PoisTableIdx;
+
+
+
+vector<vector<vector<int> > > dataConfigs;
+vector<vector<double> > dataConfigFreqs, selectConfigFreqs;
+vector<vector<int> > trackSelectConfigsForInf;
+//------------------------------------------------------
+
+
+
+string dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile = "bSFS.txt", data2bSFSFile;
+//ofstream testLik, testConfig;
+
+vector<int> allConfigs, sampledPops, allPops, profileVarKey;
+vector<double> allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
 vector<string> cmdLine;
 vector<gsl_rng *> PRNGThreadVec;
 
@@ -88,16 +109,16 @@ nlopt::opt opt, local_opt, AUGLAG;
 
 char **ms_argv;
 
-int ms_argc = 0;
+int ms_argc = 0, ms_crash_flag = 0;
 int npops = 0, kmax = 0;
-int estimate = 0, evalCount = 0, crash_counter, sampledTrees;
+int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
 		reportEveryEvals = 0, set_threads = 0;
 
-double globalUpper = 5, globalLower = 1e-3, dataLnL, bestGlobalSlLnL, bestLocalSlLnL, userLnL = 0.0, localSearchAbsTol = 1e-3;
+double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
 bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
-unsigned long int finalTableSize, seedPRNG;
+unsigned long int finalTableSize = 0, seedPRNG = 123456;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
 SearchStates currState = OTHER;
@@ -108,6 +129,7 @@ double ran1()
 	return gsl_rng_uniform(PRNGThreadVec[omp_get_thread_num()]);
 }
 
+
 void free_objects() {
 	for(int i = 0; i < ms_argc; i++)
 		free(ms_argv[i]);
@@ -116,7 +138,13 @@ void free_objects() {
 	gsl_rng_free(PRNG);
 	for (size_t i = 0; i < PRNGThreadVec.size(); i++)
 		gsl_rng_free(PRNGThreadVec[i]);
+
+	if (poisTableSize) {
+		free(poisTableScaleOrder);
+		freed2int_matrix(blockLengthsMat, poisTableSize);
+	}
 }
+
 
 //	Temporarily deactivated code for likelihood profiles (not to confused with profile likelihoods!)
 void profileLik(vector<double> MLEparVec) {
@@ -280,15 +308,20 @@ int getBrConfigNum(vector<int> brConfVec) {
 
 
 void process_tree_cond_bSFS (double ***onetreePoisTable) {
-	for (size_t i = 0; i < dataConfigs.size(); i++) {
-		double jointPoisson = 1.0;
+	//	TODO: need to look for alternatives to speed up mbSFS traversal
+	for (int data = 0; data < mbSFSLen; data++) {
+		for (size_t i = 0; i < dataConfigs[data].size(); i++) {
+			for (int scale = 0; scale < dataScales[data]; scale++) {
+				double jointPoisson = 1.0;
 
-		for (int j = 0; j < brClass; j++)
-			jointPoisson *= onetreePoisTable[0][j][dataConfigs[i][j]];
+				for (int j = 0; j < brClass; j++)
+					jointPoisson *= onetreePoisTable[data2PoisTableIdx[data][scale]][j][dataConfigs[data][i][j]];
 
-		if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
-			selectConfigFreqs[i] += jointPoisson;
-			trackSelectConfigsForInf[i] = 1;
+				if (jointPoisson > (numeric_limits<double>::min()*ms_trees)) {
+					selectConfigFreqs[data][i] += jointPoisson;
+					trackSelectConfigsForInf[data][i] = 1;
+				}
+			}
 		}
 	}
 }
@@ -377,7 +410,7 @@ void calcBSFSTable() {
 			for (int trees = 0; trees < sim_trees; trees++) {
 				if (!ms_crash_flag) {
 					double ***onetreePoisTable;
-					onetreePoisTable = d3matrix(1,brClass, mutClass);
+					onetreePoisTable = d3matrix(poisTableSize,brClass, mutClass);
 					// calling ms for sampling genealogies
 					if (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable)) {
 #pragma omp atomic
@@ -395,7 +428,7 @@ void calcBSFSTable() {
 					if (crash_counter >= crashLimit)
 						ms_crash_flag = 1;
 
-					freed3matrix(onetreePoisTable, 1, brClass);
+					freed3matrix(onetreePoisTable, poisTableSize, brClass);
 				}
 			}
 
@@ -413,57 +446,67 @@ double computeLik() {
 
 	double loglik = 0.0;
 
-	selectConfigFreqs = vector<double>(dataConfigFreqs.size(),0.0);
-	trackSelectConfigsForInf = vector<int>(dataConfigFreqs.size(),0);
+	if (bSFSmode || (estimate > 0)) {
+		for (int data = 0; data < mbSFSLen; data++) {
+			selectConfigFreqs.push_back(vector<double>(dataConfigFreqs[data].size(),0.0));
+			trackSelectConfigsForInf.push_back(vector<int>(dataConfigFreqs[data].size(),0));
+		}
+	}
 
 	//	calculating the bSFS config. probs.
 	calcBSFSTable();
 
 	if (!ms_crash_flag) {
 
-		int trackedConfigs = 0;
-		if (bSFSmode || (estimate > 1))
-			trackedConfigs = accumulate(trackSelectConfigsForInf.begin(),trackSelectConfigsForInf.end(),0);
-		else if (estimate == 1)
-			trackedConfigs = trackSelectConfigs.size();
+		vector<double> loglikData(mbSFSLen, 0.0);
+		for (int data = 0; data < mbSFSLen; data++) {
 
-		if (bSFSmode) {
-			if (nobSFSFile || profileLikBool) {
-				for (size_t i = 0; i < dataConfigs.size(); i++) {
-					if (selectConfigFreqs[i] != 0.0)
-						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
-				}
-			}
-			else {
-				ofstream ofs(bSFSFile.c_str(),ios::out);
+			vector<int> trackedConfigs (mbSFSLen, 0);
+			if (bSFSmode || (estimate > 1))
+				trackedConfigs[data] = accumulate(trackSelectConfigsForInf[data].begin(),trackSelectConfigsForInf[data].end(),0);
+//			else if (estimate == 1)
+//				trackedConfigs = trackSelectConfigs.size();
 
-				for (size_t i = 0; i < dataConfigs.size(); i++) {
-					if (selectConfigFreqs[i] != 0.0) {
-						ofs << getMutConfigStr(dataConfigs[i]) << " : " << scientific << selectConfigFreqs[i] / ms_trees << endl;
-						loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
+			if (bSFSmode) {
+				if (nobSFSFile || profileLikBool) {
+					for (size_t i = 0; i < dataConfigs[data].size(); i++) {
+						if (selectConfigFreqs[data][i] != 0.0)
+							loglikData[data] += log(selectConfigFreqs[data][i] / (ms_trees * dataScales[data])) * dataConfigFreqs[data][i];
 					}
 				}
-				ofs.close();
+				else {
+					ofstream ofs(bSFSFile.c_str(),ios::out);
+
+					for (size_t i = 0; i < dataConfigs[data].size(); i++) {
+						if (selectConfigFreqs[data][i] != 0.0) {
+							ofs << getMutConfigStr(dataConfigs[data][i]) << " : " << scientific << selectConfigFreqs[data][i] / (ms_trees * dataScales[data]) << endl;
+							loglikData[data] += log(selectConfigFreqs[data][i] / (ms_trees * dataScales[data])) * dataConfigFreqs[data][i];
+						}
+					}
+
+					ofs.close();
+				}
+
+				//	correct for the LnL if there are any data bSFS configs are unvisited
+				if (trackedConfigs[data])
+					loglikData[data] *= (double) dataConfigFreqs[data].size() / trackedConfigs[data];
+
+				if (printLikCorrFactor)
+					printf("Likelihood correction factor : %.6f\n", (double) dataConfigFreqs[data].size() / trackedConfigs[data]);
 			}
+			else if (estimate > 0) {
+				for (size_t i = 0; i < dataConfigs[data].size(); i++) {
+					if (selectConfigFreqs[data][i] != 0.0)
+						loglikData[data] += log(selectConfigFreqs[data][i] / (ms_trees * dataScales[data])) * dataConfigFreqs[data][i];
+				}
 
-			//	correct for the LnL if there are any data bSFS configs are unvisited
-			if (trackedConfigs)
-				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
-
-			if (printLikCorrFactor)
-				printf("Likelihood correction factor : %.6f\n", (double) dataConfigFreqs.size() / trackedConfigs);
-		}
-		else if (estimate > 0) {
-			for (size_t i = 0; i < dataConfigs.size(); i++) {
-				if (selectConfigFreqs[i] != 0.0)
-					loglik += log(selectConfigFreqs[i] / ms_trees) * dataConfigFreqs[i];
+				//	correct for the LnL if there are any data bSFS configs are unvisited
+				if (trackedConfigs[data])
+					loglikData[data] *= (double) dataConfigFreqs[data].size() / trackedConfigs[data];
 			}
-
-			//	correct for the LnL if there are any data bSFS configs are unvisited
-			if (trackedConfigs)
-				loglik *= (double) dataConfigFreqs.size() / trackedConfigs;
 		}
-		else if (estimate == 0) {
+
+		if (estimate == 0) {
 			ofstream ofs(bSFSFile.c_str(),ios::out);
 			for (size_t i = 0; i < allConfigs.size(); i++)
 				if (allConfigs[i] >= 0)
@@ -473,10 +516,12 @@ double computeLik() {
 			allConfigs.clear();
 			allConfigFreqs.clear();
 		}
+
+		loglik = accumulate(loglikData.begin(), loglikData.end(), 0.0);
 	}
 
 	trackSelectConfigsForInf.clear();
-	trackSelectConfigs.clear();
+//	trackSelectConfigs.clear();
 	selectConfigFreqs.clear();
 
 	return loglik;
@@ -623,7 +668,17 @@ void readConfigFile() {
 				}
 			}
 			else if (tokens[0] == "datafile") {
-				dataFile = tokens[1];
+				mbSFSLen = 0;
+				for(unsigned int j = 1; j < tokens.size(); j++) {
+					dataFile.push_back(tokens[j]);
+					++mbSFSLen;
+				}
+			}
+			else if (tokens[0] == "scale") {
+				for(unsigned int j = 1; j < tokens.size(); j++) {
+					dataScales.push_back(atoi(tokens[j].c_str()));
+					uniqueScales.insert(atoi(tokens[j].c_str()));
+				}
 			}
 			else if (tokens[0] == "datafile_format") {
 				dataFileFormat = tokens[1];
@@ -651,7 +706,6 @@ void readConfigFile() {
 					estimate = 2;
 			}
 			else if (tokens[0] == "bSFS") {
-				bSFSFile = "bSFS.txt";
 				if (tokens.size() > 1)
 					bSFSFile = tokens[1];
 			}
@@ -825,6 +879,16 @@ void parseCmdLine(char* argv[]) {
 				stst << argv[i];
 
 			stst >> ms_argv[i];
+
+			if (param == "-r") {
+				stringstream length;
+				if (cmdLineInConfigFile)
+					length << cmdLine[i+2];
+				else
+					length << argv[i+2];
+
+				length >> recLen;
+			}
 		}
 	}
 
@@ -835,7 +899,10 @@ void parseCmdLine(char* argv[]) {
 	free_objects();
 	exit(-1);
 */
+}
 
+
+void checkConfigOptions() {
 	if ((estimate == 2) || profileLikBool) {
 		if (!tbiMsCmdIdx.size()) {
 			cerr << "\nCannot proceed with inference" << endl;
@@ -853,6 +920,76 @@ void parseCmdLine(char* argv[]) {
 				localTrees = 15000;
 		}
 	}
+
+	if ((dataFile.size() == 1) && (dataScales.size() == 0)) {
+		dataScales.push_back(1);
+		uniqueScales.insert(1);
+	}
+
+	if (dataFile.size() != dataScales.size()) {
+		cerr << "The respective \"scale\" of each specified dataset must be specified for using the mbSFS!" << endl;
+		cerr << "Exiting ABLE...\n" << endl;
+		free_objects();
+		exit(-1);
+	}
+	else if ((estimate > 1) || bSFSmode) {
+		//	enumerate and label the number of onetreePoisTables needed
+		poisTableSize = accumulate(uniqueScales.begin(), uniqueScales.end(), 0);
+		poisTableScaleOrder = (int *) malloc(poisTableSize * sizeof(int));
+		//	calculate the block lengths for each "SUB"-onetreePoisTable of the mbSFS
+		blockLengthsMat = d2int_matrix(poisTableSize, 3);
+		int count = 0;
+		for (set<int>::iterator it = uniqueScales.begin(); it != uniqueScales.end(); it++) {
+			int prev = -1;
+			for (int i = 0; i < *it; i++) {
+				poisTableScaleOrder[count] = *it;
+
+				if (recLen) {
+					blockLengthsMat[count][0] = recLen / *it;
+					blockLengthsMat[count][1] = prev + 1;
+					blockLengthsMat[count][2] = prev + blockLengthsMat[count][0];
+				}
+				else {
+					blockLengthsMat[count][0] = 0;
+					blockLengthsMat[count][1] = 0;
+					blockLengthsMat[count][2] = 0;
+				}
+
+				prev = blockLengthsMat[count][2];
+				++count;
+			}
+		}
+
+		//	data2PoisTableIdx : maps each dataset to its poisTable index/indices
+		data2PoisTableIdx = vector<vector<int> > (dataScales.size(), vector <int>());
+		for (size_t i = 0; i < dataScales.size(); i++)
+			for (int j = 0; j < poisTableSize; j++)
+				if (dataScales[i] == poisTableScaleOrder[j])
+					data2PoisTableIdx[i].push_back(j);
+	}
+	else if (estimate == 0) {
+		poisTableSize = 1;
+		poisTableScaleOrder = (int *) malloc(poisTableSize * sizeof(int));
+		poisTableScaleOrder[0] = 1;
+		blockLengthsMat = d2int_matrix(poisTableSize, 3);
+		if (recLen) {
+			blockLengthsMat[0][0] = recLen;
+			blockLengthsMat[0][1] = 0;
+			blockLengthsMat[0][2] = recLen;
+		}
+		else {
+			blockLengthsMat[0][0] = 0;
+			blockLengthsMat[0][1] = 0;
+			blockLengthsMat[0][2] = 0;
+		}
+	}
+
+/*
+	for (int block = 0; block < poisTableSize; block++)
+		printf("Length: %d; start: %d; end: %d\n", blockLengthsMat[block][0], blockLengthsMat[block][1], blockLengthsMat[block][2]);
+	free_objects();
+	exit(-1);
+*/
 }
 
 
@@ -1070,10 +1207,11 @@ int main(int argc, char* argv[]) {
 			readDataAsSeqBlocks("block_SNPs.txt", alleleType);
 
 			//	convert data into bSFS and quit ABLE
-			if (dataConvert) {
+			//	restricting this task to converting one dataset at a time
+			if (dataConvert && (mbSFSLen == 1)) {
 				ofstream ofs(data2bSFSFile.c_str(),ios::out);
-				for (size_t i = 0; i < dataConfigs.size(); i++)
-					ofs << getMutConfigStr(dataConfigs[i]) << " : " << setprecision(5) << scientific << dataConfigFreqs[i] << endl;
+				for (size_t i = 0; i < dataConfigs[0].size(); i++)
+					ofs << getMutConfigStr(dataConfigs[0][i]) << " : " << setprecision(5) << scientific << dataConfigFreqs[0][i] << endl;
 				ofs.close();
 
 				cout << "Finished converting the data into a bSFS format...\n" << endl;
@@ -1085,6 +1223,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	parseCmdLine(argv);
+	checkConfigOptions();
 
 	int procs;
 	if (set_threads > 0)
