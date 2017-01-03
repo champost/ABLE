@@ -605,7 +605,7 @@ Here, the presence/absence of a \textcolor{blue}{T1} keyword respectively repres
 	
 	\item[\RIGHTarrow] \incode{set_ftol_abs} \TTwo \\
 	\Index{set\_ftol\_abs}
-	Accepts a single value which sets the tolerance in terms of the difference in absolute value between successive evaluations at points in parameter space during the local search. Let $ \epsilon $ be the user provided value and assume that the local search has evaluated the likelihood function, $ f(x) $, at points $ x_{1} $ and then $ x_{2} $. If the condition $ |f(x_{2}) - f(x_{2})| < \epsilon $ is satisfied, the search is terminated and the MLE is reported by \ABLE.
+	Accepts a single value which sets the tolerance in terms of the difference in absolute value between successive evaluations at points in parameter space during the local search. Let $ \epsilon $ be the user provided value and assume that the local search has evaluated the likelihood function, $ f(x) $, at points $ x_{1} $ and then $ x_{2} $. If the condition $ |f(x_{2}) - f(x_{1})| < \epsilon $ is satisfied, the search is terminated and the MLE is reported by \ABLE.
 	
 	\item[\RIGHTarrow] \incode{set_threads} \TTwo \\
 	\Index{set\_threads}
@@ -770,7 +770,16 @@ And \incode{config_3pop_conditional.txt} contains :
 \subsubsection{Inference with the bSFS}
 \label{sec:examples_inference}
 \IndexSub{task}{infer}
-We now consider a two population example with 3 genomes in population A and 2 genomes in B (\textit{see} Fig.~\ref{fig:models}b) and blocks of size 500bp. This is a four parameter model with unidirectional gene flow at rate $ m $ after a split at time $ T $, with all scaled populations size parameters equal to $ \theta $ and scaled intra-block recombination rate $ \rho $. The parameters "\textit{to be inferred} $" : \theta $, $ \rho $, $ m $ and $ T $ have been respectively specified as \incode{tbi1}, \incode{tbi2}, \incode{tbi3} and \incode{tbi4} in the command line below. Note that the position corresponding to the number of genealogies to be sampled during inference (\incode{xxx} below) is entirely ignored by \ABLE\ and should only be specified in the config file.
+We now consider a two population example with 3 genomes in population A and 2
+genomes in B (\textit{see} Fig.~\ref{fig:models}b) and blocks of size 500bp.
+This is a four parameter model with unidirectional gene flow at rate $ m $ after
+a split at time $ T $, with all scaled populations size parameters equal to $
+\theta $ and scaled intra-block recombination rate $ \rho $. The parameters
+"\textit{to be inferred} $" : \theta $, $ \rho $, $ m $ and $ T $ have been
+respectively specified as \incode{tbi1}, \incode{tbi2}, \incode{tbi3} and
+\incode{tbi4} in the command line below. Note that the position corresponding to
+the number of genealogies to be sampled during inference (\incode{xxx} below) is
+entirely ignored by \ABLE\ (But most be there) and should only be specified in the config file.
 \begin{codebox}
 \begin{lstlisting}[basicstyle=\ttfamily,breaklines=true,columns=fullflexible]
 ./ABLE 5 xxx -t tbi1 -r tbi2 501 -I 2 3 2 -m 1 2 tbi3 -ej tbi4 1 2 -T config_2pop_infer.txt
