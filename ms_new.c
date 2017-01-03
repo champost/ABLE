@@ -906,7 +906,7 @@ getpars(int ms_argc, char *ms_argv[], int *phowmany )
 
 	arg = 3 ;
 
-	while( arg < ms_argc ){
+	while( arg < (ms_argc - 2) ){
 		if( ms_argv[arg][0] != '-' ) { fprintf(stderr," argument should be -%s ?\n", ms_argv[arg]); usage();}
 		switch ( ms_argv[arg][1] ){
 /*
