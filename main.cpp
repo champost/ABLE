@@ -506,7 +506,7 @@ double computeLik() {
 			}
 		}
 
-		if (estimate == 0) {
+		if (!mbSFSLen && (estimate == 0)) {
 			ofstream ofs(bSFSFile.c_str(),ios::out);
 			for (size_t i = 0; i < allConfigs.size(); i++)
 				if (allConfigs[i] >= 0)
