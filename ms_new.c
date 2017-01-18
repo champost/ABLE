@@ -218,11 +218,8 @@ int gensam_ABLE(double ***onetreePoisTable, int *crash_flag)
 
 	ns = 0;
 
-	//	TODO: remove totBrLen when not needed
-
 	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
 	double **totSegBrLen = d2matrix(nsegs, allBrClasses);
-	double *totBrLen = (double *) malloc(brClass * sizeof(double));
 
 	for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++) {
 		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0)) {
@@ -238,48 +235,6 @@ int gensam_ABLE(double ***onetreePoisTable, int *crash_flag)
 		if ((segsitesin == 0) && (theta == 0.0) && (pars.mp.timeflag == 0))
 			free(seglst[seg].ptree);
 	}
-
-	//	TODO: mbSFS handling of poisTable and onetreesegs
-
-/*
-	for (i = 1; i <= brClass; i++) {
-		totBrLen[i - 1] = 0.0;
-
-		for (k = 0; k < nsegs; k++) {
-			double totFoldedSegBrLen = totSegBrLen[k][i - 1] + (foldBrClass * totSegBrLen[k][allBrClasses - i]);
-			if (foldBrClass && ((i - 1) == (allBrClasses - i)))
-				totFoldedSegBrLen /= 2;
-
-			if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
-				totBrLen[i - 1] += totFoldedSegBrLen * onetreesegs[k];
-			else
-				totBrLen[i - 1] += totFoldedSegBrLen;
-		}
-		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
-			totBrLen[i - 1] /= nsites;
-
-//		printf("***Folded %d-ton branches***\n", i);
-		if (totBrLen[i - 1] > 0.0) {
-//			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
-			for (j = 0; j < mutClass - 1; j++) {
-//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*theta));
-				onetreePoisTable[0][i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen[i - 1] * theta);
-			}
-			onetreePoisTable[0][i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen[i - 1] * theta);
-
-//			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
-//			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
-		} else {
-//			printf("Total folded branch length = 0\n\n");
-			onetreePoisTable[0][i - 1][0] = 1.0;
-			for (j = 1; j < mutClass; j++)
-				onetreePoisTable[0][i - 1][j] = 0.0;
-		}
-	}
-
-//	printf("\n");
-*/
-
 
 	for (block = 0; block < poisTableSize; block++) {
 		for (i = 1; i <= brClass; i++) {
@@ -352,7 +307,6 @@ int gensam_ABLE(double ***onetreePoisTable, int *crash_flag)
 
 
 	freed2matrix(totSegBrLen, nsegs);
-	free(totBrLen);
 	free(onetreesegs);
 
 	// based on Valgrind Memcheck
