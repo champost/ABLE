@@ -162,11 +162,11 @@ struct params pars ;
 //#pragma omp threadprivate(segfac, count, pars)
 
 
-int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
+int main_ms_ABLE(int ms_argc, char *ms_argv[], double ***onetreePoisTable)
 {
 	int howmany;
 	void getpars( int ms_argc, char *ms_argv[], int *howmany )  ;
-	int gensam_ABLE(double **onetreePoisTable, int *crash_flag) ;
+	int gensam_ABLE(double ***onetreePoisTable, int *crash_flag) ;
  	void freed2matrix(double **m, int x);
 	void free_eventlist( struct devent *pt, int npop );
 
@@ -188,9 +188,10 @@ int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable)
 }
 
 
-int gensam_ABLE(double **onetreePoisTable, int *crash_flag)
+int gensam_ABLE(double ***onetreePoisTable, int *crash_flag)
 {
-	int nsegs, i, j, k, seg, ns, start, end, len;
+//	int nsegs, i, j, k, seg, ns, start, end, len;
+	int nsegs, i, j, k, seg, ns, block;
 	struct segl *seglst, *segtre_mig(struct c_params *p, int *nsegs, int *crash_flag) ; /* used to be: [MAXSEG];  */
 	int segsitesin,nsites;
 	double theta;
@@ -219,14 +220,14 @@ int gensam_ABLE(double **onetreePoisTable, int *crash_flag)
 
 	int *onetreesegs = (int *) malloc((nsegs) * sizeof(int));
 	double **totSegBrLen = d2matrix(nsegs, allBrClasses);
-	double *totBrLen = (double *) malloc(brClass * sizeof(double));
 
 	for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++) {
 		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0)) {
-			end = (k < nsegs - 1 ? seglst[seglst[seg].next].beg - 1 : nsites - 1);
-			start = seglst[seg].beg;
-			len = end - start + 1;
-			onetreesegs[k] = len;
+//			end = (k < nsegs - 1 ? seglst[seglst[seg].next].beg - 1 : nsites - 1);
+//			start = seglst[seg].beg;
+//			len = end - start + 1;
+			seglst[seg].end = (k < nsegs - 1 ? seglst[seglst[seg].next].beg - 1 : nsites - 1);
+			onetreesegs[k] = seglst[seg].end - seglst[seg].beg + 1;
 		}
 
 		evalTreeBranchConfigs(seglst[seg].ptree, nsam, totSegBrLen[k]);
@@ -235,45 +236,77 @@ int gensam_ABLE(double **onetreePoisTable, int *crash_flag)
 			free(seglst[seg].ptree);
 	}
 
-	for (i = 1; i <= brClass; i++) {
-		totBrLen[i - 1] = 0.0;
+	for (block = 0; block < poisTableSize; block++) {
+		for (i = 1; i <= brClass; i++) {
+			double totBrLen = 0.0;
 
-		for (k = 0; k < nsegs; k++) {
-			double totFoldedSegBrLen = totSegBrLen[k][i - 1] + (foldBrClass * totSegBrLen[k][allBrClasses - i]);
-			if (foldBrClass && ((i - 1) == (allBrClasses - i)))
-				totFoldedSegBrLen /= 2;
-
-			if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
-				totBrLen[i - 1] += totFoldedSegBrLen * onetreesegs[k];
-			else
-				totBrLen[i - 1] += totFoldedSegBrLen;
-		}
-		if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0))
-			totBrLen[i - 1] /= nsites;
-
-//		printf("***Folded %d-ton branches***\n", i);
-		if (totBrLen[i - 1] > 0.0) {
-//			index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
-			for (j = 0; j < mutClass - 1; j++) {
-//				printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen[i-1]*pars.mp.theta));
-				onetreePoisTable[i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen[i - 1] * pars.mp.theta);
+			//	if the ARG consists of only a single segment
+			if (nsegs == 1) {
+				double totFoldedSegBrLen = totSegBrLen[0][i - 1] + (foldBrClass * totSegBrLen[0][allBrClasses - i]);
+				if (foldBrClass && ((i - 1) == (allBrClasses - i)))
+					totFoldedSegBrLen /= 2;
+				totBrLen = totFoldedSegBrLen;
 			}
-			onetreePoisTable[i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen[i - 1] * pars.mp.theta);
+			else if ((pars.cp.r > 0.0) || (pars.cp.f > 0.0)) {
+				for (seg = 0, k = 0; k < nsegs; seg = seglst[seg].next, k++) {
+					double totFoldedSegBrLen = totSegBrLen[k][i - 1] + (foldBrClass * totSegBrLen[k][allBrClasses - i]);
+					if (foldBrClass && ((i - 1) == (allBrClasses - i)))
+						totFoldedSegBrLen /= 2;
 
-//			printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen[i-1]*pars.mp.theta));
-//			printf("Total folded branch length = %5.5lf\n\n",totBrLen[i-1]);
-		} else {
-//			printf("Total folded branch length = 0\n\n");
-			onetreePoisTable[i - 1][0] = 1.0;
-			for (j = 1; j < mutClass; j++)
-				onetreePoisTable[i - 1][j] = 0.0;
+					//	if we are looking at segments past the position of the current block
+					if (blockLengthsMat[block][2] < seglst[seg].beg)
+						break;
+
+					//	if a single marginal genelogy spans the whole of the current block
+					else if ((seglst[seg].beg <= blockLengthsMat[block][1]) && (blockLengthsMat[block][2] <= seglst[seg].end)) {
+						totBrLen = totFoldedSegBrLen * blockLengthsMat[block][0];
+						break;
+					}
+
+					//	makes sure the marginal genealogy spans some portion of the current block
+					else if (blockLengthsMat[block][1] <= seglst[seg].end) {
+
+						//	if a left portion of the genealogy lies outside the current block
+						if (seglst[seg].beg < blockLengthsMat[block][1])
+							totBrLen += totFoldedSegBrLen * (seglst[seg].end - blockLengthsMat[block][1] + 1);
+
+						//	if a right portion of the genealogy lies outside the current block
+						else if (blockLengthsMat[block][2] < seglst[seg].end)
+							totBrLen += totFoldedSegBrLen * (blockLengthsMat[block][2] - seglst[seg].beg + 1);
+
+						//	if the marginal genealogy is entirely contained within the current block
+						else
+							totBrLen += totFoldedSegBrLen * onetreesegs[k];
+					}
+				}
+				totBrLen /= blockLengthsMat[block][0];
+			}
+
+//			printf("***Folded %d-ton branches***\n", i);
+			if (totBrLen > 0.0) {
+//				index j = mutClass-1 reserved for the marginal probabilities (i.e. gsl_cdf_poisson_Q())
+				for (j = 0; j < mutClass - 1; j++) {
+//					printf("%d : %5.5lf\n", j, gsl_ran_poisson_pdf(j,totBrLen*theta));
+					onetreePoisTable[block][i - 1][j] = gsl_ran_poisson_pdf(j, totBrLen * theta / poisTableScaleOrder[block]);
+				}
+				onetreePoisTable[block][i - 1][j] = gsl_cdf_poisson_Q(j - 1, totBrLen * theta / poisTableScaleOrder[block]);
+
+//				printf(">%d : %5.5lf\n", j, gsl_cdf_poisson_Q(j,totBrLen*theta));
+//				printf("Total folded branch length = %5.5lf\n\n",totBrLen);
+			}
+			else {
+//				printf("Total folded branch length = 0\n\n");
+				onetreePoisTable[block][i - 1][0] = 1.0;
+				for (j = 1; j < mutClass; j++)
+					onetreePoisTable[block][i - 1][j] = 0.0;
+			}
 		}
 	}
-
 //	printf("\n");
 
+
+
 	freed2matrix(totSegBrLen, nsegs);
-	free(totBrLen);
 	free(onetreesegs);
 
 	// based on Valgrind Memcheck

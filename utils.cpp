@@ -140,171 +140,190 @@ void TrimSpaces(string& str)  {
 
 void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
 
-	string line;
-	ifstream ifs(dataFile.c_str(),ios::in);
-	ofstream ofs(outSNPsFile.c_str(),ios::out);
-	int nblocks = 0, dataKmax = 0, configKmax;
-	map<vector<int>, int> finalTableMap;
+	int dataKmax = 0;
+	dataConfigs = vector<vector<vector<int> > > (mbSFSLen, vector<vector<int> >());
+	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());
 
-	while (getline(ifs,line) && !ifs.eof()) {
-		if (line[0] == '/') {
-			++nblocks;
-			vector<string> blockMat;
+	for (int data = 0; data < mbSFSLen; data++) {
+		string line;
+		ifstream ifs(dataFile[data].c_str(),ios::in);
+		ofstream ofs;
+		if (mbSFSLen == 1)
+			ofs.open(outSNPsFile.c_str(),ios::out);
+		int nblocks = 0, configKmax;
+		map<vector<int>, int> finalTableMap;
 
-			//	skip header until the start of the block
-			bool startBlock = false;
-			while (getline(ifs,line) &&  !ifs.eof()) {
-				if ((alleleType == "genotype") && ((line[0] == 'A') or (line[0] == 'T') or (line[0] == 'G') or (line[0] == 'C') or (line[0] == 'N'))) {
-					startBlock = true;
-					blockMat.push_back(line);
-				}
-				else if ((alleleType == "binary") && ((line[0] == '0') or (line[0] == '1') or (line[0] == 'N'))) {
-					startBlock = true;
-					blockMat.push_back(line);
-				}
-				else if (startBlock or (line.length() == 0))
-					break;
-			}
+		while (getline(ifs,line) && !ifs.eof()) {
+			if (line[0] == '/') {
+				++nblocks;
+				vector<string> blockMat;
 
-			int blockSize = 0, segSites = 0;
-			bool monoMorphicBlock = true;
-			vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
-
-			if (blockMat.size())
-				blockSize = blockMat[0].size();
-
-			for (int nuc = 0; nuc < blockSize; nuc++) {
-
-				bool maskChar = false;
-				vector<int> segCountVec;
-				map<int, map<char, int> > popwiseAlleleCounts;
-				map<char, bool> isAllele;
-				int sample = 0;
-				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-					for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
-						if (blockMat[sample][nuc] == 'N') {
-							maskChar = true;
-							pop = sampledPops.size() + 1;
-							break;
-						}
-						++popwiseAlleleCounts[pop][blockMat[sample][nuc]];
-						isAllele[blockMat[sample][nuc]] = true;
-						++sample;
+				//	skip header until the start of the block
+				bool startBlock = false;
+				while (getline(ifs,line) &&  !ifs.eof()) {
+					if ((alleleType == "genotype") && ((line[0] == 'A') or (line[0] == 'T') or (line[0] == 'G') or (line[0] == 'C') or (line[0] == 'N'))) {
+						startBlock = true;
+						blockMat.push_back(line);
 					}
+					else if ((alleleType == "binary") && ((line[0] == '0') or (line[0] == '1') or (line[0] == 'N'))) {
+						startBlock = true;
+						blockMat.push_back(line);
+					}
+					else if (startBlock or (line.length() == 0))
+						break;
 				}
-				if (!maskChar) {
-					//	testing for bi-allelic SNP's
-					int alleleCount = 0;
-					char chooseAnAllele;
-					for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
-						if (it->second) {
-							++alleleCount;
-							if (alleleType == "genotype")
-								chooseAnAllele = it->first;
-							else if ((alleleType == "binary") && it->first == '1')
-								chooseAnAllele = it->first;
+
+				int blockSize = 0, segSites = 0;
+				bool monoMorphicBlock = true;
+				vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
+
+				if (blockMat.size())
+					blockSize = blockMat[0].size();
+
+				for (int nuc = 0; nuc < blockSize; nuc++) {
+
+					bool maskChar = false;
+					vector<int> segCountVec;
+					map<int, map<char, int> > popwiseAlleleCounts;
+					map<char, bool> isAllele;
+					int sample = 0;
+					for (size_t pop = 0; pop < sampledPops.size(); pop++) {
+						for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
+							if (blockMat[sample][nuc] == 'N') {
+								maskChar = true;
+								pop = sampledPops.size() + 1;
+								break;
+							}
+							++popwiseAlleleCounts[pop][blockMat[sample][nuc]];
+							isAllele[blockMat[sample][nuc]] = true;
+							++sample;
 						}
 					}
+					if (!maskChar) {
+						//	testing for bi-allelic SNP's
+						int alleleCount = 0;
+						char chooseAnAllele;
+						for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
+							if (it->second) {
+								++alleleCount;
+								if (alleleType == "genotype")
+									chooseAnAllele = it->first;
+								else if ((alleleType == "binary") && it->first == '1')
+									chooseAnAllele = it->first;
+							}
+						}
 
-					if (alleleCount == 2) {
-						for (size_t pop = 0; pop < sampledPops.size(); pop++)
-							segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
-		                ++mutConfigVec[getBrConfigNum(segCountVec)];
+						if (alleleCount == 2) {
+							for (size_t pop = 0; pop < sampledPops.size(); pop++)
+								segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
+			                ++mutConfigVec[getBrConfigNum(segCountVec)];
 
-		                //	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
-		                monoMorphicBlock = false;
+			                //	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
+			                monoMorphicBlock = false;
+						}
+
+						if (alleleCount > 1)
+							++segSites;
 					}
-
-					if (alleleCount > 1)
-						++segSites;
 				}
-			}
-			ofs << segSites << endl;
+				if (mbSFSLen == 1)
+					ofs << segSites << endl;
 
-			if (!monoMorphicBlock) {
-		        //	folding the multi-dimensional SFS
-				for(int thisClass = 1; thisClass <= brClass; thisClass++) {
-		        	foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
-				    if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
-				    	foldedMutConfigVec[thisClass-1] /= 2;
-		        }
+				if (!monoMorphicBlock) {
+			        //	folding the multi-dimensional SFS
+					for(int thisClass = 1; thisClass <= brClass; thisClass++) {
+			        	foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
+					    if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
+					    	foldedMutConfigVec[thisClass-1] /= 2;
+			        }
 
-				//	taking care of the Kmax
-		    	for(int branch = 0; branch < brClass; branch++) {
-		    		if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
-		    			foldedMutConfigVec[branch] = mutClass - 1;
-		    	}
+					//	taking care of the Kmax
+			    	for(int branch = 0; branch < brClass; branch++) {
+			    		if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
+			    			foldedMutConfigVec[branch] = mutClass - 1;
+			    	}
+				}
+		    	++finalTableMap[foldedMutConfigVec];
 			}
-	    	++finalTableMap[foldedMutConfigVec];
 		}
-	}
-	ifs.close();
-	ofs.close();
+		ifs.close();
+		if (mbSFSLen == 1)
+			ofs.close();
 
 
-	for (map<vector<int>, int>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++) {
+		for (map<vector<int>, int>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++) {
 
-//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
+	//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
 
-		dataConfigs.push_back(it->first);
-		dataConfigFreqs.push_back((double) it->second/nblocks);
+			dataConfigs[data].push_back(it->first);
+			dataConfigFreqs[data].push_back((double) it->second/nblocks);
 
-		configKmax = *max_element(it->first.begin(),it->first.end());
-		if (configKmax > dataKmax)
-			dataKmax = configKmax;
+			configKmax = *max_element(it->first.begin(),it->first.end());
+			if (configKmax > dataKmax)
+				dataKmax = configKmax;
+		}
 	}
 
 	dataLnL = 0.0;
-	for (size_t i = 0; i < dataConfigs.size(); i++)
-		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
+	for (int data = 0; data < mbSFSLen; data++) {
+		for (size_t i = 0; i < dataConfigs[data].size(); i++)
+			dataLnL += log(dataConfigFreqs[data][i]) * dataConfigFreqs[data][i];
+	}
 	bestGlobalSlLnL = bestLocalSlLnL = 100000*dataLnL;
 
 	if (!mutClass)
 		mutClass = dataKmax;
-
 }
 
 
 void readDataAsbSFSConfigs() {
 
-	string line, del, keyVec;
-	vector<string> tokens;
-	vector<int> config;
-	double val;
-	int dataKmax = 0, configKmax;
+	int dataKmax = 0;
+	dataConfigs = vector<vector<vector<int> > > (mbSFSLen, vector<vector<int> >());
+	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());
 
-	ifstream ifs(dataFile.c_str(),ios::in);
-	while (getline(ifs,line)) {
-		del = ":";
-		tokens.clear();
-		Tokenize(line, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
+	for (int data = 0; data < mbSFSLen; data++) {
+		string line, del, keyVec;
+		vector<string> tokens;
+		vector<int> config;
+		double val;
+		int configKmax;
+
+		ifstream ifs(dataFile[data].c_str(),ios::in);
+		while (getline(ifs,line)) {
+			del = ":";
+			tokens.clear();
+			Tokenize(line, tokens, del);
+			for(unsigned int j=0;j<tokens.size();j++){
+				TrimSpaces(tokens[j]);
+			}
+			keyVec = tokens[0];
+			val = atof(tokens[1].c_str());
+
+			del = "(,)";
+			tokens.clear();
+			Tokenize(keyVec, tokens, del);
+			for(unsigned int j=0;j<tokens.size();j++){
+				TrimSpaces(tokens[j]);
+				config.push_back(atoi(tokens[j].c_str()));
+			}
+			dataConfigs[data].push_back(config);
+			dataConfigFreqs[data].push_back(val);
+
+			configKmax = *max_element(config.begin(),config.end());
+			if (configKmax > dataKmax)
+				dataKmax = configKmax;
+
+			config.clear();
 		}
-		keyVec = tokens[0];
-		val = atof(tokens[1].c_str());
-
-		del = "(,)";
-		tokens.clear();
-		Tokenize(keyVec, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++){
-			TrimSpaces(tokens[j]);
-			config.push_back(atoi(tokens[j].c_str()));
-		}
-		dataConfigs.push_back(config);
-		dataConfigFreqs.push_back(val);
-
-		configKmax = *max_element(config.begin(),config.end());
-		if (configKmax > dataKmax)
-			dataKmax = configKmax;
-
-		config.clear();
+		ifs.close();
 	}
-	ifs.close();
 
 	dataLnL = 0.0;
-	for (size_t i = 0; i < dataConfigs.size(); i++)
-		dataLnL += log(dataConfigFreqs[i]) * dataConfigFreqs[i];
+	for (int data = 0; data < mbSFSLen; data++) {
+		for (size_t i = 0; i < dataConfigs[data].size(); i++)
+			dataLnL += log(dataConfigFreqs[data][i]) * dataConfigFreqs[data][i];
+	}
 	bestGlobalSlLnL = bestLocalSlLnL = 100000*dataLnL;
 
 	if (!mutClass)

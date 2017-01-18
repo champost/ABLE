@@ -52,25 +52,26 @@ vector<int> getMutConfigVec(unsigned long int i);
 string getMutConfigStr(unsigned long int i);
 string getMutConfigStr(vector<int> configVec);
 int getBrConfigNum(vector<int> brConfVec);
-void process_tree_1 (double **onetreePoisTable);
-void process_tree_3 (double **onetreePoisTable);
+void process_tree_cond_bSFS (double ***onetreePoisTable);
+void process_tree_exact_bSFS (double ***onetreePoisTable);
 void calcBSFSTable();
 double computeLik();
 void evalBranchConfigs();
 void readConfigFile();
 void parseCmdLine(char* argv[]);
+void checkConfigOptions();
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data);
 double check_constraints(const vector<double> &vars, vector<double> &grad, void *data);
 
 
 extern "C" {
-int main_ms_ABLE(int ms_argc, char *ms_argv[], double **onetreePoisTable);
-//double *** d3matrix(int x, int y, int z);
-//void freed3matrix(double ***m, int x, int y);
+int main_ms_ABLE(int ms_argc, char *ms_argv[], double ***onetreePoisTable);
+double *** d3matrix(int x, int y, int z);
+void freed3matrix(double ***m, int x, int y);
 double ** d2matrix(int x, int y);
 void freed2matrix(double **m, int x);
-//int ** d2int_matrix(int x, int y);
-//void freed2int_matrix(int **m, int x);
+int ** d2int_matrix(int x, int y);
+void freed2int_matrix(int **m, int x);
 
 double ran1();
 int getPopSampleStatus(int pop);
