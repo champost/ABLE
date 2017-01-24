@@ -1360,6 +1360,11 @@ int main(int argc, char* argv[]) {
 					exit(-1);
 				}
 			}
+
+			if (skipLocalSearch) {
+				parVec = bestGlobalSPars;
+				maxLnL = bestGlobalSlLnL;
+			}
 		}
 
 	    //	If local search is not meant to be skipped
