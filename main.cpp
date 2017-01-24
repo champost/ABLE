@@ -1268,16 +1268,12 @@ int main(int argc, char* argv[]) {
 			if (setRandomPars[it->first]) {
 				//	breaks the PRNG dependence on the CPU clock in the case of a simultaneous start of jobs (e.g. on a cluster)
 				//	and a random initialisation of the start values
-				if (seedPRNGBool) {
-					gsl_rng_set(PRNG, seedPRNG - 1);
-					double tmpPar = gsl_rng_uniform(PRNG);
-					parVal = tmpPar * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
-				}
-				else
-					parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+				gsl_rng_set(PRNG, seedPRNG - 1);
+				double tmpPar = gsl_rng_uniform(PRNG);
+				parVal = tmpPar * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
 			}
 			else
-				parVal = tbiUserVal[it->first];
+				parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
 
 			parVec.push_back(parVal);
 
