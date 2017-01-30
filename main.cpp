@@ -77,6 +77,7 @@ map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds, tbiProfilesGrid;
 map<int, int> parConstraints, tbi2ParVec;
 map<int, bool> setRandomPars;
+map<double, vector<double> > bestGlobalParsMap;
 //map<int, int> trackSelectConfigs;
 
 
@@ -114,9 +115,10 @@ int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
 		reportEveryEvals = 0, set_threads = 0;
+size_t bestGlobalParsMapSize = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false, automaticBounds = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize = 0, seedPRNG = 123456;
 
@@ -760,6 +762,14 @@ void readConfigFile() {
 				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
 				parConstraints[paramID1] = paramID2;
 			}
+			else if (tokens[0] == "global_to_local") {
+				if (tokens.size() > 1) {
+					stringstream stst(tokens[1]);
+					stst >> bestGlobalParsMapSize;
+				}
+				else
+					bestGlobalParsMapSize = 10;
+			}
 			else if (tokens[0] == "seed_PRNG") {
 				stringstream stst(tokens[1]);
 				stst >> seedPRNG;
@@ -1088,6 +1098,12 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	if ((currState == GLOBAL) && (loglik > bestGlobalSlLnL)) {
 			bestGlobalSlLnL = loglik;
 			bestGlobalSPars = vars;
+
+			if (bestGlobalParsMapSize) {
+				bestGlobalParsMap[loglik] = vars;
+				if (bestGlobalParsMap.size() > bestGlobalParsMapSize)
+					bestGlobalParsMap.erase(bestGlobalParsMap.begin()->first);
+			}
 	}
 	else if ((currState == LOCAL) && (loglik > bestLocalSlLnL)) {
 			bestLocalSlLnL = loglik;
@@ -1381,7 +1397,26 @@ int main(int argc, char* argv[]) {
 
 				parVec = bestGlobalSPars;
 				bestLocalSlLnL = bestGlobalSlLnL;
-				printf("\nUsing the the global search MLE as the starting point for a refined local search...\n\n");
+				printf("\nUsing the global search MLE as the starting point for a refined local search...\n\n");
+
+				if (bestGlobalParsMapSize) {
+					printf("Using the %d best global search results to automatically set bounds for the local search...\n", (int)bestGlobalParsMapSize);
+					for (size_t i = 0; i < bestGlobalSPars.size(); i++) {
+						set<double> sortParVals;
+						for (map<double, vector<double> >::iterator it = bestGlobalParsMap.begin(); it != bestGlobalParsMap.end(); it++)
+							sortParVals.insert(it->second[i]);
+						lowerBounds[i] = *sortParVals.begin();
+						upperBounds[i] = *sortParVals.rbegin();
+					}
+					AUGLAG.set_lower_bounds(lowerBounds);
+					AUGLAG.set_upper_bounds(upperBounds);
+					int par = 0;
+					for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+						printf("tbi%d: %.3f - %.3f \n", it->first, lowerBounds[par], upperBounds[par]);
+						++par;
+					}
+					printf("\n");
+				}
 			}
 			//	Local search without a prior global search
 			else {
