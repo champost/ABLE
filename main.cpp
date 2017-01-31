@@ -114,11 +114,11 @@ int ms_argc = 0, ms_crash_flag = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
-		reportEveryEvals = 0, set_threads = 0;
+		reportEveryEvals = 0, set_threads = 0, numGlobalSearches = 1;
 size_t bestParsMapSize = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false, automaticBounds = false,
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize = 0, seedPRNG = 123456;
 
@@ -148,7 +148,7 @@ void free_objects() {
 }
 
 
-//	Temporarily deactivated code for likelihood profiles (not to confused with profile likelihoods!)
+//	Temporarily deactivated code for likelihood profiles (not to be confused with profile likelihoods!)
 void profileLik(vector<double> MLEparVec) {
 
 	double parLowerBound, parUpperBound, MLEparVal, MLEparLik;
@@ -770,6 +770,12 @@ void readConfigFile() {
 				else
 					bestParsMapSize = 10;
 			}
+			else if (tokens[0] == "global_search_iterations") {
+				if (tokens.size() > 1) {
+					stringstream stst(tokens[1]);
+					stst >> numGlobalSearches;
+				}
+			}
 			else if (tokens[0] == "seed_PRNG") {
 				stringstream stst(tokens[1]);
 				stst >> seedPRNG;
@@ -1095,15 +1101,17 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	}
 
 	//	side stepping nlopt by storing the best LnL and parameters
-	if ((currState == GLOBAL) && (loglik > bestGlobalSlLnL)) {
+	if (currState == GLOBAL) {
+		if (loglik > bestGlobalSlLnL) {
 			bestGlobalSlLnL = loglik;
 			bestGlobalSPars = vars;
+		}
 
-			if (bestParsMapSize) {
-				bestParsMap[loglik] = vars;
-				if (bestParsMap.size() > bestParsMapSize)
-					bestParsMap.erase(bestParsMap.begin()->first);
-			}
+		if (bestParsMapSize) {
+			bestParsMap[loglik] = vars;
+			if (bestParsMap.size() > bestParsMapSize)
+				bestParsMap.erase(bestParsMap.begin()->first);
+		}
 	}
 	else if ((currState == LOCAL) && (loglik > bestLocalSlLnL)) {
 			bestLocalSlLnL = loglik;
@@ -1347,30 +1355,77 @@ int main(int argc, char* argv[]) {
 
 			printf("\nStarting global search...\n");
 
-			ms_trees = globalTrees;
-			evalCount = 0;
-			abortNLopt = false;
-			currState = GLOBAL;
-
 			//	Global search with AUGLAG
 			AUGLAG.set_local_optimizer(opt);
 
-			try {
-				AUGLAG.optimize(parVec, maxLnL);
-				throw abortNLopt;
-			}
-			catch (...) {
-				if (abortNLopt) {
-					cerr << "Something went wrong in the calculation of the LnL during the global search!" << endl;
-					cerr << "Aborting ABLE..." << endl;
+			//	Iterate over the specified number of global searches
+			int globalIter = 1;
+			while (globalIter <= numGlobalSearches) {
+				ms_trees = globalTrees;
+				evalCount = 0;
+				abortNLopt = false;
+				currState = GLOBAL;
 
-					for (size_t i = 0; i < parVec.size(); i++)
-						printf("%.6f ", parVec[i]);
-					printf(" LnL: %.6f\n\n", maxLnL);
-
-					free_objects();
-					exit(-1);
+				try {
+					AUGLAG.optimize(parVec, maxLnL);
+					throw abortNLopt;
 				}
+				catch (...) {
+					if (abortNLopt) {
+						cerr << "Something went wrong in the calculation of the LnL during the global search!" << endl;
+						cerr << "Aborting ABLE..." << endl;
+
+						for (size_t i = 0; i < parVec.size(); i++)
+							printf("%.6f ", parVec[i]);
+						printf(" LnL: %.6f\n\n", maxLnL);
+
+						free_objects();
+						exit(-1);
+					}
+				}
+
+				if (bestParsMapSize && (globalIter < numGlobalSearches)) {
+//					cout << "\nglobalIter: " << globalIter << endl;
+//					cout << "bestLnL: " << bestParsMap.rbegin()->first << endl;
+//					cout << "worstLnL: " << bestParsMap.begin()->first << endl;
+//					for (map<double, vector<double> >::reverse_iterator it = bestParsMap.rbegin(); it != bestParsMap.rend(); it++) {
+//						for (size_t i = 0; i < it->second.size(); i++)
+//							printf("%.6f ", it->second[i]);
+//						printf(" LnL: %.6f\n", it->first);
+//					}
+
+					printf("\nUsing the %d best global search results to automatically set bounds for the next GLOBAL search...\n", (int)bestParsMapSize);
+					for (size_t i = 0; i < bestGlobalSPars.size(); i++) {
+						set<double> sortParVals;
+						for (map<double, vector<double> >::iterator it = bestParsMap.begin(); it != bestParsMap.end(); it++)
+							sortParVals.insert(it->second[i]);
+						lowerBounds[i] = *sortParVals.begin();
+						upperBounds[i] = *sortParVals.rbegin();
+
+						//	resetting bounds for the next search if the current estimate lies close to the search bounds
+						if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
+							lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
+							if (lowerBounds[i] <= 0)
+								lowerBounds[i] = bestGlobalSPars[i] / 2;
+						}
+						else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
+							upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+					}
+
+					AUGLAG.set_lower_bounds(lowerBounds);
+					AUGLAG.set_upper_bounds(upperBounds);
+
+					int par = 0;
+					for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+						printf("tbi%d: %.3f - %.3f \n", it->first, lowerBounds[par], upperBounds[par]);
+						++par;
+					}
+					printf("\n");
+
+					parVec = bestGlobalSPars;
+					maxLnL = bestGlobalSlLnL;
+				}
+				++globalIter;
 			}
 
 			if (skipLocalSearch) {
@@ -1383,7 +1438,10 @@ int main(int argc, char* argv[]) {
 		//	Specifying the the Subplex algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Sbplx_.28based_on_Subplex.29)
 		if (!skipLocalSearch) {
 			if (!skipGlobalSearch) {
-				printf("\nReporting the global search MLE after %d evaluations\n", evalCount);
+				if (numGlobalSearches > 1)
+					printf("\nReporting the final global search MLE after %d iterations of %d evaluations each\n", numGlobalSearches, evalCount);
+				else
+					printf("\nReporting the final global search MLE after %d evaluations\n", evalCount);
 				for (size_t i = 0; i < bestGlobalSPars.size(); i++)
 					printf("%.6f ", bestGlobalSPars[i]);
 				printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
@@ -1407,9 +1465,20 @@ int main(int argc, char* argv[]) {
 							sortParVals.insert(it->second[i]);
 						lowerBounds[i] = *sortParVals.begin();
 						upperBounds[i] = *sortParVals.rbegin();
+
+						//	resetting bounds for the next search if the current estimate lies close to the search bounds
+						if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
+							lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
+							if (lowerBounds[i] <= 0)
+								lowerBounds[i] = bestGlobalSPars[i] / 2;
+						}
+						else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
+							upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
 					}
+
 					AUGLAG.set_lower_bounds(lowerBounds);
 					AUGLAG.set_upper_bounds(upperBounds);
+
 					int par = 0;
 					for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 						printf("tbi%d: %.3f - %.3f \n", it->first, lowerBounds[par], upperBounds[par]);
