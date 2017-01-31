@@ -62,6 +62,7 @@ void parseCmdLine(char* argv[]);
 void checkConfigOptions();
 double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, void *data);
 double check_constraints(const vector<double> &vars, vector<double> &grad, void *data);
+void exploreProfiles (size_t &varIdx);
 
 
 extern "C" {
