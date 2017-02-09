@@ -118,7 +118,7 @@ int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikT
 size_t bestParsMapSize = 0;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false, progressiveBounds = false,
 		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
 unsigned long int finalTableSize = 0, seedPRNG = 123456;
 
@@ -776,6 +776,14 @@ void readConfigFile() {
 					stst >> numGlobalSearches;
 				}
 			}
+			else if (tokens[0] == "global_bounds_refinement") {
+				if (tokens.size() > 1) {
+					if (tokens[1] == "progressive")
+						progressiveBounds = true;
+					else if (tokens[1] == "overall")
+						progressiveBounds = false;
+				}
+			}
 			else if (tokens[0] == "seed_PRNG") {
 				stringstream stst(tokens[1]);
 				stst >> seedPRNG;
@@ -1393,34 +1401,46 @@ int main(int argc, char* argv[]) {
 //							printf("%.6f ", it->second[i]);
 //						printf(" LnL: %.6f\n", it->first);
 //					}
+//					printf("\n");
 
-					printf("\nUsing the %d best global search results to automatically set bounds for the next GLOBAL search...\n", (int)bestParsMapSize);
-					for (size_t i = 0; i < bestGlobalSPars.size(); i++) {
-						set<double> sortParVals;
-						for (map<double, vector<double> >::iterator it = bestParsMap.begin(); it != bestParsMap.end(); it++)
-							sortParVals.insert(it->second[i]);
-						lowerBounds[i] = *sortParVals.begin();
-						upperBounds[i] = *sortParVals.rbegin();
+					if (progressiveBounds) {
+						printf("\nUsing the %d best global search results to automatically set bounds for the next GLOBAL search...\n", (int)bestParsMapSize);
+						for (size_t i = 0; i < bestGlobalSPars.size(); i++) {
+							set<double> sortParVals;
+							for (map<double, vector<double> >::iterator it = bestParsMap.begin(); it != bestParsMap.end(); it++)
+								sortParVals.insert(it->second[i]);
+							lowerBounds[i] = *sortParVals.begin();
+							upperBounds[i] = *sortParVals.rbegin();
 
-						//	resetting bounds for the next search if the current estimate lies close to the search bounds
-						if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
-							lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
-							if (lowerBounds[i] <= 0)
-								lowerBounds[i] = bestGlobalSPars[i] / 2;
+							//	expand bounds for the next search if the current best estimate is equal to the search bounds
+							if (lowerBounds[i] == upperBounds[i]) {
+								lowerBounds[i] = bestGlobalSPars[i] / 1.001;
+								upperBounds[i] = bestGlobalSPars[i] * 1.001;
+							}
+							//	adjust bounds for the next search if the current best estimate lies close to the search bounds
+							else {
+								if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
+									lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
+									if (lowerBounds[i] <= 0)
+										lowerBounds[i] = bestGlobalSPars[i] / 2;
+								}
+								else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
+									upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+							}
 						}
-						else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
-							upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
-					}
 
-					AUGLAG.set_lower_bounds(lowerBounds);
-					AUGLAG.set_upper_bounds(upperBounds);
+						AUGLAG.set_lower_bounds(lowerBounds);
+						AUGLAG.set_upper_bounds(upperBounds);
 
-					int par = 0;
-					for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
-						printf("tbi%d: %.3f - %.3f \n", it->first, lowerBounds[par], upperBounds[par]);
-						++par;
+						int par = 0;
+						for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
+							printf("tbi%d: %.3f - %.3f \n", it->first, lowerBounds[par], upperBounds[par]);
+							++par;
+						}
+						printf("\n");
 					}
-					printf("\n");
+					else
+						printf("\nOnto the next GLOBAL search. The %d best global search results OVERALL have been retained.\n", (int)bestParsMapSize);
 
 					parVec = bestGlobalSPars;
 					maxLnL = bestGlobalSlLnL;
@@ -1439,9 +1459,9 @@ int main(int argc, char* argv[]) {
 		if (!skipLocalSearch) {
 			if (!skipGlobalSearch) {
 				if (numGlobalSearches > 1)
-					printf("\nReporting the final global search MLE after %d iterations of %d evaluations each\n", numGlobalSearches, evalCount);
+					printf("\nReporting the final global search MLE after %d iterations of %d evaluations each : \n", numGlobalSearches, evalCount);
 				else
-					printf("\nReporting the final global search MLE after %d evaluations\n", evalCount);
+					printf("\nReporting the final global search MLE after %d evaluations : \n", evalCount);
 				for (size_t i = 0; i < bestGlobalSPars.size(); i++)
 					printf("%.6f ", bestGlobalSPars[i]);
 				printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
@@ -1458,6 +1478,15 @@ int main(int argc, char* argv[]) {
 				printf("\nUsing the global search MLE as the starting point for a refined local search...\n\n");
 
 				if (bestParsMapSize) {
+//					cout << "bestLnL: " << bestParsMap.rbegin()->first << endl;
+//					cout << "worstLnL: " << bestParsMap.begin()->first << endl;
+//					for (map<double, vector<double> >::reverse_iterator it = bestParsMap.rbegin(); it != bestParsMap.rend(); it++) {
+//						for (size_t i = 0; i < it->second.size(); i++)
+//							printf("%.6f ", it->second[i]);
+//						printf(" LnL: %.6f\n", it->first);
+//					}
+//					printf("\n");
+
 					printf("Using the %d best global search results to automatically set bounds for the local search...\n", (int)bestParsMapSize);
 					for (size_t i = 0; i < bestGlobalSPars.size(); i++) {
 						set<double> sortParVals;
@@ -1466,14 +1495,21 @@ int main(int argc, char* argv[]) {
 						lowerBounds[i] = *sortParVals.begin();
 						upperBounds[i] = *sortParVals.rbegin();
 
-						//	resetting bounds for the next search if the current estimate lies close to the search bounds
-						if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
-							lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
-							if (lowerBounds[i] <= 0)
-								lowerBounds[i] = bestGlobalSPars[i] / 2;
+						//	expand bounds for the next search if the current best estimate is equal to the search bounds
+						if (lowerBounds[i] == upperBounds[i]) {
+							lowerBounds[i] = bestGlobalSPars[i] / 1.001;
+							upperBounds[i] = bestGlobalSPars[i] * 1.001;
 						}
-						else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
-							upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+						//	adjust bounds for the next search if the current best estimate lies close to the search bounds
+						else {
+							if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
+								lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
+								if (lowerBounds[i] <= 0)
+									lowerBounds[i] = bestGlobalSPars[i] / 2;
+							}
+							else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
+								upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+						}
 					}
 
 					AUGLAG.set_lower_bounds(lowerBounds);
