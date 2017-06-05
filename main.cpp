@@ -1652,18 +1652,21 @@ int main(int argc, char* argv[]) {
 					maxLnL = bestLocalSlLnL;
 				}
 			}
-			//	IF user specified a cutoff LnL and no global search
+			//	IF user specified a cutoff LnL and/or no global search
 			else {
 				if ((userLnL != 0.0) && (maxLnL <= userLnL)) {
 					printf("\nIgnoring local search results as they did not improve on the user-specified LnL after %d evaluations\n", evalCount);
 					endTaskInfer = true;
 				}
-				else
+				else {
 					printf("\nFound the local search MLE after %d evaluations\n", evalCount);
+					parVec = bestLocalSPars;
+					maxLnL = bestLocalSlLnL;
+				}
 			}
 		}
 
-		//	Prematurely end task infer if user specified LnL cutoff was not met during local search
+		//	If ABLE didn't terminate prematurely end (i.e. if user specified LnL cutoff was not met during local search)
 		if (!endTaskInfer) {
 			//	Refining MLE after global/local search
 			if ((!skipGlobalSearch || !skipLocalSearch) && refineLikTrees) {
