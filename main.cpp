@@ -75,7 +75,7 @@ map<vector<int>, int> intVec2BrConfig;
 map<int, vector<int> > tbiMsCmdIdx;
 map<int, double> tbiUserVal;
 map<int, vector<double> > tbiSearchBounds, tbiProfilesGrid;
-map<int, int> parConstraints, tbi2ParVec;
+map<int, int> parConstraints, tbi2ParVec, ParVecToTbi;
 map<int, bool> setRandomPars;
 map<double, vector<double> > bestParsMap;
 //map<int, int> trackSelectConfigs;
@@ -102,7 +102,7 @@ string dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearc
 //ofstream testLik, testConfig;
 
 vector<int> allConfigs, sampledPops, allPops, profileVarKey;
-vector<double> allConfigFreqs, upperBounds, lowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
+vector<double> allConfigFreqs, upperBounds, lowerBounds, hardUpperBounds, hardLowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
 vector<string> cmdLine;
 vector<gsl_rng *> PRNGThreadVec;
 
@@ -751,7 +751,7 @@ void readConfigFile() {
 			}
 			else if (tokens[0] == "bounds") {
 				int paramID = atoi(tokens[1].substr(3).c_str());
-				for(unsigned int j = 2; j < 4; j++) {
+				for(unsigned int j = 2; j < tokens.size(); j++) {
 					double val;
 					stringstream stst(tokens[j]);
 					stst >> val;
@@ -1204,7 +1204,7 @@ void exploreProfiles (size_t &varIdx) {
 
 int main(int argc, char* argv[]) {
 
-	string version = "0.1 (Built on " + datestring + " at " + timestring + ")";
+	string version = "0.1.x (Built on " + datestring + " at " + timestring + ")";
 
 	cout << endl << endl;
 	cout << "******************************************************************" << endl;
@@ -1285,15 +1285,37 @@ int main(int argc, char* argv[]) {
 		int count = 0;
 		for (map<int, vector<int> >::iterator it = tbiMsCmdIdx.begin(); it != tbiMsCmdIdx.end(); it++) {
 			//	Customising search bounds based on user specifications
-			if (tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) {
+			if ((tbiSearchBounds.find(it->first) != tbiSearchBounds.end()) && (tbiSearchBounds[it->first].size() >= 2)) {
 				lowerBounds.push_back(tbiSearchBounds[it->first][0]);
 				upperBounds.push_back(tbiSearchBounds[it->first][1]);
+				//	if HARD upper/lower bounds have been specified
+				if (tbiSearchBounds[it->first].size() == 4) {
+					double hardLower = tbiSearchBounds[it->first][2],
+						   hardUpper = tbiSearchBounds[it->first][3];
+					if ((lowerBounds.back() < hardLower) || (hardUpper < upperBounds.back())) {
+						cerr << "Please recheck your bounds for tbi" << it->first << ", the Upper/Lower hard bounds seem to have been misspecified!" << endl;
+						cerr << "Aborting ABLE..." << endl;
+						free_objects();
+						exit(-1);
+					}
+					else {
+						hardLowerBounds.push_back(hardLower);
+						hardUpperBounds.push_back(hardUpper);
+					}
+				}
+				else if (tbiSearchBounds[it->first].size() == 2) {
+					hardLowerBounds.push_back(tbiSearchBounds[it->first][0]);
+					hardUpperBounds.push_back(tbiSearchBounds[it->first][1]);
+				}
 			}
 			else {
 				lowerBounds.push_back(globalLower);
 				upperBounds.push_back(globalUpper);
+				hardLowerBounds.push_back(globalLower);
+				hardUpperBounds.push_back(globalUpper);
 			}
 			tbi2ParVec[it->first] = count;
+			ParVecToTbi[count] = it->first;
 
 			//	if random user values have been specified
 			double parVal;
@@ -1409,23 +1431,44 @@ int main(int argc, char* argv[]) {
 							set<double> sortParVals;
 							for (map<double, vector<double> >::iterator it = bestParsMap.begin(); it != bestParsMap.end(); it++)
 								sortParVals.insert(it->second[i]);
-							lowerBounds[i] = *sortParVals.begin();
-							upperBounds[i] = *sortParVals.rbegin();
 
-							//	expand bounds for the next search if the current best estimate is equal to the search bounds
-							if (lowerBounds[i] == upperBounds[i]) {
-								lowerBounds[i] = bestGlobalSPars[i] / 1.001;
-								upperBounds[i] = bestGlobalSPars[i] * 1.001;
+							double tmpLowerBound, tmpUpperBound;
+							tmpLowerBound = *sortParVals.begin();
+							tmpUpperBound = *sortParVals.rbegin();
+
+//							printf("tbi%d: %.3f - %.3f; %.3f - %.3f; %.3f - %.3f \n", ParVecToTbi[i], tmpLowerBound, tmpUpperBound, lowerBounds[i], upperBounds[i], hardLowerBounds[i], hardUpperBounds[i]);
+
+							//	IF tmpLowerBound is within 1% of the current lowerBounds[i]
+							//	OR IF bestGlobalSPars[i] is within 5% of the current lowerBounds[i]
+							//	then further DECREASE lowerBounds[i]
+							if ((abs((tmpLowerBound - lowerBounds[i]) / lowerBounds[i]) < 0.01)
+									|| (abs((bestGlobalSPars[i] - lowerBounds[i]) / lowerBounds[i]) < 0.05)) {
+//								printf("Decreasing the lower bound for tbi%d...\n", ParVecToTbi[i]);
+								if (lowerBounds[i] == hardLowerBounds[i])
+									printf("WARNING. ABLE has attained the hard lower bound (%.3f) for tbi%d!\n", hardLowerBounds[i], ParVecToTbi[i]);
+								lowerBounds[i] = (hardLowerBounds[i] + lowerBounds[i]) / 2;
 							}
-							//	adjust bounds for the next search if the current best estimate lies close to the search bounds
+							//	else INCREASE the LOWER bound (using tmpLowerBound)
 							else {
-								if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
-									lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
-									if (lowerBounds[i] <= 0)
-										lowerBounds[i] = bestGlobalSPars[i] / 2;
-								}
-								else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
-									upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+//								printf("Increasing the lower bound for tbi%d...\n", ParVecToTbi[i]);
+								lowerBounds[i] = (tmpLowerBound + lowerBounds[i]) / 2;
+							}
+
+
+							//	IF tmpUpperBound is within 1% of the current upperBounds[i]
+							//	OR IF bestGlobalSPars[i] is within 5% of the current upperBounds[i]
+							//	then further INCREASE upperBounds[i]
+							if ((abs((tmpUpperBound - upperBounds[i]) / upperBounds[i]) < 0.01)
+									|| (abs((bestGlobalSPars[i] - upperBounds[i]) / upperBounds[i]) < 0.05)) {
+//								printf("Increasing the upper bound for tbi%d...\n", ParVecToTbi[i]);
+								if (upperBounds[i] == hardUpperBounds[i])
+									printf("WARNING. ABLE has attained the hard upper bound (%.3f) for tbi%d!\n", hardUpperBounds[i], ParVecToTbi[i]);
+								upperBounds[i] = (hardUpperBounds[i] + upperBounds[i]) / 2;
+							}
+							//	else DECREASE the UPPER bound (using tmpUpperBound)
+							else {
+//								printf("Decreasing the upper bound for tbi%d...\n", ParVecToTbi[i]);
+								upperBounds[i] = (tmpUpperBound + upperBounds[i]) / 2;
 							}
 						}
 
@@ -1440,7 +1483,7 @@ int main(int argc, char* argv[]) {
 						printf("\n");
 					}
 					else
-						printf("\nOnto the next GLOBAL search. The %d best global search results OVERALL have been retained.\n", (int)bestParsMapSize);
+						printf("\nOnto the next GLOBAL search. The %d best global search results OVERALL will be retained.\n", (int)bestParsMapSize);
 
 					parVec = bestGlobalSPars;
 					maxLnL = bestGlobalSlLnL;
@@ -1492,23 +1535,44 @@ int main(int argc, char* argv[]) {
 						set<double> sortParVals;
 						for (map<double, vector<double> >::iterator it = bestParsMap.begin(); it != bestParsMap.end(); it++)
 							sortParVals.insert(it->second[i]);
-						lowerBounds[i] = *sortParVals.begin();
-						upperBounds[i] = *sortParVals.rbegin();
 
-						//	expand bounds for the next search if the current best estimate is equal to the search bounds
-						if (lowerBounds[i] == upperBounds[i]) {
-							lowerBounds[i] = bestGlobalSPars[i] / 1.001;
-							upperBounds[i] = bestGlobalSPars[i] * 1.001;
+						double tmpLowerBound, tmpUpperBound;
+						tmpLowerBound = *sortParVals.begin();
+						tmpUpperBound = *sortParVals.rbegin();
+
+//						printf("tbi%d: %.3f - %.3f; %.3f - %.3f; %.3f - %.3f \n", ParVecToTbi[i], tmpLowerBound, tmpUpperBound, lowerBounds[i], upperBounds[i], hardLowerBounds[i], hardUpperBounds[i]);
+
+						//	IF tmpLowerBound is within 1% of the current lowerBounds[i]
+						//	OR IF bestGlobalSPars[i] is within 5% of the current lowerBounds[i]
+						//	then further DECREASE lowerBounds[i]
+						if ((abs((tmpLowerBound - lowerBounds[i]) / lowerBounds[i]) < 0.01)
+								|| (abs((bestGlobalSPars[i] - lowerBounds[i]) / lowerBounds[i]) < 0.05)) {
+//							printf("Decreasing the lower bound for tbi%d...\n", ParVecToTbi[i]);
+							if (lowerBounds[i] == hardLowerBounds[i])
+								printf("WARNING. ABLE has attained the hard lower bound (%.3f) for tbi%d!\n", hardLowerBounds[i], ParVecToTbi[i]);
+							lowerBounds[i] = (hardLowerBounds[i] + lowerBounds[i]) / 2;
 						}
-						//	adjust bounds for the next search if the current best estimate lies close to the search bounds
+						//	else INCREASE the LOWER bound (using tmpLowerBound)
 						else {
-							if (log(bestGlobalSPars[i]/lowerBounds[i]) < 0.005) {
-								lowerBounds[i] -= (upperBounds[i] - lowerBounds[i]) / 2;
-								if (lowerBounds[i] <= 0)
-									lowerBounds[i] = bestGlobalSPars[i] / 2;
-							}
-							else if (log(upperBounds[i]/bestGlobalSPars[i]) < 0.005)
-								upperBounds[i] += (upperBounds[i] - lowerBounds[i]) / 2;
+//							printf("Increasing the lower bound for tbi%d...\n", ParVecToTbi[i]);
+							lowerBounds[i] = (tmpLowerBound + lowerBounds[i]) / 2;
+						}
+
+
+						//	IF tmpUpperBound is within 1% of the current upperBounds[i]
+						//	OR IF bestGlobalSPars[i] is within 5% of the current upperBounds[i]
+						//	then further INCREASE upperBounds[i]
+						if ((abs((tmpUpperBound - upperBounds[i]) / upperBounds[i]) < 0.01)
+								|| (abs((bestGlobalSPars[i] - upperBounds[i]) / upperBounds[i]) < 0.05)) {
+//							printf("Increasing the upper bound for tbi%d...\n", ParVecToTbi[i]);
+							if (upperBounds[i] == hardUpperBounds[i])
+								printf("WARNING. ABLE has attained the hard upper bound (%.3f) for tbi%d!\n", hardUpperBounds[i], ParVecToTbi[i]);
+							upperBounds[i] = (hardUpperBounds[i] + upperBounds[i]) / 2;
+						}
+						//	else DECREASE the UPPER bound (using tmpUpperBound)
+						else {
+//							printf("Decreasing the upper bound for tbi%d...\n", ParVecToTbi[i]);
+							upperBounds[i] = (tmpUpperBound + upperBounds[i]) / 2;
 						}
 					}
 
