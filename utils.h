@@ -66,7 +66,7 @@ extern int getBrConfigNum(vector<int> brConfVec);
 extern string getMutConfigStr(vector<int> configVec);
 
 
-inline uint32 hash( time_t t, clock_t c )
+inline uint32 hash_time( time_t t, clock_t c )
 {
 	// Get a uint32 from t and c
 	// Better than uint32(x) in case x is floating point in [0,1]

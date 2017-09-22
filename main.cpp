@@ -1216,7 +1216,7 @@ int main(int argc, char* argv[]) {
 	cout << endl << endl;
 
 	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
-	gsl_rng_set(PRNG, hash(time(NULL), clock()));
+	gsl_rng_set(PRNG, hash_time(time(NULL), clock()));
 
 	time_t likStartTime, likEndTime;
 /*
@@ -1267,7 +1267,7 @@ int main(int argc, char* argv[]) {
 	printf("Setting up %d threads...\n\n", procs);
 
 	if (!seedPRNGBool)
-		seedPRNG = hash(time(NULL), clock());
+		seedPRNG = hash_time(time(NULL), clock());
 
 	for (int i = 0; i < procs; i++) {
 		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
