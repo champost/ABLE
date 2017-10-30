@@ -860,9 +860,7 @@ void parseCmdLine(char* argv[]) {
 					tbiUserVal[paramID] = tmpPar;
 					stst << tmpPar;
 					stst >> ms_argv[i];
-
-					if (startRandom)
-						setRandomPars[paramID] = true;
+					setRandomPars[paramID] = true;
 				}
 			}
 			else {
@@ -1273,7 +1271,7 @@ int main(int argc, char* argv[]) {
 				parVal = tmpPar * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
 			}
 			else
-				parVal = tbiUserVal[it->first] * (upperBounds[count] - lowerBounds[count]) + lowerBounds[count];
+				parVal = tbiUserVal[it->first];
 
 			parVec.push_back(parVal);
 
