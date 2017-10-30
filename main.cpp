@@ -113,7 +113,7 @@ int ms_argc = 0, ms_crash_flag = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
-		reportEveryEvals = 0, set_threads = 0;
+		reportEveryEvals = 0, set_threads = 0, outputDigits = 6;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
 bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false,
@@ -492,7 +492,7 @@ double computeLik() {
 					loglikData[data] *= (double) dataConfigFreqs[data].size() / trackedConfigs[data];
 
 				if (printLikCorrFactor)
-					printf("Likelihood correction factor : %.6f\n", (double) dataConfigFreqs[data].size() / trackedConfigs[data]);
+					printf("Likelihood correction factor : %.*f\n", outputDigits, (double) dataConfigFreqs[data].size() / trackedConfigs[data]);
 			}
 			else if (estimate > 0) {
 				for (size_t i = 0; i < dataConfigs[data].size(); i++) {
@@ -809,6 +809,10 @@ void readConfigFile() {
 					tbiProfilesGrid[paramID].push_back(val);
 				}
 			}
+			else if (tokens[0] == "output_precision") {
+				stringstream stst(tokens[1]);
+				stst >> outputDigits;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -1021,10 +1025,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 /*
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.6f ", vars[i]);
+			printf("%.*f ", outputDigits, vars[i]);
 
 		printf(" Trees: %d ", 0);
-		printf(" Penalised LnL: %.6f\n", 10*dataLnL);
+		printf(" Penalised LnL: %.*f\n", outputDigits, 10*dataLnL);
 */
 		return 10*dataLnL;
 	}
@@ -1051,10 +1055,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 /*
 		printf("%5d ", evalCount);
 		for (size_t i = 0; i < vars.size(); i++)
-			printf("%.6f ", vars[i]);
+			printf("%.*f ", outputDigits, vars[i]);
 
 		printf(" Trees: %d ", 0);
-		printf(" Penalised LnL: %.6f ", 10*dataLnL);
+		printf(" Penalised LnL: %.*f ", outputDigits, 10*dataLnL);
 		printf(" ms CRASH!\n");
 */
 		return 10*dataLnL;
@@ -1064,10 +1068,10 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	++evalCount;
 	printf("%6d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf("%.6f ", vars[i]);
+		printf("%.*f ", outputDigits, vars[i]);
 //	printf(" Trees: %d ", ms_trees);
 //	printf(" Sampled: %d ", sampledTrees);
-	printf(" LnL: %.6f\n", loglik);
+	printf(" LnL: %.*f\n", outputDigits, loglik);
 
 	if (loglik == 0.0) {
 		abortNLopt = true;
@@ -1078,8 +1082,8 @@ double optimize_wrapper_nlopt(const vector<double> &vars, vector<double> &grad, 
 	if ((currState == GLOBAL) && reportEveryEvals && !(evalCount % reportEveryEvals) && (evalCount < globalEvals)) {
 		printf("\nReporting the best MLE after %d evaluations\n", evalCount);
 		for (size_t i = 0; i < bestGlobalSPars.size(); i++)
-			printf("%.6f ", bestGlobalSPars[i]);
-		printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
+			printf("%.*f ", outputDigits, bestGlobalSPars[i]);
+		printf(" LnL: %.*f\n\n", outputDigits, bestGlobalSlLnL);
 	}
 
 	//	side stepping nlopt by storing the best LnL and parameters
@@ -1114,9 +1118,9 @@ double check_constraints(const vector<double> &vars, vector<double> &grad, void 
 /*
 	printf("%5d ", evalCount);
 	for (size_t i = 0; i < vars.size(); i++)
-		printf("%.6f ", vars[i]);
+		printf("%.*f ", outputDigits, vars[i]);
 
-	printf(" diff: %f\n", consDiff);
+	printf(" diff: %f\n", outputDigits, consDiff);
 */
 
 	return consDiff;
@@ -1155,11 +1159,11 @@ void exploreProfiles (size_t &varIdx) {
 			++evalCount;
 			printf("%6d ", evalCount);
 			for (size_t j = 0; j < profileVars.size(); j++)
-				printf("%.6f ", profileVars[j]);
+				printf("%.*f ", outputDigits, profileVars[j]);
 
 			//	IF parameter combination satisfies user-specified constraints
 			if (parConstraintPass)
-				printf(" LnL: %.6f\n", computeLik());
+				printf(" LnL: %.*f\n", outputDigits, computeLik());
 			else
 				printf(" Point does not pass user-specified constraint...skipping!\n");
 		}
@@ -1347,8 +1351,8 @@ int main(int argc, char* argv[]) {
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
-						printf("%.6f ", parVec[i]);
-					printf(" LnL: %.6f\n\n", maxLnL);
+						printf("%.*f ", outputDigits, parVec[i]);
+					printf(" LnL: %.*f\n\n", outputDigits, maxLnL);
 
 					free_objects();
 					exit(-1);
@@ -1367,8 +1371,8 @@ int main(int argc, char* argv[]) {
 			if (!skipGlobalSearch) {
 				printf("\nReporting the global search MLE after %d evaluations\n", evalCount);
 				for (size_t i = 0; i < bestGlobalSPars.size(); i++)
-					printf("%.6f ", bestGlobalSPars[i]);
-				printf(" LnL: %.6f\n\n", bestGlobalSlLnL);
+					printf("%.*f ", outputDigits, bestGlobalSPars[i]);
+				printf(" LnL: %.*f\n\n", outputDigits, bestGlobalSlLnL);
 
 				if (localTrees < globalTrees) {
 					cerr << "It is strongly advised to rerun the local search with a value of \"local trees\" >= \"global trees\"!" << endl;
@@ -1425,8 +1429,8 @@ int main(int argc, char* argv[]) {
 					cerr << "Aborting ABLE..." << endl;
 
 					for (size_t i = 0; i < parVec.size(); i++)
-						printf("%.6f ", parVec[i]);
-					printf(" LnL: %.6f\n\n", maxLnL);
+						printf("%.*f ", outputDigits, parVec[i]);
+					printf(" LnL: %.*f\n\n", outputDigits, maxLnL);
 
 					free_objects();
 					exit(-1);
@@ -1478,8 +1482,8 @@ int main(int argc, char* argv[]) {
 			//	Final MLE output after global/local search and followed by LnL refinement (if specified)
 			printf("\n\nFound a maximum at ");
 			for (size_t i = 0; i < parVec.size(); i++)
-				printf("%.6f ", parVec[i]);
-			printf(" LnL: %.6f\n\n", maxLnL);
+				printf("%.*f ", outputDigits, parVec[i]);
+			printf(" LnL: %.*f\n\n", outputDigits, maxLnL);
 		}
 
 		time(&likEndTime);
@@ -1558,7 +1562,7 @@ int main(int argc, char* argv[]) {
 					exit(-1);
 				}
 				else if (!profileLikBool)
-					printf(" LnL: %.6f (Trees sampled : %d)\n", loglik, sampledTrees);
+					printf(" LnL: %.*f (Trees sampled : %d)\n", outputDigits, loglik, sampledTrees);
 
 				printf("\nTime taken for computation : %.0f seconds\n\n", float(likEndTime - likStartTime));
 			}
