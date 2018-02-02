@@ -113,13 +113,17 @@ char **ms_argv;
 int ms_argc = 0, ms_crash_flag = 0;
 int npops = 0, kmax = 0;
 int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
-int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0, profileLikTrees = 0, ms_trees = 1,
+int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0,
+		profileLikTrees = 0, ms_trees = 1,
 		reportEveryEvals = 0, set_threads = 0, numGlobalSearches = 1, outputDigits = 6;
 size_t bestParsMapSize = 0;
 
-double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0, bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
-bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false, cmdLineInConfigFile = false, progressiveBounds = false,
-		seedPRNGBool = false, nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false, skipLocalSearch = false;
+double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0,
+		bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
+bool skipGlobalSearch = false, bSFSmode = false, profileLikBool = false, abortNLopt = false,
+		cmdLineInConfigFile = false, progressiveBounds = false, seedPRNGBool = false,
+		nobSFSFile = false, printLikCorrFactor = false, startRandom = false, dataConvert = false,
+		skipLocalSearch = false, outputSNPfile = true;
 unsigned long int finalTableSize = 0, seedPRNG = 123456;
 
 enum SearchStates {GLOBAL, LOCAL, OTHER};
@@ -837,6 +841,9 @@ void readConfigFile() {
 				stringstream stst(tokens[1]);
 				stst >> outputDigits;
 			}
+			else if (tokens[0] == "no_SNP_file") {
+				outputSNPfile = false;
+			}
 			else {
 				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
 				cerr << "Aborting ABLE..." << endl;
@@ -1238,7 +1245,7 @@ int main(int argc, char* argv[]) {
 
 	if ((estimate > 1) || bSFSmode || dataConvert) {
 		if (dataFileFormat == "pseudo_MS") {
-			readDataAsSeqBlocks("block_SNPs.txt", alleleType);
+			readDataAsSeqBlocks(alleleType, outputSNPfile);
 
 			//	convert data into bSFS and quit ABLE
 			//	restricting this task to converting one dataset at a time

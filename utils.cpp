@@ -138,17 +138,18 @@ void TrimSpaces(string& str)  {
 }
 
 
-void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
+void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 
 	int dataKmax = 0;
 	dataConfigs = vector<vector<vector<int> > > (mbSFSLen, vector<vector<int> >());
 	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());
+	string outSNPsFile = "block_SNPs.txt";
 
 	for (int data = 0; data < mbSFSLen; data++) {
 		string line;
 		ifstream ifs(dataFile[data].c_str(),ios::in);
 		ofstream ofs;
-		if (mbSFSLen == 1)
+		if (mbSFSLen == 1 && outSNPs)
 			ofs.open(outSNPsFile.c_str(),ios::out);
 		int nblocks = 0, configKmax;
 		map<vector<int>, int> finalTableMap;
@@ -226,7 +227,7 @@ void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
 							++segSites;
 					}
 				}
-				if (mbSFSLen == 1)
+				if (mbSFSLen == 1 && outSNPs)
 					ofs << segSites << endl;
 
 				if (!monoMorphicBlock) {
@@ -247,7 +248,7 @@ void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
 			}
 		}
 		ifs.close();
-		if (mbSFSLen == 1)
+		if (mbSFSLen == 1 && outSNPs)
 			ofs.close();
 
 

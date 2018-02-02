@@ -52,7 +52,7 @@ vector<double> logspaced(double a, double b, int n);
 vector<double> negLogspaced(double a, double b, int n);
 void Tokenize(const string& str, vector<string>& tokens, const string& delimiters);
 void TrimSpaces(string& str);
-void readDataAsSeqBlocks(string outSNPsFile, string alleleType);
+void readDataAsSeqBlocks(string alleleType, bool outSNPs);
 void readDataAsbSFSConfigs();
 
 extern vector<string> dataFile;
