@@ -1241,6 +1241,23 @@ int main(int argc, char* argv[]) {
 
 	readConfigFile();
 
+	int procs;
+	if (set_threads > 0)
+		procs = set_threads;
+	else
+		procs = omp_get_num_procs();
+
+	omp_set_num_threads(procs);
+	printf("Setting up %d threads...\n\n", procs);
+
+	if (!seedPRNGBool)
+		seedPRNG = hash_time(time(NULL), clock());
+
+	for (int i = 0; i < procs; i++) {
+		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
+		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
+	}
+
 	evalBranchConfigs();
 
 	if ((estimate > 1) || bSFSmode || dataConvert) {
@@ -1265,24 +1282,6 @@ int main(int argc, char* argv[]) {
 
 	parseCmdLine(argv);
 	checkConfigOptions();
-
-	int procs;
-	if (set_threads > 0)
-		procs = set_threads;
-	else
-		procs = omp_get_num_procs();
-
-	omp_set_num_threads(procs);
-	printf("Setting up %d threads...\n\n", procs);
-
-	if (!seedPRNGBool)
-		seedPRNG = hash_time(time(NULL), clock());
-
-	for (int i = 0; i < procs; i++) {
-		PRNGThreadVec.push_back(gsl_rng_alloc(gsl_rng_mt19937));
-		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
-	}
-
 
 //*********************************************************************************************************************************************
 	//	i.e. task infer
