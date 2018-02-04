@@ -45,6 +45,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <map>
 #include <fstream>
 #include <iostream>
+#include <omp.h>
 
 #include "utils.h"
 
@@ -138,120 +139,136 @@ void TrimSpaces(string& str)  {
 }
 
 
-void readDataAsSeqBlocks(string outSNPsFile, string alleleType) {
+void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
+
+	if (procs > 1) {
+		outSNPs = false;
+		printf("WARNING. No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n");
+	}
 
 	int dataKmax = 0;
 	dataConfigs = vector<vector<vector<int> > > (mbSFSLen, vector<vector<int> >());
 	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());
+	string outSNPsFile = "block_SNPs.txt";
+
+	ofstream ofs;
+	if (mbSFSLen == 1 && outSNPs)
+		ofs.open(outSNPsFile.c_str(),ios::out);
 
 	for (int data = 0; data < mbSFSLen; data++) {
 		string line;
 		ifstream ifs(dataFile[data].c_str(),ios::in);
-		ofstream ofs;
-		if (mbSFSLen == 1)
-			ofs.open(outSNPsFile.c_str(),ios::out);
 		int nblocks = 0, configKmax;
-		map<vector<int>, int> finalTableMap;
 
+		vector< vector<string> > blockMat;
 		while (getline(ifs,line) && !ifs.eof()) {
 			if (line[0] == '/') {
-				++nblocks;
-				vector<string> blockMat;
+				blockMat.push_back(vector<string> ());
 
 				//	skip header until the start of the block
 				bool startBlock = false;
 				while (getline(ifs,line) &&  !ifs.eof()) {
 					if ((alleleType == "genotype") && ((line[0] == 'A') or (line[0] == 'T') or (line[0] == 'G') or (line[0] == 'C') or (line[0] == 'N'))) {
 						startBlock = true;
-						blockMat.push_back(line);
+						blockMat[nblocks].push_back(line);
 					}
 					else if ((alleleType == "binary") && ((line[0] == '0') or (line[0] == '1') or (line[0] == 'N'))) {
 						startBlock = true;
-						blockMat.push_back(line);
+						blockMat[nblocks].push_back(line);
 					}
 					else if (startBlock or (line.length() == 0))
 						break;
 				}
-
-				int blockSize = 0, segSites = 0;
-				bool monoMorphicBlock = true;
-				vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
-
-				if (blockMat.size())
-					blockSize = blockMat[0].size();
-
-				for (int nuc = 0; nuc < blockSize; nuc++) {
-
-					bool maskChar = false;
-					vector<int> segCountVec;
-					map<int, map<char, int> > popwiseAlleleCounts;
-					map<char, bool> isAllele;
-					int sample = 0;
-					for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-						for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
-							if (blockMat[sample][nuc] == 'N') {
-								maskChar = true;
-								pop = sampledPops.size() + 1;
-								break;
-							}
-							++popwiseAlleleCounts[pop][blockMat[sample][nuc]];
-							isAllele[blockMat[sample][nuc]] = true;
-							++sample;
-						}
-					}
-					if (!maskChar) {
-						//	testing for bi-allelic SNP's
-						int alleleCount = 0;
-						char chooseAnAllele;
-						for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
-							if (it->second) {
-								++alleleCount;
-								if (alleleType == "genotype")
-									chooseAnAllele = it->first;
-								else if ((alleleType == "binary") && it->first == '1')
-									chooseAnAllele = it->first;
-							}
-						}
-
-						if (alleleCount == 2) {
-							for (size_t pop = 0; pop < sampledPops.size(); pop++)
-								segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
-			                ++mutConfigVec[getBrConfigNum(segCountVec)];
-
-			                //	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
-			                monoMorphicBlock = false;
-						}
-
-						if (alleleCount > 1)
-							++segSites;
-					}
-				}
-				if (mbSFSLen == 1)
-					ofs << segSites << endl;
-
-				if (!monoMorphicBlock) {
-			        //	folding the multi-dimensional SFS
-					for(int thisClass = 1; thisClass <= brClass; thisClass++) {
-			        	foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
-					    if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
-					    	foldedMutConfigVec[thisClass-1] /= 2;
-			        }
-
-					//	taking care of the Kmax
-			    	for(int branch = 0; branch < brClass; branch++) {
-			    		if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
-			    			foldedMutConfigVec[branch] = mutClass - 1;
-			    	}
-				}
-		    	++finalTableMap[foldedMutConfigVec];
+				++nblocks;
 			}
 		}
 		ifs.close();
-		if (mbSFSLen == 1)
+
+		vector < map<vector<int>, int> > finalTableMap = vector < map<vector<int>, int> > (procs, map<vector<int>, int> ());
+#pragma omp parallel for
+		for (size_t block = 0; block < blockMat.size(); block++) {
+			int blockSize = 0, segSites = 0;
+			bool monoMorphicBlock = true;
+			vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
+
+			if (blockMat[block].size())
+				blockSize = blockMat[block][0].size();
+
+			for (int nuc = 0; nuc < blockSize; nuc++) {
+
+				bool maskChar = false;
+				vector<int> segCountVec;
+				map<int, map<char, int> > popwiseAlleleCounts;
+				map<char, bool> isAllele;
+				int sample = 0;
+				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
+					for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
+						if (blockMat[block][sample][nuc] == 'N') {
+							maskChar = true;
+							pop = sampledPops.size() + 1;
+							break;
+						}
+						++popwiseAlleleCounts[pop][blockMat[block][sample][nuc]];
+						isAllele[blockMat[block][sample][nuc]] = true;
+						++sample;
+					}
+				}
+				if (!maskChar) {
+					//	testing for bi-allelic SNP's
+					int alleleCount = 0;
+					char chooseAnAllele;
+					for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
+						if (it->second) {
+							++alleleCount;
+							if (alleleType == "genotype")
+								chooseAnAllele = it->first;
+							else if ((alleleType == "binary") && it->first == '1')
+								chooseAnAllele = it->first;
+						}
+					}
+
+					if (alleleCount == 2) {
+						for (size_t pop = 0; pop < sampledPops.size(); pop++)
+							segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
+						++mutConfigVec[getBrConfigNum(segCountVec)];
+
+						//	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
+						monoMorphicBlock = false;
+					}
+
+					if (alleleCount > 1)
+						++segSites;
+				}
+			}
+			if (mbSFSLen == 1 && outSNPs)
+				ofs << segSites << endl;
+
+			if (!monoMorphicBlock) {
+				//	folding the multi-dimensional SFS
+				for(int thisClass = 1; thisClass <= brClass; thisClass++) {
+					foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
+					if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
+						foldedMutConfigVec[thisClass-1] /= 2;
+				}
+
+				//	taking care of the Kmax
+				for(int branch = 0; branch < brClass; branch++) {
+					if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
+						foldedMutConfigVec[branch] = mutClass - 1;
+				}
+			}
+			++finalTableMap[omp_get_thread_num()][foldedMutConfigVec];
+		}
+
+		if (mbSFSLen == 1 && outSNPs)
 			ofs.close();
 
 
-		for (map<vector<int>, int>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++) {
+		for (int thread = 1; thread < procs; thread++)
+			for (map<vector<int>, int>::iterator it = finalTableMap[thread].begin(); it != finalTableMap[thread].end(); it++)
+				finalTableMap[0][it->first] += it->second;
+
+		for (map<vector<int>, int>::iterator it = finalTableMap[0].begin(); it != finalTableMap[0].end(); it++) {
 
 	//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
 
