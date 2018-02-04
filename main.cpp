@@ -64,7 +64,7 @@ knowledge of the CeCILL license and that you accept its terms.
 using namespace std;
 
 //************ EXTERN **************
-int brClass = 0, mutClass = 0, foldBrClass = 0, allBrClasses = 0, sampledPopsSize = 0, poisTableSize = 0;
+int brClass = 0, mutClass = 0, foldBrClass = 0, allBrClasses = 0, sampledPopsSize = 0, poisTableSize = 0, procs = 1;
 int *poisTableScaleOrder;
 int **blockLengthsMat;
 //**********************************
@@ -1241,7 +1241,6 @@ int main(int argc, char* argv[]) {
 
 	readConfigFile();
 
-	int procs;
 	if (set_threads > 0)
 		procs = set_threads;
 	else

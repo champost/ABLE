@@ -140,6 +140,11 @@ void TrimSpaces(string& str)  {
 
 void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 
+	if (procs > 1) {
+		outSNPs = false;
+		printf("WARNING. No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n");
+	}
+
 	int dataKmax = 0;
 	dataConfigs = vector<vector<vector<int> > > (mbSFSLen, vector<vector<int> >());
 	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());

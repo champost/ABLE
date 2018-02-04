@@ -56,7 +56,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs);
 void readDataAsbSFSConfigs();
 
 extern vector<string> dataFile;
-extern int brClass, mutClass, foldBrClass, allBrClasses, mbSFSLen;
+extern int brClass, mutClass, foldBrClass, allBrClasses, mbSFSLen, procs;
 extern double dataLnL, bestGlobalSlLnL, bestLocalSlLnL;
 extern vector<int> sampledPops;
 extern vector<vector<double> > dataConfigFreqs;
