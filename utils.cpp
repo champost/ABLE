@@ -45,6 +45,7 @@ knowledge of the CeCILL license and that you accept its terms.
 #include <map>
 #include <fstream>
 #include <iostream>
+#include <omp.h>
 
 #include "utils.h"
 
@@ -150,14 +151,14 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 	dataConfigFreqs = vector<vector<double> > (mbSFSLen, vector<double>());
 	string outSNPsFile = "block_SNPs.txt";
 
+	ofstream ofs;
+	if (mbSFSLen == 1 && outSNPs)
+		ofs.open(outSNPsFile.c_str(),ios::out);
+
 	for (int data = 0; data < mbSFSLen; data++) {
 		string line;
 		ifstream ifs(dataFile[data].c_str(),ios::in);
-		ofstream ofs;
-		if (mbSFSLen == 1 && outSNPs)
-			ofs.open(outSNPsFile.c_str(),ios::out);
 		int nblocks = 0, configKmax;
-		map<vector<int>, int> finalTableMap;
 
 		vector< vector<string> > blockMat;
 		while (getline(ifs,line) && !ifs.eof()) {
@@ -183,6 +184,8 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		}
 		ifs.close();
 
+		vector < map<vector<int>, int> > finalTableMap = vector < map<vector<int>, int> > (procs, map<vector<int>, int> ());
+#pragma omp parallel for
 		for (size_t block = 0; block < blockMat.size(); block++) {
 			int blockSize = 0, segSites = 0;
 			bool monoMorphicBlock = true;
@@ -254,13 +257,18 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 						foldedMutConfigVec[branch] = mutClass - 1;
 				}
 			}
-			++finalTableMap[foldedMutConfigVec];
+			++finalTableMap[omp_get_thread_num()][foldedMutConfigVec];
 		}
 
 		if (mbSFSLen == 1 && outSNPs)
 			ofs.close();
 
-		for (map<vector<int>, int>::iterator it = finalTableMap.begin(); it != finalTableMap.end(); it++) {
+
+		for (int thread = 1; thread < procs; thread++)
+			for (map<vector<int>, int>::iterator it = finalTableMap[thread].begin(); it != finalTableMap[thread].end(); it++)
+				finalTableMap[0][it->first] += it->second;
+
+		for (map<vector<int>, int>::iterator it = finalTableMap[0].begin(); it != finalTableMap[0].end(); it++) {
 
 	//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
 
