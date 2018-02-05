@@ -60,7 +60,7 @@ vector< vector<int> > nChooseKVec(int n, int k);
 extern vector<string> dataFile;
 extern int brClass, mutClass, foldBrClass, allBrClasses, mbSFSLen, procs;
 extern double dataLnL, bestGlobalSlLnL, bestLocalSlLnL;
-extern vector<int> sampledPops;
+extern vector<int> sampledPops, subsamplePops;
 extern vector<vector<double> > dataConfigFreqs;
 extern vector<vector<vector<int> > > dataConfigs;
 

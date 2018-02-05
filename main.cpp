@@ -1277,14 +1277,14 @@ int main(int argc, char* argv[]) {
 			if (nsubpops) {
 				if ((nsubpops != npops) || (sampledPops.size() != subsamplePops.size())) {
 					cerr << "The specified dimensions of \"subsample_pops\" does not correspond to the \"pops\" keyword!" << endl;
-					cerr << "Aborting ABLE..." << endl;
+					cerr << "Aborting ABLE...\n" << endl;
 					exit(-1);
 				}
 
 				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
 					if (sampledPops[pop] < subsamplePops[pop]) {
 						cerr << "\"subsample_pops\" values have to necessarily be less than or equal to the \"pops\" values!" << endl;
-						cerr << "Aborting ABLE..." << endl;
+						cerr << "Aborting ABLE...\n" << endl;
 						exit(-1);
 					}
 				}
