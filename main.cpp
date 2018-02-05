@@ -101,7 +101,7 @@ vector<vector<int> > trackSelectConfigsForInf;
 string dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile = "bSFS.txt", data2bSFSFile;
 //ofstream testLik, testConfig;
 
-vector<int> allConfigs, sampledPops, allPops, profileVarKey;
+vector<int> allConfigs, sampledPops, allPops, profileVarKey, subsamplePops;
 vector<double> allConfigFreqs, upperBounds, lowerBounds, hardUpperBounds, hardLowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
 vector<string> cmdLine;
 vector<gsl_rng *> PRNGThreadVec;
@@ -111,7 +111,7 @@ nlopt::opt opt, local_opt, AUGLAG;
 char **ms_argv;
 
 int ms_argc = 0, ms_crash_flag = 0;
-int npops = 0, kmax = 0;
+int npops = 0, kmax = 0, nsubpops = 0;
 int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0;
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0,
 		profileLikTrees = 0, ms_trees = 1,
@@ -655,6 +655,18 @@ void readConfigFile() {
 				}
 				sampledPopsSize = sampledPops.size();
 			}
+			else if (tokens[0] == "subsample_pops") {
+				stringstream stst1(tokens[1]);
+				stst1 >> nsubpops;
+				for (int i = 0; i < nsubpops; i++) {
+					stringstream stst2(tokens[i+2]);
+					if (stst2.str() != "u") {
+						int tmp;
+						stst2 >> tmp;
+						subsamplePops.push_back(tmp);
+					}
+				}
+			}
 			else if (tokens[0] == "start") {
 				double val;
 				if (tokens[1] == "all") {
@@ -936,6 +948,7 @@ void parseCmdLine(char* argv[]) {
 
 
 void checkConfigOptions() {
+
 	if ((estimate == 2) || profileLikBool) {
 		if (!tbiMsCmdIdx.size()) {
 			cerr << "\nCannot proceed with inference" << endl;
@@ -1261,6 +1274,22 @@ int main(int argc, char* argv[]) {
 
 	if ((estimate > 1) || bSFSmode || dataConvert) {
 		if (dataFileFormat == "pseudo_MS") {
+			if (nsubpops) {
+				if ((nsubpops != npops) || (sampledPops.size() != subsamplePops.size())) {
+					cerr << "The specified dimensions of \"subsample_pops\" does not correspond to the \"pops\" keyword!" << endl;
+					cerr << "Aborting ABLE..." << endl;
+					exit(-1);
+				}
+
+				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
+					if (sampledPops[pop] < subsamplePops[pop]) {
+						cerr << "\"subsample_pops\" values have to necessarily be less than or equal to the \"pops\" values!" << endl;
+						cerr << "Aborting ABLE..." << endl;
+						exit(-1);
+					}
+				}
+			}
+
 			readDataAsSeqBlocks(alleleType, outputSNPfile);
 
 			//	convert data into bSFS and quit ABLE

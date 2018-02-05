@@ -143,7 +143,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 
 	if (procs > 1) {
 		outSNPs = false;
-		printf("WARNING. No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n");
+		printf("WARNING! No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n\n");
 	}
 
 	int dataKmax = 0;
@@ -187,14 +187,16 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		vector < map<vector<int>, int> > finalTableMap = vector < map<vector<int>, int> > (procs, map<vector<int>, int> ());
 #pragma omp parallel for
 		for (size_t block = 0; block < blockMat.size(); block++) {
-			int blockSize = 0, segSites = 0;
+			int seqSize = 0, segSites = 0;
+			if (blockMat[block].size())
+				seqSize = blockMat[block][0].size();
+
+
 			bool monoMorphicBlock = true;
 			vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
 
-			if (blockMat[block].size())
-				blockSize = blockMat[block][0].size();
 
-			for (int nuc = 0; nuc < blockSize; nuc++) {
+			for (int nuc = 0; nuc < seqSize; nuc++) {
 
 				bool maskChar = false;
 				vector<int> segCountVec;
@@ -236,10 +238,11 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 						monoMorphicBlock = false;
 					}
 
-					if (alleleCount > 1)
+					if (outSNPs && (alleleCount > 1))
 						++segSites;
 				}
-			}
+			}	// READING EVERY BLOCK
+
 			if (mbSFSLen == 1 && outSNPs)
 				ofs << segSites << endl;
 
@@ -257,8 +260,10 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 						foldedMutConfigVec[branch] = mutClass - 1;
 				}
 			}
+
 			++finalTableMap[omp_get_thread_num()][foldedMutConfigVec];
-		}
+
+		} 	// PROCESSING EVERY BLOCK
 
 		if (mbSFSLen == 1 && outSNPs)
 			ofs.close();
@@ -279,7 +284,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 			if (configKmax > dataKmax)
 				dataKmax = configKmax;
 		}
-	}
+	}	// PROCESSING EVERY DATASET (i.e. for the mbSFS)
 
 	dataLnL = 0.0;
 	for (int data = 0; data < mbSFSLen; data++) {
@@ -348,4 +353,76 @@ void readDataAsbSFSConfigs() {
 }
 
 
+// ----------------------------------------------------------------------------------------
+// nChooseK
+// ----------------------------------------------------------------------------------------
+unsigned long nChooseK(int n, int k)
+{
+	if (!(n >= k && k >= 0)) {
+		cerr << "nChooseK() requires (n >= k && k >= 0)\n";
+		cerr << "Aborting ABLE..." << endl;
+		exit(-1);
+	}
+
+	if ((k == 0) || (n == k)) {
+		return 1;
+	}
+
+	unsigned long result = n;
+	int i = 2;
+	n = n-1; k = k-1;
+	while (k != 0){
+		result = result * n / i;
+		i = i+1;
+		k = k-1;
+		n = n-1;
+	}
+	return result;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// nChooseKVec
+// ----------------------------------------------------------------------------------------
+vector< vector<int> > nChooseKVec(int n, int k)
+{
+	vector< vector<int> > results;
+	vector<int> result(k,0);
+
+	unsigned long ncombs = nChooseK(n, k);
+
+	for (unsigned long x = 0 ; x < ncombs ; x++) {
+		unsigned long i = x, K = k, N = n;
+		double c = ncombs * K / N;
+		int counter = 0;
+		for (int element = 0; element < n; element++){
+			if (i < c) {
+				//take this element, and K-1 from the remaining
+				result[counter] = element;
+				++counter;
+				K = K-1;
+				if (K == 0) {
+					break;
+				}
+				//have c == nChooseK(N-1,K), want nChooseK(N-2,K-1)
+				c = c * K / (N-1);
+			}
+			else {
+				//skip this element, and take all from the remaining
+				i = i-c;
+				//have c == nChooseK(N-1,K-1), want nChooseK(N-2,K-1)
+				c = c * (N-K) / (N-1);
+			}
+			N = N-1;
+		}
+		//    cout << "{ ";
+		//    for (int x = 0 ; x < k-1 ; x++)
+		//      cout << result[x] << " ";
+		//    cout << result[k-1] << " }" << endl;
+
+		counter = 0;
+		results.push_back(result);
+	}
+	return results;
+}
 
