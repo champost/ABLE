@@ -143,7 +143,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 
 	if (procs > 1) {
 		outSNPs = false;
-		printf("WARNING. No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n");
+		printf("WARNING! No \"block_SNPs.txt\" will be created when using multiple CPU cores for converting data into the bSFS!\n\n");
 	}
 
 	int dataKmax = 0;
@@ -160,6 +160,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		ifstream ifs(dataFile[data].c_str(),ios::in);
 		int nblocks = 0, configKmax;
 
+		//	Read data file
 		vector< vector<string> > blockMat;
 		while (getline(ifs,line) && !ifs.eof()) {
 			if (line[0] == '/') {
@@ -184,85 +185,140 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		}
 		ifs.close();
 
+		//	preparing combinatorial indices for subsampling each population
+		unsigned long compositeFactor = 1;
+		vector < vector< vector<int> > > tmpCombHolder;
+		vector <int> popCombVecSizes;
+		for (size_t pop = 0; pop < sampledPops.size(); pop++) {
+			if (subsamplePops.size()) {
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subsamplePops[pop]));
+				popCombVecSizes.push_back(nChooseK(sampledPops[pop], subsamplePops[pop]));
+			}
+			else {
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop]));
+				popCombVecSizes.push_back(nChooseK(sampledPops[pop], sampledPops[pop]));
+			}
+			compositeFactor *= popCombVecSizes.back();
+		}
+
+		//	creating thread-specific vectors of combinatorial indices
+		//	[] : threads
+		//	[][] : number of sampled pops
+		//	[][][] : possible subsamples for a given pop
+		//	[][][][] : sequence positions pertaining to a given subsample
+		vector < vector < vector< vector<int> > > > perThreadCombHolder;
+		for (int thread = 1; thread <= procs; thread++)
+			perThreadCombHolder.push_back(tmpCombHolder);
+
+		//	Parallel "BLOCKWISE" data conversion
 		vector < map<vector<int>, int> > finalTableMap = vector < map<vector<int>, int> > (procs, map<vector<int>, int> ());
 #pragma omp parallel for
 		for (size_t block = 0; block < blockMat.size(); block++) {
-			int blockSize = 0, segSites = 0;
-			bool monoMorphicBlock = true;
-			vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
-
+			int seqSize = 0, segSites = 0;
 			if (blockMat[block].size())
-				blockSize = blockMat[block][0].size();
+				seqSize = blockMat[block][0].size();
 
-			for (int nuc = 0; nuc < blockSize; nuc++) {
-
-				bool maskChar = false;
-				vector<int> segCountVec;
-				map<int, map<char, int> > popwiseAlleleCounts;
-				map<char, bool> isAllele;
-				int sample = 0;
-				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-					for (int popSam = 0; popSam < sampledPops[pop]; popSam++) {
-						if (blockMat[block][sample][nuc] == 'N') {
-							maskChar = true;
-							pop = sampledPops.size() + 1;
-							break;
-						}
-						++popwiseAlleleCounts[pop][blockMat[block][sample][nuc]];
-						isAllele[blockMat[block][sample][nuc]] = true;
-						++sample;
-					}
+			//	Permutation with replacement over combinatorial indices (i.e. perThreadCombHolder)
+			//	Code inspired by https://rosettacode.org/wiki/Permutations_with_repetitions#C
+			int idx, permuteVecSize = sampledPops.size();
+			vector <int> permuteVec(permuteVecSize,0);
+			permuteVec[permuteVecSize-1] = -1;
+			idx = permuteVecSize-1;
+			while (1) {
+				if (permuteVec[idx] == popCombVecSizes[idx]-1) {
+					idx--;
+					if (idx == -1)
+						break;
 				}
-				if (!maskChar) {
-					//	testing for bi-allelic SNP's
-					int alleleCount = 0;
-					char chooseAnAllele;
-					for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
-						if (it->second) {
-							++alleleCount;
-							if (alleleType == "genotype")
-								chooseAnAllele = it->first;
-							else if ((alleleType == "binary") && it->first == '1')
-								chooseAnAllele = it->first;
+				else {
+					permuteVec[idx]++;
+					while (idx < permuteVecSize-1) {
+						idx++;
+						permuteVec[idx] = 0;
+					}
+//					printf("(");
+//					for (int printIdx = 0 ; printIdx < permuteVecSize; printIdx++)
+//						printf("%d", permuteVec[printIdx]);
+//					printf(")\n");
+
+					bool monoMorphicBlock = true;
+					vector<int> mutConfigVec(allBrClasses,0), foldedMutConfigVec(brClass,0);
+					for (int nuc = 0; nuc < seqSize; nuc++) {
+
+						bool maskChar = false;
+						vector<int> segCountVec;
+						map<int, map<char, int> > popwiseAlleleCounts;
+						map<char, bool> isAllele;
+						int betweenPopIdx = 0;
+						for (size_t pop = 0; pop < sampledPops.size(); pop++) {
+							for (size_t popSubSam = 0; popSubSam < perThreadCombHolder[omp_get_thread_num()][pop][permuteVec[pop]].size(); popSubSam++) {
+								int samIdx = betweenPopIdx + perThreadCombHolder[omp_get_thread_num()][pop][permuteVec[pop]][popSubSam];
+
+								if (blockMat[block][samIdx][nuc] == 'N') {
+									maskChar = true;
+									pop = sampledPops.size() + 1;
+									break;
+								}
+
+								++popwiseAlleleCounts[pop][blockMat[block][samIdx][nuc]];
+								isAllele[blockMat[block][samIdx][nuc]] = true;
+							}
+							betweenPopIdx += sampledPops[pop];
+						}
+
+						if (!maskChar) {
+							//	testing for bi-allelic SNP's
+							int alleleCount = 0;
+							char chooseAnAllele;
+							for (map<char, bool>::iterator it = isAllele.begin(); it != isAllele.end(); it++) {
+								if (it->second) {
+									++alleleCount;
+									if (alleleType == "genotype")
+										chooseAnAllele = it->first;
+									else if ((alleleType == "binary") && it->first == '1')
+										chooseAnAllele = it->first;
+								}
+							}
+
+							if (alleleCount == 2) {
+								for (size_t pop = 0; pop < sampledPops.size(); pop++)
+									segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
+								++mutConfigVec[getBrConfigNum(segCountVec)];
+
+								//	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
+								monoMorphicBlock = false;
+							}
+
+							if (outSNPs && (alleleCount > 1))
+								++segSites;
+						}
+					}	// READING EVERY BLOCK
+
+					if (mbSFSLen == 1 && outSNPs)
+						ofs << segSites << endl;
+
+					if (!monoMorphicBlock) {
+						//	folding the multi-dimensional SFS
+						for(int thisClass = 1; thisClass <= brClass; thisClass++) {
+							foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
+							if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
+								foldedMutConfigVec[thisClass-1] /= 2;
+						}
+
+						//	taking care of the Kmax
+						for(int branch = 0; branch < brClass; branch++) {
+							if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
+								foldedMutConfigVec[branch] = mutClass - 1;
 						}
 					}
 
-					if (alleleCount == 2) {
-						for (size_t pop = 0; pop < sampledPops.size(); pop++)
-							segCountVec.push_back(popwiseAlleleCounts[pop][chooseAnAllele]);
-						++mutConfigVec[getBrConfigNum(segCountVec)];
-
-						//	NB. Tri/Quadri-allelic nucleotide positions are treated as monomorphic
-						monoMorphicBlock = false;
-					}
-
-					if (alleleCount > 1)
-						++segSites;
+					++finalTableMap[omp_get_thread_num()][foldedMutConfigVec];
 				}
 			}
-			if (mbSFSLen == 1 && outSNPs)
-				ofs << segSites << endl;
-
-			if (!monoMorphicBlock) {
-				//	folding the multi-dimensional SFS
-				for(int thisClass = 1; thisClass <= brClass; thisClass++) {
-					foldedMutConfigVec[thisClass-1] = mutConfigVec[thisClass-1] + (foldBrClass * mutConfigVec[allBrClasses-thisClass]);
-					if (foldBrClass && ((thisClass-1) == (allBrClasses-thisClass)))
-						foldedMutConfigVec[thisClass-1] /= 2;
-				}
-
-				//	taking care of the Kmax
-				for(int branch = 0; branch < brClass; branch++) {
-					if ((mutClass > 0) && (foldedMutConfigVec[branch] > (mutClass - 2)))
-						foldedMutConfigVec[branch] = mutClass - 1;
-				}
-			}
-			++finalTableMap[omp_get_thread_num()][foldedMutConfigVec];
-		}
+		} 	// PROCESSING EVERY BLOCK
 
 		if (mbSFSLen == 1 && outSNPs)
 			ofs.close();
-
 
 		for (int thread = 1; thread < procs; thread++)
 			for (map<vector<int>, int>::iterator it = finalTableMap[thread].begin(); it != finalTableMap[thread].end(); it++)
@@ -279,7 +335,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 			if (configKmax > dataKmax)
 				dataKmax = configKmax;
 		}
-	}
+	}	// PROCESSING EVERY DATASET (i.e. for the mbSFS)
 
 	dataLnL = 0.0;
 	for (int data = 0; data < mbSFSLen; data++) {
@@ -348,4 +404,76 @@ void readDataAsbSFSConfigs() {
 }
 
 
+// ----------------------------------------------------------------------------------------
+// nChooseK
+// ----------------------------------------------------------------------------------------
+unsigned long nChooseK(int n, int k)
+{
+	if (!(n >= k && k >= 0)) {
+		cerr << "nChooseK() requires (n >= k && k >= 0)\n";
+		cerr << "Aborting ABLE..." << endl;
+		exit(-1);
+	}
+
+	if ((k == 0) || (n == k)) {
+		return 1;
+	}
+
+	unsigned long result = n;
+	int i = 2;
+	n = n-1; k = k-1;
+	while (k != 0){
+		result = result * n / i;
+		i = i+1;
+		k = k-1;
+		n = n-1;
+	}
+	return result;
+}
+
+
+// ----------------------------------------------------------------------------------------
+// nChooseKVec
+// ----------------------------------------------------------------------------------------
+vector< vector<int> > nChooseKVec(int n, int k)
+{
+	vector< vector<int> > results;
+	vector<int> result(k,0);
+
+	unsigned long ncombs = nChooseK(n, k);
+
+	for (unsigned long x = 0 ; x < ncombs ; x++) {
+		unsigned long i = x, K = k, N = n;
+		double c = ncombs * K / N;
+		int counter = 0;
+		for (int element = 0; element < n; element++){
+			if (i < c) {
+				//take this element, and K-1 from the remaining
+				result[counter] = element;
+				++counter;
+				K = K-1;
+				if (K == 0) {
+					break;
+				}
+				//have c == nChooseK(N-1,K), want nChooseK(N-2,K-1)
+				c = c * K / (N-1);
+			}
+			else {
+				//skip this element, and take all from the remaining
+				i = i-c;
+				//have c == nChooseK(N-1,K-1), want nChooseK(N-2,K-1)
+				c = c * (N-K) / (N-1);
+			}
+			N = N-1;
+		}
+		//    cout << "{ ";
+		//    for (int x = 0 ; x < k-1 ; x++)
+		//      cout << result[x] << " ";
+		//    cout << result[k-1] << " }" << endl;
+
+		counter = 0;
+		results.push_back(result);
+	}
+	return results;
+}
 

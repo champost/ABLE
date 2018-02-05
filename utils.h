@@ -54,11 +54,13 @@ void Tokenize(const string& str, vector<string>& tokens, const string& delimiter
 void TrimSpaces(string& str);
 void readDataAsSeqBlocks(string alleleType, bool outSNPs);
 void readDataAsbSFSConfigs();
+unsigned long nChooseK(int n, int k);
+vector< vector<int> > nChooseKVec(int n, int k);
 
 extern vector<string> dataFile;
 extern int brClass, mutClass, foldBrClass, allBrClasses, mbSFSLen, procs;
 extern double dataLnL, bestGlobalSlLnL, bestLocalSlLnL;
-extern vector<int> sampledPops;
+extern vector<int> sampledPops, subsamplePops;
 extern vector<vector<double> > dataConfigFreqs;
 extern vector<vector<vector<int> > > dataConfigs;
 
