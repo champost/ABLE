@@ -186,19 +186,15 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		ifs.close();
 
 		//	preparing combinatorial indices for subsampling each population
-		unsigned long compositeFactor = 1;
 		vector < vector< vector<int> > > tmpCombHolder;
 		vector <int> popCombVecSizes;
 		for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-			if (subSamplePops.size()) {
+			if (subSamplePops.size())
 				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subSamplePops[pop], ploidy));
-				popCombVecSizes.push_back(nChooseK(sampledPops[pop], subSamplePops[pop]));
-			}
-			else {
+			else
 				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop], 1));
-				popCombVecSizes.push_back(nChooseK(sampledPops[pop], sampledPops[pop]));
-			}
-			compositeFactor *= popCombVecSizes.back();
+
+			popCombVecSizes.push_back(tmpCombHolder.back().size());
 		}
 
 		//	creating thread-specific vectors of combinatorial indices
@@ -481,10 +477,6 @@ vector< vector<int> > nChooseKVec(int n, int k, size_t cons)
 			}
 			N = N-1;
 		}
-		//    cout << "{ ";
-		//    for (int x = 0 ; x < k-1 ; x++)
-		//      cout << result[x] << " ";
-		//    cout << result[k-1] << " }" << endl;
 
 		counter = 0;
 
@@ -501,6 +493,11 @@ vector< vector<int> > nChooseKVec(int n, int k, size_t cons)
 		}
 		else
 			results.push_back(result);
+
+//		cout << "{ ";
+//		for (int x = 0 ; x < results.back().size()-1 ; x++)
+//			cout << results.back()[x] << " ";
+//		cout << results.back()[results.back().size()-1] << " }" << endl;
 	}
 	return results;
 }
