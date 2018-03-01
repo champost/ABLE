@@ -101,7 +101,7 @@ vector<vector<int> > trackSelectConfigsForInf;
 string dataFileFormat = "bSFS", alleleType = "genotype", configFile, globalSearchAlg, bSFSFile = "bSFS.txt", data2bSFSFile;
 //ofstream testLik, testConfig;
 
-vector<int> allConfigs, sampledPops, allPops, profileVarKey, subsamplePops;
+vector<int> allConfigs, sampledPops, allPops, profileVarKey, subSamplePops;
 vector<double> allConfigFreqs, upperBounds, lowerBounds, hardUpperBounds, hardLowerBounds, bestGlobalSPars, bestLocalSPars, profileVars;
 vector<string> cmdLine;
 vector<gsl_rng *> PRNGThreadVec;
@@ -116,7 +116,7 @@ int estimate = 0, evalCount = 0, crash_counter = 0, sampledTrees = 0, recLen = 0
 int globalTrees = 0, localTrees = 0, globalEvals = 0, localEvals = 0, refineLikTrees = 0,
 		profileLikTrees = 0, ms_trees = 1,
 		reportEveryEvals = 0, set_threads = 0, numGlobalSearches = 1, outputDigits = 6;
-size_t bestParsMapSize = 0;
+size_t bestParsMapSize = 0, ploidy = 1;
 
 double globalUpper = 5, globalLower = 1e-3, dataLnL = 0.0, bestGlobalSlLnL = -1000000.0,
 		bestLocalSlLnL = -1000000.0, userLnL = 0.0, localSearchAbsTol = 1e-3;
@@ -663,9 +663,13 @@ void readConfigFile() {
 					if (stst2.str() != "u") {
 						int tmp;
 						stst2 >> tmp;
-						subsamplePops.push_back(tmp);
+						subSamplePops.push_back(tmp);
 					}
 				}
+			}
+			else if (tokens[0] == "ploidy") {
+				stringstream stst(tokens[1]);
+				stst >> ploidy;
 			}
 			else if (tokens[0] == "start") {
 				double val;
@@ -1275,14 +1279,14 @@ int main(int argc, char* argv[]) {
 	if ((estimate > 1) || bSFSmode || dataConvert) {
 		if (dataFileFormat == "pseudo_MS") {
 			if (nsubpops) {
-				if ((nsubpops != npops) || (sampledPops.size() != subsamplePops.size())) {
+				if ((nsubpops != npops) || (sampledPops.size() != subSamplePops.size())) {
 					cerr << "The specified dimensions of \"subsample_pops\" does not correspond to the \"pops\" keyword!" << endl;
 					cerr << "Aborting ABLE...\n" << endl;
 					exit(-1);
 				}
 
 				for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-					if (sampledPops[pop] < subsamplePops[pop]) {
+					if (sampledPops[pop] < subSamplePops[pop]) {
 						cerr << "\"subsample_pops\" values have to necessarily be less than or equal to the \"pops\" values!" << endl;
 						cerr << "Aborting ABLE...\n" << endl;
 						exit(-1);

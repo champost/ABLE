@@ -190,12 +190,12 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		vector < vector< vector<int> > > tmpCombHolder;
 		vector <int> popCombVecSizes;
 		for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-			if (subsamplePops.size()) {
-				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subsamplePops[pop]));
-				popCombVecSizes.push_back(nChooseK(sampledPops[pop], subsamplePops[pop]));
+			if (subSamplePops.size()) {
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subSamplePops[pop], ploidy));
+				popCombVecSizes.push_back(nChooseK(sampledPops[pop], subSamplePops[pop]));
 			}
 			else {
-				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop]));
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop], 1));
 				popCombVecSizes.push_back(nChooseK(sampledPops[pop], sampledPops[pop]));
 			}
 			compositeFactor *= popCombVecSizes.back();
@@ -434,11 +434,26 @@ unsigned long nChooseK(int n, int k)
 
 // ----------------------------------------------------------------------------------------
 // nChooseKVec
+// cons: refers to "consecutive" or the number of indices which need to be sampled together
 // ----------------------------------------------------------------------------------------
-vector< vector<int> > nChooseKVec(int n, int k)
+vector< vector<int> > nChooseKVec(int n, int k, size_t cons)
 {
+	if (cons > 1) {
+		if ((n % cons != 0) || (k % cons != 0)) {
+//			cerr << "nChooseKVec() requires (n, k) to be multiples of cons\n";
+			cerr << "Some sample/subsample sizes were found not to be multiples of the ploidy!\n";
+			cerr << "Aborting ABLE..." << endl;
+			exit(-1);
+		}
+		else {
+			n = n / cons;
+			k = k / cons;
+		}
+	}
+
 	vector< vector<int> > results;
 	vector<int> result(k,0);
+	vector<int> expandResult = vector<int>(k*cons,0);
 
 	unsigned long ncombs = nChooseK(n, k);
 
@@ -472,7 +487,20 @@ vector< vector<int> > nChooseKVec(int n, int k)
 		//    cout << result[k-1] << " }" << endl;
 
 		counter = 0;
-		results.push_back(result);
+
+		//	when consecutive combinatorial indices need to be grouped together
+		if (cons > 1) {
+			int ctr = 0;
+			for (int i = 0; i < k; i++) {
+				for (size_t j = 0; j < cons; j++) {
+					expandResult[ctr] = result[i]*cons+j;
+					++ctr;
+				}
+			}
+			results.push_back(expandResult);
+		}
+		else
+			results.push_back(result);
 	}
 	return results;
 }
