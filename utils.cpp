@@ -186,6 +186,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 		ifs.close();
 
 		//	preparing combinatorial indices for subsampling each population
+		unsigned long compositeFactor = 1;
 		vector < vector< vector<int> > > tmpCombHolder;
 		vector <int> popCombVecSizes;
 		for (size_t pop = 0; pop < sampledPops.size(); pop++) {
@@ -195,6 +196,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop], 1));
 
 			popCombVecSizes.push_back(tmpCombHolder.back().size());
+			compositeFactor *= popCombVecSizes.back();
 		}
 
 		//	creating thread-specific vectors of combinatorial indices
@@ -325,7 +327,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 	//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
 
 			dataConfigs[data].push_back(it->first);
-			dataConfigFreqs[data].push_back((double) it->second/nblocks);
+			dataConfigFreqs[data].push_back((double) it->second/(nblocks*compositeFactor));
 
 			configKmax = *max_element(it->first.begin(),it->first.end());
 			if (configKmax > dataKmax)
