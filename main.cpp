@@ -535,20 +535,20 @@ double computeLik() {
 
 
 //	conversion from decimal to base-(maxPopSize+1)
-void evalBranchConfigs() {
+void evalBranchConfigs(vector<int> popsVec) {
 
 	int quo, rem, maxPopSize, totPopSum, count = 0, sumConfig;
 	bool skipConfig;
-	maxPopSize = totPopSum = sampledPops[0];
+	maxPopSize = totPopSum = popsVec[0];
 
 	if (kmax == 0)
 		mutClass = 0;
 	else
 		mutClass = kmax+2;
 
-	brClass = sampledPops[0]+1;
-	for (size_t i = 1; i < sampledPops.size(); i++)
-		brClass *= (sampledPops[i]+1);
+	brClass = popsVec[0]+1;
+	for (size_t i = 1; i < popsVec.size(); i++)
+		brClass *= (popsVec[i]+1);
 	brClass -= 2;
 	allBrClasses = brClass;
 
@@ -560,14 +560,14 @@ void evalBranchConfigs() {
 			brClass = brClass / 2;
 	}
 
-	for (size_t i = 1; i < sampledPops.size(); i++) {
-		totPopSum += sampledPops[i];
-		if (sampledPops[i] > maxPopSize)
-			maxPopSize = sampledPops[i];
+	for (size_t i = 1; i < popsVec.size(); i++) {
+		totPopSum += popsVec[i];
+		if (popsVec[i] > maxPopSize)
+			maxPopSize = popsVec[i];
 	}
 	++maxPopSize;
 
-	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,sampledPops.size()); i++) {
+	for (unsigned long int i = 1; i <= (unsigned long int) pow(maxPopSize,popsVec.size()); i++) {
 		quo = i;
 		rem = 0;
 /*
@@ -578,11 +578,11 @@ void evalBranchConfigs() {
 		skipConfig = false;
 		vector<int> vec;
 
-		for (size_t j = 0; j < sampledPops.size(); j++) {
+		for (size_t j = 0; j < popsVec.size(); j++) {
 			if (quo) {
 				rem = quo % (maxPopSize);
 				quo /= (maxPopSize);
-				if (rem > sampledPops[sampledPops.size()-1-j]) {
+				if (rem > popsVec[popsVec.size()-1-j]) {
 					skipConfig = true;
 					break;
 				}
@@ -596,7 +596,7 @@ void evalBranchConfigs() {
 			}
 
 /*
-			if (j < sampledPops.size() - 1)
+			if (j < popsVec.size() - 1)
 				stst << ",";
 */
 		}
@@ -1274,8 +1274,6 @@ int main(int argc, char* argv[]) {
 		gsl_rng_set(PRNGThreadVec[i], seedPRNG + i);
 	}
 
-	evalBranchConfigs();
-
 	if ((estimate > 1) || bSFSmode || dataConvert) {
 		if (dataFileFormat == "pseudo_MS") {
 			if (nsubpops) {
@@ -1292,7 +1290,11 @@ int main(int argc, char* argv[]) {
 						exit(-1);
 					}
 				}
+
+				evalBranchConfigs(subSamplePops);
 			}
+			else
+				evalBranchConfigs(sampledPops);
 
 			readDataAsSeqBlocks(alleleType, outputSNPfile);
 
@@ -1308,9 +1310,13 @@ int main(int argc, char* argv[]) {
 				return 0;
 			}
 		}
-		else
+		else {
+			evalBranchConfigs(sampledPops);
 			readDataAsbSFSConfigs();
+		}
 	}
+	else
+		evalBranchConfigs(sampledPops);
 
 	parseCmdLine(argv);
 	checkConfigOptions();
