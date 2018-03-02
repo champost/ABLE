@@ -184,22 +184,24 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 			}
 		}
 		ifs.close();
+		printf("Processing %d sequence blocks...\n", nblocks);
 
 		//	preparing combinatorial indices for subsampling each population
 		unsigned long compositeFactor = 1;
 		vector < vector< vector<int> > > tmpCombHolder;
 		vector <int> popCombVecSizes;
 		for (size_t pop = 0; pop < sampledPops.size(); pop++) {
-			if (subsamplePops.size()) {
-				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subsamplePops[pop]));
-				popCombVecSizes.push_back(nChooseK(sampledPops[pop], subsamplePops[pop]));
-			}
-			else {
-				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop]));
-				popCombVecSizes.push_back(nChooseK(sampledPops[pop], sampledPops[pop]));
-			}
+			if (subSamplePops.size())
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], subSamplePops[pop], ploidy));
+			else
+				tmpCombHolder.push_back(nChooseKVec(sampledPops[pop], sampledPops[pop], 1));
+
+			popCombVecSizes.push_back(tmpCombHolder.back().size());
 			compositeFactor *= popCombVecSizes.back();
 		}
+
+		if (compositeFactor > 1)
+			printf("Processing %lu subsampling configurations...\n", compositeFactor);
 
 		//	creating thread-specific vectors of combinatorial indices
 		//	[] : threads
@@ -329,7 +331,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 	//		printf("%s : %.5e\n", getMutConfigStr(it->first).c_str(), (double) it->second/nblocks);
 
 			dataConfigs[data].push_back(it->first);
-			dataConfigFreqs[data].push_back((double) it->second/nblocks);
+			dataConfigFreqs[data].push_back((double) it->second/(nblocks*compositeFactor));
 
 			configKmax = *max_element(it->first.begin(),it->first.end());
 			if (configKmax > dataKmax)
@@ -434,11 +436,26 @@ unsigned long nChooseK(int n, int k)
 
 // ----------------------------------------------------------------------------------------
 // nChooseKVec
+// cons: refers to "consecutive" or the number of indices which need to be sampled together
 // ----------------------------------------------------------------------------------------
-vector< vector<int> > nChooseKVec(int n, int k)
+vector< vector<int> > nChooseKVec(int n, int k, size_t cons)
 {
+	if (cons > 1) {
+		if ((n % cons != 0) || (k % cons != 0)) {
+//			cerr << "nChooseKVec() requires (n, k) to be multiples of cons\n";
+			cerr << "Some sample/subsample sizes were found not to be multiples of the ploidy!\n";
+			cerr << "Aborting ABLE..." << endl;
+			exit(-1);
+		}
+		else {
+			n = n / cons;
+			k = k / cons;
+		}
+	}
+
 	vector< vector<int> > results;
 	vector<int> result(k,0);
+	vector<int> expandResult = vector<int>(k*cons,0);
 
 	unsigned long ncombs = nChooseK(n, k);
 
@@ -466,13 +483,27 @@ vector< vector<int> > nChooseKVec(int n, int k)
 			}
 			N = N-1;
 		}
-		//    cout << "{ ";
-		//    for (int x = 0 ; x < k-1 ; x++)
-		//      cout << result[x] << " ";
-		//    cout << result[k-1] << " }" << endl;
 
 		counter = 0;
-		results.push_back(result);
+
+		//	when consecutive combinatorial indices need to be grouped together
+		if (cons > 1) {
+			int ctr = 0;
+			for (int i = 0; i < k; i++) {
+				for (size_t j = 0; j < cons; j++) {
+					expandResult[ctr] = result[i]*cons+j;
+					++ctr;
+				}
+			}
+			results.push_back(expandResult);
+		}
+		else
+			results.push_back(result);
+
+//		cout << "{ ";
+//		for (int x = 0 ; x < results.back().size()-1 ; x++)
+//			cout << results.back()[x] << " ";
+//		cout << results.back()[results.back().size()-1] << " }" << endl;
 	}
 	return results;
 }

@@ -56,7 +56,7 @@ void process_tree_cond_bSFS (double ***onetreePoisTable);
 void process_tree_exact_bSFS (double ***onetreePoisTable);
 void calcBSFSTable();
 double computeLik();
-void evalBranchConfigs();
+void evalBranchConfigs(vector<int> popsVec);
 void readConfigFile();
 void parseCmdLine(char* argv[]);
 void checkConfigOptions();
