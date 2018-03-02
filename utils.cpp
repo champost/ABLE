@@ -184,6 +184,7 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 			}
 		}
 		ifs.close();
+		printf("Processing %d sequence blocks...\n", nblocks);
 
 		//	preparing combinatorial indices for subsampling each population
 		unsigned long compositeFactor = 1;
@@ -198,6 +199,9 @@ void readDataAsSeqBlocks(string alleleType, bool outSNPs) {
 			popCombVecSizes.push_back(tmpCombHolder.back().size());
 			compositeFactor *= popCombVecSizes.back();
 		}
+
+		if (compositeFactor > 1)
+			printf("Processing %lu subsampling configurations...\n", compositeFactor);
 
 		//	creating thread-specific vectors of combinatorial indices
 		//	[] : threads
