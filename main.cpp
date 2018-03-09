@@ -1230,7 +1230,7 @@ void exploreProfiles (size_t &varIdx) {
 
 int main(int argc, char* argv[]) {
 
-	string version = "0.1.x (Built on " + datestring + " at " + timestring + ")";
+	string version = "0.1.1 (Built on " + datestring + " at " + timestring + ")";
 
 	cout << endl << endl;
 	cout << "******************************************************************" << endl;
