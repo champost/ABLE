@@ -1231,15 +1231,15 @@ void exploreProfiles (size_t &varIdx) {
 
 int main(int argc, char* argv[]) {
 
-	string version = "0.1.1 (Built on " + datestring + " at " + timestring + ")";
+	string version = "0.1.2 (Built on " + datestring + " at " + timestring + ")";
 
 	cout << endl << endl;
-	cout << "******************************************************************" << endl;
-	cout << "*  This is ABLE version " << version << ".  *" << endl;
-	cout << "*  ABLE is distributed under the CeCILL licence. See             *" << endl;
-	cout << "*  http://www.cecill.info/index.en.html for more information.    *" << endl;
-	cout << "*  © Champak Beeravolu Reddy 2015-now (champak.br@gmail.com)     *" << endl;
-	cout << "******************************************************************" << endl;
+	cout << "*******************************************************************" << endl;
+	cout << "*  This is ABLE version " << version << ". *" << endl;
+	cout << "*  ABLE is distributed under the CeCILL licence. See              *" << endl;
+	cout << "*  http://www.cecill.info/index.en.html for more information.     *" << endl;
+	cout << "*  © Champak Beeravolu Reddy 2015-now (champak.br@gmail.com)      *" << endl;
+	cout << "*******************************************************************" << endl;
 	cout << endl << endl;
 
 	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
