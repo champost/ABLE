@@ -465,6 +465,10 @@ segtre_mig(struct c_params *cp, int *pnsegs, int *crash_flag)
 
 		// based on Valgrind Memcheck (CBR 25.02.2016)
 		free(nnodes);
+
+		// based on Valgrind Memcheck (CBR 16.03.2018)
+		for (i = 0; i < nchrom; i++)
+			free(chrom[i].pseg);
 		free(chrom);
 
 		return (seglst);
