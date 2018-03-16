@@ -415,8 +415,7 @@ void calcBSFSTable() {
 #pragma omp parallel for shared(ms_crash_flag, crash_counter, sampledTrees)
 			for (int trees = 0; trees < sim_trees; trees++) {
 				if (!ms_crash_flag) {
-					double ***onetreePoisTable;
-					onetreePoisTable = d3matrix(poisTableSize,brClass, mutClass);
+					double ***onetreePoisTable = d3matrix(poisTableSize,brClass, mutClass);
 					// calling ms for sampling genealogies
 					if (main_ms_ABLE(ms_argc, ms_argv, onetreePoisTable)) {
 #pragma omp atomic
@@ -625,245 +624,247 @@ void evalBranchConfigs(vector<int> popsVec) {
 void readConfigFile() {
 
 	string line, del, keyWord;
-	vector<string> tokens;
 	ifstream ifs(configFile.c_str(),ios::in);
 	while (getline(ifs,line)) {
+		vector<string> tokens;
 		del = " ";
-		tokens.clear();
-		Tokenize(line, tokens, del);
-		for(unsigned int j=0;j<tokens.size();j++)
-			TrimSpaces(tokens[j]);
 
-		if ((tokens[0][0] != '#') && (line.size() > 0)) {
-			if (tokens[0] == "ABLE") {
-				cmdLineInConfigFile = true;
-				cmdLine = tokens;
-			}
-			else if (tokens[0] == "pops") {
-				stringstream stst1(tokens[1]);
-				stst1 >> npops;
-				for (int i = 0; i < npops; i++) {
-					stringstream stst2(tokens[i+2]);
-					if (stst2.str() != "u") {
-						int tmp;
-						stst2 >> tmp;
-						sampledPops.push_back(tmp);
-						allPops.push_back(1);
+		if (line.size() > 0) {
+			Tokenize(line, tokens, del);
+			for(unsigned int j=0;j<tokens.size();j++)
+				TrimSpaces(tokens[j]);
+
+			if (tokens[0][0] != '#') {
+				if (tokens[0] == "ABLE") {
+					cmdLineInConfigFile = true;
+					cmdLine = tokens;
+				}
+				else if (tokens[0] == "pops") {
+					stringstream stst1(tokens[1]);
+					stst1 >> npops;
+					for (int i = 0; i < npops; i++) {
+						stringstream stst2(tokens[i+2]);
+						if (stst2.str() != "u") {
+							int tmp;
+							stst2 >> tmp;
+							sampledPops.push_back(tmp);
+							allPops.push_back(1);
+						}
+						else
+							allPops.push_back(0);
+					}
+					sampledPopsSize = sampledPops.size();
+				}
+				else if (tokens[0] == "subsample_pops") {
+					stringstream stst1(tokens[1]);
+					stst1 >> nsubpops;
+					for (int i = 0; i < nsubpops; i++) {
+						stringstream stst2(tokens[i+2]);
+						if (stst2.str() != "u") {
+							int tmp;
+							stst2 >> tmp;
+							subSamplePops.push_back(tmp);
+						}
+					}
+				}
+				else if (tokens[0] == "ploidy") {
+					stringstream stst(tokens[1]);
+					stst >> ploidy;
+				}
+				else if (tokens[0] == "start") {
+					double val;
+					if (tokens[1] == "all") {
+						for(unsigned int j = 2; j < tokens.size(); j++) {
+							stringstream stst_val(tokens[j]);
+							stst_val >> val;
+							tbiUserVal[j-1] = val;
+						}
+					}
+					else if (tokens[1] == "random") {
+						startRandom = true;
+					}
+					else {
+						stringstream stst(tokens[2]);
+						stst >> val;
+						tbiUserVal[atoi(tokens[1].substr(3).c_str())] = val;
+					}
+				}
+				else if (tokens[0] == "datafile") {
+					mbSFSLen = 0;
+					for(unsigned int j = 1; j < tokens.size(); j++) {
+						dataFile.push_back(tokens[j]);
+						++mbSFSLen;
+					}
+				}
+				else if (tokens[0] == "scale") {
+					for(unsigned int j = 1; j < tokens.size(); j++) {
+						dataScales.push_back(atoi(tokens[j].c_str()));
+						uniqueScales.insert(atoi(tokens[j].c_str()));
+					}
+				}
+				else if (tokens[0] == "datafile_format") {
+					dataFileFormat = tokens[1];
+				}
+				else if (tokens[0] == "convert_data_to_bSFS") {
+					dataConvert = true;
+					data2bSFSFile = "data2bSFS.txt";
+					if (tokens.size() > 1)
+						data2bSFSFile = tokens[1];
+				}
+				else if (tokens[0] == "allele_type") {
+					alleleType = tokens[1];
+				}
+				//	this option has been deprecated
+				else if (tokens[0] == "estimate") {
+					stringstream stst(tokens[1]);
+					stst >> estimate;
+				}
+				else if (tokens[0] == "task") {
+					if (tokens[1] == "exact_bSFS")
+						estimate = 0;
+					else if (tokens[1] == "conditional_bSFS")
+						bSFSmode = true;
+					else if (tokens[1] == "infer")
+						estimate = 2;
+				}
+				else if (tokens[0] == "bSFS") {
+					if (tokens.size() > 1)
+						bSFSFile = tokens[1];
+				}
+				else if (tokens[0] == "kmax") {
+					stringstream stst(tokens[1]);
+					stst >> kmax;
+				}
+				else if (tokens[0] == "folded")
+					foldBrClass = 1;
+				else if (tokens[0] == "global_search")
+					globalSearchAlg = tokens[1];
+				else if (tokens[0] == "global_search_trees") {
+					stringstream stst(tokens[1]);
+					stst >> globalTrees;
+				}
+				else if (tokens[0] == "local_search_trees") {
+					stringstream stst(tokens[1]);
+					stst >> localTrees;
+				}
+				else if (tokens[0] == "global_search_evals") {
+					stringstream stst(tokens[1]);
+					stst >> globalEvals;
+				}
+				else if (tokens[0] == "local_search_evals") {
+					stringstream stst(tokens[1]);
+					stst >> localEvals;
+				}
+				else if (tokens[0] == "global_upper_bound") {
+					stringstream stst(tokens[1]);
+					stst >> globalUpper;
+				}
+				else if (tokens[0] == "global_lower_bound") {
+					stringstream stst(tokens[1]);
+					stst >> globalLower;
+				}
+				else if (tokens[0] == "skip_global_search") {
+					skipGlobalSearch = true;
+				}
+				else if (tokens[0] == "skip_local_search") {
+					skipLocalSearch = true;
+				}
+				else if (tokens[0] == "bounds") {
+					int paramID = atoi(tokens[1].substr(3).c_str());
+					for(unsigned int j = 2; j < tokens.size(); j++) {
+						double val;
+						stringstream stst(tokens[j]);
+						stst >> val;
+						tbiSearchBounds[paramID].push_back(val);
+					}
+				}
+				else if (tokens[0] == "constrain") {
+					int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
+					parConstraints[paramID1] = paramID2;
+				}
+				else if (tokens[0] == "retain_best_points") {
+					if (tokens.size() > 1) {
+						stringstream stst(tokens[1]);
+						stst >> bestParsMapSize;
 					}
 					else
-						allPops.push_back(0);
+						bestParsMapSize = 10;
 				}
-				sampledPopsSize = sampledPops.size();
-			}
-			else if (tokens[0] == "subsample_pops") {
-				stringstream stst1(tokens[1]);
-				stst1 >> nsubpops;
-				for (int i = 0; i < nsubpops; i++) {
-					stringstream stst2(tokens[i+2]);
-					if (stst2.str() != "u") {
-						int tmp;
-						stst2 >> tmp;
-						subSamplePops.push_back(tmp);
+				else if (tokens[0] == "global_search_iterations") {
+					if (tokens.size() > 1) {
+						stringstream stst(tokens[1]);
+						stst >> numGlobalSearches;
 					}
 				}
-			}
-			else if (tokens[0] == "ploidy") {
-				stringstream stst(tokens[1]);
-				stst >> ploidy;
-			}
-			else if (tokens[0] == "start") {
-				double val;
-				if (tokens[1] == "all") {
+				else if (tokens[0] == "global_bounds_refinement") {
+					if (tokens.size() > 1) {
+						if (tokens[1] == "progressive")
+							progressiveBounds = true;
+						else if (tokens[1] == "overall")
+							progressiveBounds = false;
+					}
+				}
+				else if (tokens[0] == "seed_PRNG") {
+					stringstream stst(tokens[1]);
+					stst >> seedPRNG;
+					seedPRNGBool = true;
+				}
+				else if (tokens[0] == "refine_likelihoods") {
+					if (tokens.size() > 1) {
+						stringstream stst(tokens[1]);
+						stst >> refineLikTrees;
+					}
+				}
+				else if (tokens[0] == "profile_likelihoods") {
+					bSFSmode = profileLikBool = true;
+					if (tokens.size() > 1) {
+						stringstream stst(tokens[1]);
+						stst >> profileLikTrees;
+					}
+				}
+				else if (tokens[0] == "report_likelihoods") {
+					stringstream stst(tokens[1]);
+					stst >> reportEveryEvals;
+				}
+				else if (tokens[0] == "start_likelihood") {
+					stringstream stst(tokens[1]);
+					stst >> userLnL;
+				}
+				else if (tokens[0] == "no_bSFS_file") {
+					nobSFSFile = true;
+				}
+				else if (tokens[0] == "print_correction_factor") {
+					printLikCorrFactor = true;
+				}
+				else if (tokens[0] == "set_ftol_abs") {
+					stringstream stst(tokens[1]);
+					stst >> localSearchAbsTol;
+				}
+				else if (tokens[0] == "set_threads") {
+					stringstream stst(tokens[1]);
+					stst >> set_threads;
+				}
+				else if (tokens[0] == "profile") {
+					int paramID = atoi(tokens[1].substr(3).c_str());
 					for(unsigned int j = 2; j < tokens.size(); j++) {
-						stringstream stst_val(tokens[j]);
-						stst_val >> val;
-						tbiUserVal[j-1] = val;
+						double val;
+						stringstream stst(tokens[j]);
+						stst >> val;
+						tbiProfilesGrid[paramID].push_back(val);
 					}
 				}
-				else if (tokens[1] == "random") {
-					startRandom = true;
+				else if (tokens[0] == "output_precision") {
+					stringstream stst(tokens[1]);
+					stst >> outputDigits;
+				}
+				else if (tokens[0] == "no_SNP_file") {
+					outputSNPfile = false;
 				}
 				else {
-					stringstream stst(tokens[2]);
-					stst >> val;
-					tbiUserVal[atoi(tokens[1].substr(3).c_str())] = val;
+					cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
+					cerr << "Aborting ABLE..." << endl;
+					exit(-1);
 				}
-			}
-			else if (tokens[0] == "datafile") {
-				mbSFSLen = 0;
-				for(unsigned int j = 1; j < tokens.size(); j++) {
-					dataFile.push_back(tokens[j]);
-					++mbSFSLen;
-				}
-			}
-			else if (tokens[0] == "scale") {
-				for(unsigned int j = 1; j < tokens.size(); j++) {
-					dataScales.push_back(atoi(tokens[j].c_str()));
-					uniqueScales.insert(atoi(tokens[j].c_str()));
-				}
-			}
-			else if (tokens[0] == "datafile_format") {
-				dataFileFormat = tokens[1];
-			}
-			else if (tokens[0] == "convert_data_to_bSFS") {
-				dataConvert = true;
-				data2bSFSFile = "data2bSFS.txt";
-				if (tokens.size() > 1)
-					data2bSFSFile = tokens[1];
-			}
-			else if (tokens[0] == "allele_type") {
-				alleleType = tokens[1];
-			}
-			//	this option has been deprecated
-			else if (tokens[0] == "estimate") {
-				stringstream stst(tokens[1]);
-				stst >> estimate;
-			}
-			else if (tokens[0] == "task") {
-				if (tokens[1] == "exact_bSFS")
-					estimate = 0;
-				else if (tokens[1] == "conditional_bSFS")
-					bSFSmode = true;
-				else if (tokens[1] == "infer")
-					estimate = 2;
-			}
-			else if (tokens[0] == "bSFS") {
-				if (tokens.size() > 1)
-					bSFSFile = tokens[1];
-			}
-			else if (tokens[0] == "kmax") {
-				stringstream stst(tokens[1]);
-				stst >> kmax;
-			}
-			else if (tokens[0] == "folded")
-				foldBrClass = 1;
-			else if (tokens[0] == "global_search")
-				globalSearchAlg = tokens[1];
-			else if (tokens[0] == "global_search_trees") {
-				stringstream stst(tokens[1]);
-				stst >> globalTrees;
-			}
-			else if (tokens[0] == "local_search_trees") {
-				stringstream stst(tokens[1]);
-				stst >> localTrees;
-			}
-			else if (tokens[0] == "global_search_evals") {
-				stringstream stst(tokens[1]);
-				stst >> globalEvals;
-			}
-			else if (tokens[0] == "local_search_evals") {
-				stringstream stst(tokens[1]);
-				stst >> localEvals;
-			}
-			else if (tokens[0] == "global_upper_bound") {
-				stringstream stst(tokens[1]);
-				stst >> globalUpper;
-			}
-			else if (tokens[0] == "global_lower_bound") {
-				stringstream stst(tokens[1]);
-				stst >> globalLower;
-			}
-			else if (tokens[0] == "skip_global_search") {
-				skipGlobalSearch = true;
-			}
-			else if (tokens[0] == "skip_local_search") {
-				skipLocalSearch = true;
-			}
-			else if (tokens[0] == "bounds") {
-				int paramID = atoi(tokens[1].substr(3).c_str());
-				for(unsigned int j = 2; j < tokens.size(); j++) {
-					double val;
-					stringstream stst(tokens[j]);
-					stst >> val;
-					tbiSearchBounds[paramID].push_back(val);
-				}
-			}
-			else if (tokens[0] == "constrain") {
-				int paramID1 = atoi(tokens[1].substr(3).c_str()), paramID2 = atoi(tokens[2].substr(3).c_str());
-				parConstraints[paramID1] = paramID2;
-			}
-			else if (tokens[0] == "retain_best_points") {
-				if (tokens.size() > 1) {
-					stringstream stst(tokens[1]);
-					stst >> bestParsMapSize;
-				}
-				else
-					bestParsMapSize = 10;
-			}
-			else if (tokens[0] == "global_search_iterations") {
-				if (tokens.size() > 1) {
-					stringstream stst(tokens[1]);
-					stst >> numGlobalSearches;
-				}
-			}
-			else if (tokens[0] == "global_bounds_refinement") {
-				if (tokens.size() > 1) {
-					if (tokens[1] == "progressive")
-						progressiveBounds = true;
-					else if (tokens[1] == "overall")
-						progressiveBounds = false;
-				}
-			}
-			else if (tokens[0] == "seed_PRNG") {
-				stringstream stst(tokens[1]);
-				stst >> seedPRNG;
-				seedPRNGBool = true;
-			}
-			else if (tokens[0] == "refine_likelihoods") {
-				if (tokens.size() > 1) {
-					stringstream stst(tokens[1]);
-					stst >> refineLikTrees;
-				}
-			}
-			else if (tokens[0] == "profile_likelihoods") {
-				bSFSmode = profileLikBool = true;
-				if (tokens.size() > 1) {
-					stringstream stst(tokens[1]);
-					stst >> profileLikTrees;
-				}
-			}
-			else if (tokens[0] == "report_likelihoods") {
-				stringstream stst(tokens[1]);
-				stst >> reportEveryEvals;
-			}
-			else if (tokens[0] == "start_likelihood") {
-				stringstream stst(tokens[1]);
-				stst >> userLnL;
-			}
-			else if (tokens[0] == "no_bSFS_file") {
-				nobSFSFile = true;
-			}
-			else if (tokens[0] == "print_correction_factor") {
-				printLikCorrFactor = true;
-			}
-			else if (tokens[0] == "set_ftol_abs") {
-				stringstream stst(tokens[1]);
-				stst >> localSearchAbsTol;
-			}
-			else if (tokens[0] == "set_threads") {
-				stringstream stst(tokens[1]);
-				stst >> set_threads;
-			}
-			else if (tokens[0] == "profile") {
-				int paramID = atoi(tokens[1].substr(3).c_str());
-				for(unsigned int j = 2; j < tokens.size(); j++) {
-					double val;
-					stringstream stst(tokens[j]);
-					stst >> val;
-					tbiProfilesGrid[paramID].push_back(val);
-				}
-			}
-			else if (tokens[0] == "output_precision") {
-				stringstream stst(tokens[1]);
-				stst >> outputDigits;
-			}
-			else if (tokens[0] == "no_SNP_file") {
-				outputSNPfile = false;
-			}
-			else {
-				cerr << "Unrecognised keyword \"" << tokens[0] << "\" found in the config file!" << endl;
-				cerr << "Aborting ABLE..." << endl;
-				exit(-1);
 			}
 		}
 	}
@@ -1230,15 +1231,15 @@ void exploreProfiles (size_t &varIdx) {
 
 int main(int argc, char* argv[]) {
 
-	string version = "0.1.1 (Built on " + datestring + " at " + timestring + ")";
+	string version = "0.1.2 (Built on " + datestring + " at " + timestring + ")";
 
 	cout << endl << endl;
-	cout << "******************************************************************" << endl;
-	cout << "*  This is ABLE version " << version << ".  *" << endl;
-	cout << "*  ABLE is distributed under the CeCILL licence. See             *" << endl;
-	cout << "*  http://www.cecill.info/index.en.html for more information.    *" << endl;
-	cout << "*  © Champak Beeravolu Reddy 2015-now (champak.br@gmail.com)     *" << endl;
-	cout << "******************************************************************" << endl;
+	cout << "*******************************************************************" << endl;
+	cout << "*  This is ABLE version " << version << ". *" << endl;
+	cout << "*  ABLE is distributed under the CeCILL licence. See              *" << endl;
+	cout << "*  http://www.cecill.info/index.en.html for more information.     *" << endl;
+	cout << "*  © Champak Beeravolu Reddy 2015-now (champak.br@gmail.com)      *" << endl;
+	cout << "*******************************************************************" << endl;
 	cout << endl << endl;
 
 	PRNG = gsl_rng_alloc(gsl_rng_mt19937);
@@ -1387,7 +1388,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		//	Specifying the the Augmented Lagrangian algorithm (http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Augmented_Lagrangian_algorithm)
-		void* data;
+		void* data = NULL;
 		AUGLAG = nlopt::opt(nlopt::AUGLAG, tbiMsCmdIdx.size());
 		AUGLAG.set_lower_bounds(lowerBounds);
 		AUGLAG.set_upper_bounds(upperBounds);
