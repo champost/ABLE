@@ -1,0 +1,8 @@
+pops 2 4 2
+subsample_pops 2 2 2
+ploidy 2
+datafile Orangutan_500bp_blocks_without_KB9258.txt
+datafile_format pseudo_MS
+allele_type genotype
+convert_data_to_bSFS Orangutan_500bp_blocks_folded_cbSFS_without_KB9258.txt 
+folded
