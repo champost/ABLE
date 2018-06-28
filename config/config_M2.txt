@@ -1,0 +1,23 @@
+pops 2 4 4
+task infer
+folded
+datafile Orangutan_2kb_blocks_folded_bSFS.txt
+seed_PRNG 48467692
+
+global_search CRS
+
+global_search_trees 50000
+local_search_trees 50000
+
+report_likelihoods 1000
+refine_likelihoods 1000000
+
+global_upper_bound 15
+global_lower_bound 1e-2
+bounds tbi1 1e-1 4
+bounds tbi2 1e-1 4
+bounds tbi3 1e-3 5
+bounds tbi4 1e-3 5
+bounds tbi5 1e-3 5
+
+global_search_evals 7500

@@ -4,16 +4,28 @@ This folder contains the Orangutan data used in the draft illustrating the perfo
 
 - KB5405 (B, male, SRS009466), 
 - KB4204 (B, male, SRS009464), 
-- KB9258 (S, male, SRS009469) and
+- KB9258 (S, female, SRS009469) and
 - KB4361 (S, female, SRS009471).
 
-### `pseudo_MS` format
+#### `pseudo_MS` format
 
 - `Orangutan_500bp_blocks.txt`
 - `Orangutan_2kb_blocks.txt`
 
+#### `bSFS` format
 
-### `bSFS` format
-
-- `Orangutan_2kb_blocks_folded_bSFS.txt`
 - `Orangutan_500bp_blocks_folded_bSFS.txt`
+- `Orangutan_2kb_blocks_folded_bSFS.txt`
+
+### The files listed below exclude the only individual from Batang Toru (Sumatra) which has been identified as part of the new species _Pongo tapanuliensis_.
+#### `pseudo_MS` format excluding KB9258
+
+- `Orangutan_500bp_blocks_without_KB9258.txt`
+- `Orangutan_2kb_blocks_without_KB9258.txt`
+
+#### `cbSFS` format excluding KB9258
+
+- `Orangutan_500bp_blocks_folded_cbSFS_without_KB9258.txt`
+- `Orangutan_2kb_blocks_folded_cbSFS_without_KB9258.txt`
+
+
