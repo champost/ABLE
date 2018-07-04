@@ -1,0 +1,6 @@
+pops 2 4 4
+datafile Orangutan_500bp_blocks.txt
+datafile_format pseudo_MS
+allele_type genotype
+folded
+convert_data_to_bSFS Orangutan_500bp_blocks_folded_bSFS.txt  

@@ -38,7 +38,15 @@ Here we are assuming 2 diploid samples/population (which is also applicable to 4
 ./ABLE 8 xxx -t tbi1 -r tbi2 2001 -I 2 4 4 -n 1 tbi4 -n 2 tbi5 -es tbi8 1 tbi6 -ej tbi8 3 2 -es tbi8 2 tbi7 -ej tbi8 4 1 -ej tbi3 1 2 -T config_M6.txt
 ```
 
-### Converting files from `pseudo_MS` format to the `cbSFS`
+### Converting files from `pseudo_MS` format to the `bSFS`
+The following command lines along with the provided config files can be used to produce the `bSFS` input used in the paper (which is also available in the `data` folder).
+
+```
+./ABLE config_bSFS_Pongo_500bp.txt
+./ABLE config_bSFS_Pongo_2kb.txt
+```
+
+### Converting files from `pseudo_MS` format to the `cbSFS` (composite `bSFS`)
 The following command lines along with the provided config files can be used to produce the `cbSFS` input used in the paper (which is also available in the `data` folder).
 
 ```
